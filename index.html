@@ -164,6 +164,11 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .urow.head{font-size:.76rem;font-weight:700;color:var(--ink-2);border-top:0}
 .urow .nm{font-weight:600;overflow-wrap:anywhere}
 .urow.off{opacity:.55}
+.trow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
+.trow.off input{opacity:.55}
+.tbtns{display:flex;gap:6px}
+.inline-add select{flex:1 1 10rem}
+@media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
 .crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .crow.off input{opacity:.55}
 .inline-add{display:flex;gap:8px;flex-wrap:wrap}
@@ -257,7 +262,7 @@ const isConfigured=!/DÁN/.test(firebaseConfig.apiKey||'DÁN');
 let auth=null,db=null;
 
 /* ===== Trạng thái ===== */
-const S={user:null,profile:null,users:[],systems:[],types:[],settings:{},tasks:[],notes:[],
+const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
   editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
@@ -381,13 +386,17 @@ async function boot(){
   }));
   unsubs.push(listen(collection(db,'systems'),snap=>{
     S.systems=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
-    renderQuickSelects();renderReport();renderCatalog('systems');
+    renderQuickSelects();renderReport();renderCatalog('systems');renderTplAdmin();
   }));
   unsubs.push(listen(collection(db,'types'),snap=>{
     S.types=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
-    renderQuickSelects();renderReport();renderCatalog('types');
+    renderQuickSelects();renderReport();renderCatalog('types');renderTplAdmin();
   }));
   unsubs.push(listen(doc(db,'settings','app'),snap=>{S.settings=snap.exists()?snap.data():{};renderSettings();applyWeekSetting()}));
+  unsubs.push(listen(doc(db,'settings','templates'),snap=>{
+    const it=snap.exists()?snap.data().items:[];S.tpls=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
+    renderQuickSelects();renderTplAdmin();
+  }));
   subWeek();
   renderQuickSelects();renderWho();renderReport();renderNotes();
   if(isAdmin)ensureDefaults();
@@ -454,7 +463,8 @@ function buildShell(){
   +'<label class="field"><span>Loại việc</span><select id="q-type"></select></label>'
   +'<label class="field"><span>Trạng thái</span><select id="q-status">'+STATUS.map(s=>'<option value="'+s.id+'">'+s.label+'</option>').join('')+'</select></label>'
   +'<label class="field"><span>Số lượng (không bắt buộc)</span><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Ví dụ: 25"></label>'
-  +'<label class="field wide"><span>Đầu việc</span><input id="q-title" maxlength="300" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
+  +'<label class="field wide" id="q-tplf" hidden><span>Chọn việc có sẵn</span><select id="q-tpl"></select></label>'
+  +'<label class="field wide" id="q-titlef"><span>Đầu việc</span><input id="q-title" maxlength="300" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
   +'<details class="more" id="q-more"><summary>Thêm kết quả, mã phiếu, ghi chú</summary><div class="grid">'
   +'<label class="field"><span>Kết quả / số liệu</span><input id="q-result" maxlength="400" autocomplete="off" placeholder="Ví dụ: 12/12 phiếu đã đóng"></label>'
   +'<label class="field"><span>Mã phiếu / yêu cầu</span><input id="q-ticket" maxlength="120" autocomplete="off" placeholder="Ví dụ: INC-2026-0001"></label>'
@@ -482,6 +492,7 @@ function buildAdmin(){
   +'<button type="button" data-act="adm" data-t="users" aria-pressed="true">Người dùng</button>'
   +'<button type="button" data-act="adm" data-t="systems" aria-pressed="false">Hệ thống</button>'
   +'<button type="button" data-act="adm" data-t="types" aria-pressed="false">Loại việc</button>'
+  +'<button type="button" data-act="adm" data-t="tpls" aria-pressed="false">Việc mẫu</button>'
   +'<button type="button" data-act="adm" data-t="settings" aria-pressed="false">Cài đặt</button></div>'
 
   +'<div id="adm-users" class="app">'
@@ -502,6 +513,13 @@ function buildAdmin(){
   +'<div id="adm-types" class="app" hidden><section class="panel"><h2>Loại việc</h2>'
   +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="80" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
   +'<div class="tbl" id="cat-types"></div></section></div>'
+
+  +'<div id="adm-tpls" class="app" hidden><section class="panel"><h2>Việc mẫu</h2>'
+  +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
+  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="300" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
+  +'<div class="actions"><button type="button" class="btn" data-act="tpl-import">Lấy từ các việc đã nhập</button><span class="msg" id="tpl-msg" role="status"></span></div>'
+  +'<div class="tbl" id="tpl-list"></div>'
+  +'<p class="muted">Hệ thống và loại việc là tùy chọn. Nếu gắn, khi người dùng chọn việc mẫu thì hệ thống và loại việc được chọn sẵn. Việc bị ẩn không hiện cho người dùng, báo cáo cũ vẫn giữ nguyên.</p></section></div>'
 
   +'<div id="adm-settings" class="app" hidden><section class="panel"><h2>Cài đặt</h2>'
   +'<label class="check"><input type="checkbox" id="allow-signup"><span>Cho phép người dùng tự tạo tài khoản<br><small class="muted">Người dùng nhập họ tên, đơn vị, tên đăng nhập và mật khẩu ngay ở màn hình đăng nhập. Tài khoản tự tạo luôn có quyền Người dùng.</small></span></label>'
@@ -555,7 +573,14 @@ function renderQuickSelects(){
   fill('q-system',act(S.systems),S.qSystem||$('q-system').value);
   fill('q-type',act(S.types),S.qType||$('q-type').value);
   $('q-status').value=S.qStatus;
+  const tl=act(S.tpls),sel=$('q-tpl');
+  $('q-tplf').hidden=!tl.length;
+  sel.innerHTML='<option value="">Việc khác (nhập tên mới)</option>'+tl.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+(x.system?' · '+esc(sysName(x.system)):'')+'</option>').join('');
+  if(!tl.some(x=>x.id===S.qTpl))S.qTpl='';
+  sel.value=S.qTpl;applyTplMode();
 }
+const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
+function applyTplMode(){const f=$('q-titlef');if(f)f.hidden=!!curTpl()}
 function pill(t,canEdit){
   return '<label class="pillwrap s-'+(ST[t.status]?t.status:'wait')+'"><select data-status="'+esc(t.id)+'" aria-label="Trạng thái: '+esc(t.title)+'"'+(canEdit?'':' disabled')+'>'
     +STATUS.map(s=>'<option value="'+s.id+'"'+(s.id===t.status?' selected':'')+'>'+s.label+'</option>').join('')+'</select></label>';
@@ -659,6 +684,7 @@ function resetQuick(keep){
 function startEdit(t){
   S.editing=t;
   S.qDate=t.date;S.qSystem=t.system;S.qType=t.type;
+  const mt=S.tpls.find(x=>x.active!==false&&x.name===t.title);S.qTpl=mt?mt.id:'';
   renderQuickSelects();
   $('q-date').value=t.date;
   // hệ thống đã ẩn vẫn phải chọn được khi sửa
@@ -674,7 +700,7 @@ function startEdit(t){
   $('quick').scrollIntoView({block:'center'});$('q-title').focus();
 }
 async function submitQuick(){
-  const title=$('q-title').value.trim(),msg=$('q-msg');
+  const tp=curTpl(),title=tp?tp.name:$('q-title').value.trim(),msg=$('q-msg');
   if(!title){msg.className='msg';msg.textContent='Hãy nhập đầu việc.';$('q-title').focus();return}
   if(!$('q-system').value||!$('q-type').value){msg.className='msg';msg.textContent='Chưa có hệ thống hoặc loại việc. Hãy nhờ quản trị viên thêm.';return}
   const qv=$('q-qty').value.trim();let qty=null;
@@ -690,7 +716,7 @@ async function submitQuick(){
     const wasEdit=!!S.editing;
     resetQuick(true);renderQuickSelects();
     msg.className='msg ok';msg.textContent=wasEdit?'Đã lưu thay đổi.':'Đã thêm. Nhập việc tiếp theo.';
-    $('q-title').focus();
+    (S.qTpl?$('q-qty'):$('q-title')).focus();
   }catch(e){msg.className='msg';msg.textContent=fsMsg(e)}
   $('q-save').disabled=false;
 }
@@ -1005,6 +1031,22 @@ function renderCatalog(kind){
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button></div>').join('')
     ||'<p class="muted">Chưa có mục nào.</p>';
 }
+async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
+function renderTplAdmin(){
+  const sf=$('t-system'),tf=$('t-type'),ls=$('tpl-list');if(!sf||!tf||!ls)return;
+  const opt=(list,first,cur)=>'<option value="">'+first+'</option>'+list.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name)+(x.active===false?' (đã ẩn)':'')+'</option>').join('');
+  const vs=sf.value,vt=tf.value,on=l=>l.filter(x=>x.active!==false);
+  sf.innerHTML=opt(on(S.systems),'— Không gắn hệ thống —',vs);tf.innerHTML=opt(on(S.types),'— Không gắn loại việc —',vt);
+  ls.innerHTML=S.tpls.map((x,i)=>'<div class="trow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
+    +'<input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên đầu việc">'
+    +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống">'+opt(S.systems,'— Tất cả hệ thống —',x.system)+'</select>'
+    +'<select data-tpltype="'+esc(x.id)+'" aria-label="Loại việc">'+opt(S.types,'— Không gắn loại việc —',x.type)+'</select>'
+    +'<span class="tbtns"><button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
+    +'<button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="1"'+(i===S.tpls.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
+    +'<button type="button" class="btn sm" data-act="tpl-toggle" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
+    +'<button type="button" class="btn sm" data-act="tpl-del" data-id="'+esc(x.id)+'">Xóa</button></span></div>').join('')
+    ||'<p class="muted">Chưa có việc mẫu nào. Hãy thêm ở ô phía trên.</p>';
+}
 function applyWeekSetting(){
   const w=Number.isInteger(S.settings.weekStart)&&S.settings.weekStart>=0&&S.settings.weekStart<=6?S.settings.weekStart:1;
   if(w===WK)return;
@@ -1056,7 +1098,7 @@ root.addEventListener('click',async e=>{
     if(act==='adm'){
       S.admTab=b.dataset.t;
       document.querySelectorAll('[data-act="adm"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.admTab)));
-      ['users','systems','types','settings'].forEach(k=>{const p=$('adm-'+k);if(p)p.hidden=k!==S.admTab});return;
+      ['users','systems','types','tpls','settings'].forEach(k=>{const p=$('adm-'+k);if(p)p.hidden=k!==S.admTab});return;
     }
     if(act==='me'){
       const p=$('me-panel');p.hidden=!p.hidden;
@@ -1100,6 +1142,27 @@ root.addEventListener('click',async e=>{
       const x=S[b.dataset.k].find(i=>i.id===b.dataset.id);if(!x)return;
       await updateDoc(doc(db,b.dataset.k,x.id),{active:x.active===false});return;
     }
+    if(act==='tpl-move'){
+      const l=S.tpls.slice(),i=l.findIndex(x=>x.id===b.dataset.id),j=i+Number(b.dataset.d);
+      if(i<0||j<0||j>=l.length)return;const t=l[i];l[i]=l[j];l[j]=t;await saveTpls(l);return;
+    }
+    if(act==='tpl-toggle'){await saveTpls(S.tpls.map(x=>x.id===b.dataset.id?Object.assign({},x,{active:x.active===false}):x));return}
+    if(act==='tpl-del'){
+      if(b.dataset.armed){await saveTpls(S.tpls.filter(x=>x.id!==b.dataset.id))}
+      else{b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');
+        setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},3000)}
+      return;
+    }
+    if(act==='tpl-import'){
+      const m=$('tpl-msg'),have=new Set(S.tpls.map(x=>x.name.trim().toLowerCase())),add=[],seen=new Set();
+      S.tasks.concat(S.mTasks).slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).forEach(t=>{
+        const n=String(t.title||'').trim().replace(/\s+/g,' '),k=n.toLowerCase();
+        if(!n||have.has(k)||seen.has(k))return;seen.add(k);
+        add.push({id:newId()+add.length,name:n,system:t.system||'',type:t.type||'',active:true});
+      });
+      if(!add.length){m.className='msg';m.textContent='Không có đầu việc mới để lấy (dựa trên các việc của tuần và tháng đang xem).';return}
+      await saveTpls(S.tpls.concat(add));m.className='msg ok';m.textContent='Đã thêm '+add.length+' việc mẫu. Bạn có thể sửa tên, hệ thống, loại việc hoặc ẩn bớt.';return;
+    }
     if(act==='cat-move'){await moveCatalog(b.dataset.k,b.dataset.id,Number(b.dataset.d));return}
   }catch(err){flash(fsMsg(err))}
 });
@@ -1119,6 +1182,20 @@ root.addEventListener('change',async e=>{
     if(t.matches&&t.matches('input[data-catname]')){
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
+    }
+    if(t.id==='q-tpl'){
+      S.qTpl=t.value;const tp=curTpl();
+      if(tp){
+        if(tp.system&&[...$('q-system').options].some(o=>o.value===tp.system)){$('q-system').value=tp.system;S.qSystem=tp.system}
+        if(tp.type&&[...$('q-type').options].some(o=>o.value===tp.type)){$('q-type').value=tp.type;S.qType=tp.type}
+      }
+      applyTplMode();if(!tp)$('q-title').focus();return;
+    }
+    if(t.matches&&t.matches('input[data-tplname],select[data-tplsys],select[data-tpltype]')){
+      const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype,patch={};
+      if(t.dataset.tplname){const n=t.value.trim();if(!n){renderTplAdmin();return}patch.name=n}
+      else if(t.dataset.tplsys!==undefined)patch.system=t.value;else patch.type=t.value;
+      try{await saveTpls(S.tpls.map(x=>x.id===id?Object.assign({},x,patch):x))}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
     }
     if(t.id==='week-start'){
       const m=$('set-msg'),v=parseInt(t.value,10);
@@ -1177,6 +1254,13 @@ root.addEventListener('submit',async e=>{
     m.textContent='Đang tạo…';
     try{await createUserAsAdmin(name,user,pass,unit,role);$('f-adduser').reset();m.className='msg ok';m.textContent='Đã tạo tài khoản "'+user+'". Hãy gửi tên đăng nhập và mật khẩu cho người dùng.'}
     catch(err){m.className='msg';m.textContent=authMsg(err)}
+    return;
+  }
+  if(id==='f-addtpl'){
+    const n=$('t-name').value.trim().replace(/\s+/g,' ');if(!n)return;
+    if(S.tpls.some(x=>x.name.trim().toLowerCase()===n.toLowerCase())){flash('Việc mẫu này đã có trong danh sách.');return}
+    try{await saveTpls(S.tpls.concat({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,active:true}));$('t-name').value='';$('t-name').focus()}
+    catch(err){flash(fsMsg(err))}
     return;
   }
   if(e.target.dataset&&e.target.dataset.add){
