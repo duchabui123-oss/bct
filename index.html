@@ -168,6 +168,12 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .trow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .trow.off input{opacity:.55}
 .tbtns{display:flex;gap:6px}
+.qf{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start;margin-bottom:12px}
+.qf details{flex:1 1 20rem;min-width:0}
+.qf summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.qf-list{max-height:16rem;overflow:auto;display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.qf-item{display:flex;gap:8px;align-items:flex-start;font-size:.88rem;min-width:0}
+.qf-item input{width:auto;padding:0;margin-top:.25rem;flex:none}
 .tgroup{margin:.9rem 0 .2rem;font-size:.78rem;font-weight:700;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase}
 .inline-add select{flex:1 1 10rem}
 @media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
@@ -264,7 +270,7 @@ const isConfigured=!/DÁN/.test(firebaseConfig.apiKey||'DÁN');
 let auth=null,db=null;
 
 /* ===== Trạng thái ===== */
-const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',settings:{},tasks:[],notes:[],
+const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:'',qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
   editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
@@ -864,10 +870,17 @@ function renderStats(){
     +'<ul class="legend">'+STATUS.map(s=>'<li><span class="dot b-'+s.id+'"></span>'+s.label+' <span class="mono">'+c[s.id]+'</span></li>').join('')+'</ul></section>';
   h+='<section class="panel"><h2>Theo hệ thống</h2>'+statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'))+'</section>';
   h+='<section class="panel"><h2>Theo loại việc</h2>'+statTable('Loại việc',groupRows(list,'type',S.types,'Khác'))+'</section>';
-  const qg=qtyGroups(list);
-  if(qg.length)h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="tscroll"><div class="stbl"><div class="srow head qrow"><span>Đầu việc</span><span>Số lần</span><span>Tổng số lượng</span></div>'
-    +qg.map(g=>'<div class="srow qrow"><span class="nm">'+esc(g.name)+'</span><span class="mono">'+g.n+'</span><span class="mono"><b>'+fmtQ(g.sum)+'</b></span></div>').join('')
-    +'</div></div><p class="muted">Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p></section>';
+  const qv=qtyView(list,true);
+  const checked=c=>qv.isDefault?c.hasSum:qv.sel.has(c.key);
+  h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="qf">'
+    +'<label class="who">Hệ thống <select id="qf-system"><option value="">Tất cả hệ thống</option>'+S.systems.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===S.qfSys?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select></label>'
+    +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc có số lượng':qv.sel.size+' đã chọn')+')</summary>'
+    +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qf-default">Mặc định</button><button type="button" class="btn sm" data-act="qf-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="qf-none">Bỏ chọn tất cả</button></div>'
+    +'<div class="qf-list">'+(qv.catalog.map(c=>'<label class="qf-item"><input type="checkbox" data-qfk="'+esc(c.key)+'"'+(checked(c)?' checked':'')+'><span>'+esc(c.name)+' <span class="muted">('+c.n+' lần)</span></span></label>').join('')||'<span class="muted">Chưa có đầu việc nào.</span>')+'</div></details></div>'
+    +(qv.rows.length?'<div class="tscroll"><div class="stbl"><div class="srow head qrow"><span>Đầu việc</span><span>Số lần</span><span>Tổng số lượng</span></div>'
+      +qv.rows.map(c=>{const q=qtyCells(c);return '<div class="srow qrow"><span class="nm">'+esc(q[0])+'</span><span class="mono">'+q[1]+'</span><span class="mono"><b>'+(q[2]===''?'':fmtQ(q[2]))+'</b></span></div>'}).join('')
+      +'</div></div>':'<p class="muted">'+(qv.isDefault?'Chưa có việc nào ghi số lượng. Hãy mở "Chọn đầu việc" để chọn các đầu việc muốn xem.':'Chưa chọn đầu việc nào.')+'</p>')
+    +'<p class="muted">Mặc định hiện các đầu việc có ghi số lượng. Đầu việc được chọn mà chưa có số liệu thì để trống. Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p></section>';
   h+='<section class="panel"><h2>Theo ngày</h2>'+dayChart(list)+'</section>';
   if(S.mWho==='all')h+='<section class="panel"><h2>Theo người</h2>'+statTable('Người báo cáo',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'))+'</section>';
   $('stats-body').innerHTML=h;
@@ -886,8 +899,8 @@ function statsText(){
   };
   sect('THEO HỆ THỐNG',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'));
   sect('THEO LOẠI VIỆC',groupRows(list,'type',S.types,'Khác'));
-  const qg=qtyGroups(list);
-  if(qg.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC');qg.forEach(g=>L.push('- '+g.name+': '+fmtQ(g.sum)+' ('+g.n+' lần ghi nhận)'));L.push('')}
+  const qv=qtyView(list,true);
+  if(qv.rows.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC'+(qv.sys?' – '+sysName(qv.sys):''));qv.rows.forEach(c=>L.push('- '+c.name+': '+(c.hasSum?fmtQ(c.sum):'(trống)')+(c.n?' ('+c.n+' lần ghi nhận)':'')));L.push('')}
   if(S.mWho==='all')sect('THEO NGƯỜI',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'));
   return L.join('\n').replace(/\n+$/,'');
 }
@@ -968,11 +981,22 @@ function exportCtx(kind){
 }
 const hasQty=t=>typeof t.qty==='number'&&isFinite(t.qty);
 const fmtQ=n=>String(Math.round(n*1000)/1000).replace('.',',');
-function qtyGroups(list){
-  const m=new Map();
-  list.forEach(t=>{if(!hasQty(t))return;const k=String(t.title||'').trim().replace(/\s+/g,' ').toLowerCase();let g=m.get(k);if(!g){g={name:String(t.title||'').trim(),n:0,sum:0};m.set(k,g)}g.n++;g.sum+=t.qty});
-  return [...m.values()].sort((a,b)=>b.sum-a.sum);
+const titleKey=t=>String(t||'').trim().replace(/\s+/g,' ').toLowerCase();
+/* Số lượng theo đầu việc: lọc theo hệ thống, chọn đầu việc. useFilter=false thì dùng chế độ mặc định (các việc có số lượng) */
+function qtyView(list,useFilter){
+  const sys=useFilter?S.qfSys:'',sel=useFilter?S.qfSel:null;
+  const data=sys?list.filter(t=>t.system===sys):list;
+  const cat=new Map();
+  const add=(name,isTpl)=>{const k=titleKey(name);if(k&&!cat.has(k))cat.set(k,{key:k,name:String(name).trim().replace(/\s+/g,' '),n:0,sum:0,hasSum:false})};
+  S.tpls.filter(x=>x.active!==false&&(!sys||!x.system||x.system===sys)).forEach(x=>add(x.name));
+  const extra=[];data.forEach(t=>{const k=titleKey(t.title);if(k&&!cat.has(k)){add(t.title);extra.push(k)}});
+  data.forEach(t=>{const c=cat.get(titleKey(t.title));if(!c)return;c.n++;if(hasQty(t)){c.sum+=t.qty;c.hasSum=true}});
+  const tplKeys=[...cat.keys()].filter(k=>extra.indexOf(k)<0),ex=extra.sort((a,b)=>cat.get(a).name.localeCompare(cat.get(b).name,'vi'));
+  const catalog=tplKeys.concat(ex).map(k=>cat.get(k));
+  const rows=sel===null?catalog.filter(c=>c.hasSum).sort((a,b)=>b.sum-a.sum):catalog.filter(c=>sel.has(c.key));
+  return {catalog:catalog,rows:rows,isDefault:sel===null,sys:sys,sel:sel};
 }
+const qtyCells=c=>[c.name,c.n?c.n:'',c.hasSum?Math.round(c.sum*1000)/1000:''];
 const dmy=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]+'/'+p[0]};
 const wdName=s=>DAYS[(parse(s).getDay()+6)%7];
 const stLabel=id=>ST[id]?ST[id].label:'Chờ';
@@ -1002,8 +1026,8 @@ function buildXlsx(x){
   const tt=taskTableRows(x.list,x.all);
   sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,40,13,14,30,22]});
   statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
-  const qg=qtyGroups(x.list);
-  if(qg.length)sheets.push({name:'Số lượng theo đầu việc',rows:[['Đầu việc','Số lần ghi nhận','Tổng số lượng']].concat(qg.map(g=>[g.name,g.n,Math.round(g.sum*1000)/1000])),headRows:[0],freeze:1,widths:[56,16,16]});
+  const qv=qtyView(x.list,x.kind==='month');
+  if(qv.rows.length||!qv.isDefault)sheets.push({name:'Số lượng theo đầu việc',rows:[['Hệ thống',qv.sys?sysName(qv.sys):'Tất cả hệ thống'],[],['Đầu việc','Số lần ghi nhận','Tổng số lượng']].concat(qv.rows.map(qtyCells)),headRows:[2],freeze:3,widths:[56,16,16]});
   if(x.kind==='week'){
     const nr=[['Người báo cáo','Kết quả nổi bật','Tồn đọng, rủi ro, cần hỗ trợ','Kế hoạch tuần sau']];
     noteIds(x).forEach(uid=>{const d=noteOf(uid);if(d.highlights||d.issues||d.plan)nr.push([userName(uid),d.highlights||'',d.issues||'',d.plan||''])});
@@ -1017,8 +1041,8 @@ function buildPrintHtml(x){
   let h='<h1>'+esc(x.title)+'</h1><p class="meta">'+esc(x.period)+' · '+esc(x.who)+' · Ngày xuất '+full(new Date())+'</p>'
     +'<p class="sum"><b>'+n+'</b> việc · <b>'+c.done+'</b> hoàn thành ('+pct+'%) · '+c.doing+' đang làm · '+c.wait+' chờ · '+c.block+' vướng'+(x.kind==='month'?' · '+new Set(x.list.map(t=>t.date)).size+' ngày có việc':'')+'</p>';
   if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
-  const qg=qtyGroups(x.list);
-  if(qg.length)h+='<h2>Số lượng theo đầu việc</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qg.map(g=>[g.name,g.n,fmtQ(g.sum)]));
+  const qv=qtyView(x.list,x.kind==='month');
+  if(qv.rows.length)h+='<h2>Số lượng theo đầu việc'+(qv.sys?' – '+esc(sysName(qv.sys)):'')+'</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qv.rows.map(c=>{const q=qtyCells(c);return [q[0],q[1],q[2]===''?'':fmtQ(q[2])]}));
   if(x.kind==='week'){
     let k=0;const seen=new Set();
     S.systems.forEach(sy=>{const l=x.list.filter(t=>t.system===sy.id);if(!l.length)return;seen.add(sy.id);k++;const tt=taskTableRows(l,x.all);
@@ -1178,6 +1202,9 @@ root.addEventListener('click',async e=>{
     if(act==='s-copy'){const p=$('s-panel');$('s-text').value=statsText();p.hidden=false;$('s-msg').textContent='';p.scrollIntoView({block:'center'});copyStats();return}
     if(act==='s-copy-now'){await copyStats();return}
     if(act==='s-close'){$('s-panel').hidden=true;return}
+    if(act==='qf-default'){S.qfSel=null;renderStats();return}
+    if(act==='qf-all'){S.qfSel=new Set(qtyView(monthTasks(),true).catalog.map(c=>c.key));renderStats();return}
+    if(act==='qf-none'){S.qfSel=new Set();renderStats();return}
     if(act==='n-suggest'){suggestNotes();return}
     if(act==='goto-week'){setWeek(mondayOf(parse(b.dataset.d)));$('q-goto').hidden=true;return}
     if(act==='cancel-edit'){resetQuick();return}
@@ -1255,6 +1282,7 @@ root.addEventListener('click',async e=>{
     if(act==='cat-move'){await moveCatalog(b.dataset.k,b.dataset.id,Number(b.dataset.d));return}
   }catch(err){flash(fsMsg(err))}
 });
+root.addEventListener('toggle',e=>{if(e.target&&e.target.id==='qf-det')S.qfOpen=e.target.open},true);
 root.addEventListener('change',async e=>{
   const t=e.target;
   try{
@@ -1271,6 +1299,12 @@ root.addEventListener('change',async e=>{
     if(t.matches&&t.matches('input[data-catname]')){
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
+    }
+    if(t.id==='qf-system'){S.qfSys=t.value;S.qfSel=null;renderStats();return}
+    if(t.matches&&t.matches('input[data-qfk]')){
+      const v=qtyView(monthTasks(),true),sel=S.qfSel?new Set(S.qfSel):new Set(v.catalog.filter(c=>c.hasSum).map(c=>c.key));
+      if(t.checked)sel.add(t.dataset.qfk);else sel.delete(t.dataset.qfk);
+      S.qfSel=sel;renderStats();return;
     }
     if(t.id==='tpl-filter'){S.tplFilter=t.value;renderTplAdmin();return}
     if(t.id==='q-tpl'){
