@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.12 -->
+<!-- Phiên bản 1.15 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -184,6 +184,8 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .usys{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:.84rem;color:var(--ink-2)}
 .usys .qf-chip{font-size:.84rem}
 .qdays{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:6px}
+.field select.tpl-new{font-weight:700}
+#q-tpl option[value=""]{font-weight:700}
 .qf-sys{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;flex:1 1 100%}
 .qf-chip{display:inline-flex;gap:6px;align-items:center;font-size:.88rem}
 .qf-chip input{width:auto;padding:0;margin:0}
@@ -287,7 +289,7 @@ const isConfigured=!/DÁN/.test(firebaseConfig.apiKey||'DÁN');
 let auth=null,db=null;
 
 /* ===== Trạng thái ===== */
-const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
+const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),qfSOpen:false,qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
   editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
@@ -626,6 +628,7 @@ function renderQuickSelects(){
 const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
 function applyTplMode(){
   const f=$('q-titlef');if(!f)return;const tp=curTpl();f.hidden=!!tp;
+  const qs=$('q-tpl');if(qs)qs.classList.toggle('tpl-new',!tp);
   const ql=$('q-qty').parentElement;ql.hidden=!!(tp&&tp.noQty);ql.firstElementChild.textContent=(tp&&tp.label?tp.label:'Số lượng')+' (không bắt buộc)';
 }
 function pill(t,canEdit){
@@ -907,7 +910,9 @@ function renderStats(){
   const qv=qtyView(list,true);
   const checked=c=>qv.isDefault?c.n>0:qv.sel.has(c.key);
   h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="qf">'
-    +'<div class="qf-sys"><b>Hệ thống:</b> <label class="qf-chip"><input type="checkbox" data-qfs=""'+(S.qfSys.size?'':' checked')+'> Tất cả hệ thống</label>'+S.systems.map(x=>'<label class="qf-chip"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(S.qfSys.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')+'</div>'
+    +'<details id="qf-sdet"'+(S.qfSOpen?' open':'')+'><summary>Chọn hệ thống ('+(S.qfSys.size?S.qfSys.size+' đã chọn':'tất cả hệ thống')+')</summary>'
+    +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qfs-all">Chọn tất cả hệ thống</button></div>'
+    +'<div class="qf-list">'+S.systems.map(x=>'<label class="qf-item"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(!S.qfSys.size||S.qfSys.has(x.id)?' checked':'')+'><span>'+esc(x.name)+'</span></label>').join('')+'</div></details>'
     +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc đã thực hiện':qv.sel.size+' đã chọn')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qf-default">Mặc định</button><button type="button" class="btn sm" data-act="qf-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="qf-none">Bỏ chọn tất cả</button></div>'
     +'<div class="qf-list">'+(qv.catalog.map(c=>'<label class="qf-item"><input type="checkbox" data-qfk="'+esc(c.key)+'"'+(checked(c)?' checked':'')+'><span>'+esc(c.name)+' <span class="muted">('+c.n+' lần)</span></span></label>').join('')||'<span class="muted">Chưa có đầu việc nào.</span>')+'</div></details></div>'
@@ -1372,6 +1377,7 @@ root.addEventListener('click',async e=>{
     if(act==='s-copy'){const p=$('s-panel');$('s-text').value=statsText();p.hidden=false;$('s-msg').textContent='';p.scrollIntoView({block:'center'});copyStats();return}
     if(act==='s-copy-now'){await copyStats();return}
     if(act==='s-close'){$('s-panel').hidden=true;return}
+    if(act==='qfs-all'){S.qfSys=new Set();S.qfSel=null;renderStats();return}
     if(act==='qf-default'){S.qfSel=null;renderStats();return}
     if(act==='qf-all'){S.qfSel=new Set(qtyView(monthTasks(),true).catalog.map(c=>c.key));renderStats();return}
     if(act==='qf-none'){S.qfSel=new Set();renderStats();return}
@@ -1453,7 +1459,7 @@ root.addEventListener('click',async e=>{
     if(act==='cat-move'){await moveCatalog(b.dataset.k,b.dataset.id,Number(b.dataset.d));return}
   }catch(err){flash(fsMsg(err))}
 });
-root.addEventListener('toggle',e=>{if(e.target&&e.target.id==='qf-det')S.qfOpen=e.target.open},true);
+root.addEventListener('toggle',e=>{if(e.target&&e.target.id==='qf-det')S.qfOpen=e.target.open;if(e.target&&e.target.id==='qf-sdet')S.qfSOpen=e.target.open},true);
 root.addEventListener('change',async e=>{
   const t=e.target;
   try{
@@ -1479,7 +1485,7 @@ root.addEventListener('change',async e=>{
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
     }
-    if(t.matches&&t.matches('input[data-qfs]')){const v=t.dataset.qfs;if(!v)S.qfSys=new Set();else{const n=new Set(S.qfSys);t.checked?n.add(v):n.delete(v);S.qfSys=n}S.qfSel=null;renderStats();return}
+    if(t.matches&&t.matches('input[data-qfs]')){if(!t.isConnected)return;const all=S.systems.map(x=>x.id),n=new Set(S.qfSys.size?S.qfSys:all);t.checked?n.add(t.dataset.qfs):n.delete(t.dataset.qfs);S.qfSys=(n.size===0||n.size===all.length)?new Set():n;S.qfSel=null;renderStats();return}
     if(t.matches&&t.matches('input[data-qfk]')){
       const v=qtyView(monthTasks(),true),sel=S.qfSel?new Set(S.qfSel):new Set(v.catalog.filter(c=>c.n>0).map(c=>c.key));
       if(t.checked)sel.add(t.dataset.qfk);else sel.delete(t.dataset.qfk);
