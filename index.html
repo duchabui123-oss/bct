@@ -165,9 +165,16 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .urow.head{font-size:.76rem;font-weight:700;color:var(--ink-2);border-top:0}
 .urow .nm{font-weight:600;overflow-wrap:anywhere}
 .urow.off{opacity:.55}
-.trow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
+.trow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .trow.off input{opacity:.55}
-.tbtns{display:flex;gap:6px}
+.tbtns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sumtbl{width:100%;border-collapse:collapse;margin:0 0 16px;font-size:.9rem}
+.sumtbl th,.sumtbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.sumtbl thead th{background:var(--accent-soft);font-weight:700}
+.sumtbl tr.band td{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.sumtbl td:first-child{width:68%}
+.tpl-noq{display:flex;gap:4px;align-items:center;font-size:.78rem;color:var(--ink-2);white-space:nowrap}
+.tpl-noq input{width:auto;padding:0}
 .qf{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start;margin-bottom:12px}
 .qf details{flex:1 1 20rem;min-width:0}
 .qf summary{cursor:pointer;font-weight:600;color:var(--accent)}
@@ -179,6 +186,8 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 @media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
 .crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .crow.off input{opacity:.55}
+.crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto}
+@media(max-width:600px){.crow.sys{grid-template-columns:1fr 1fr}.crow.sys input{grid-column:1/-1}}
 .inline-add{display:flex;gap:8px;flex-wrap:wrap}
 .inline-add input{flex:1 1 14rem}
 .check{display:flex;gap:10px;align-items:flex-start}
@@ -461,7 +470,7 @@ function buildShell(){
   +'<label class="who">Xem báo cáo của <select id="who"></select></label>'
   +'<div class="seg" role="group" aria-label="Kiểu xem"><button type="button" data-act="view" data-v="system" aria-pressed="true">Theo hệ thống</button><button type="button" data-act="view" data-v="day" aria-pressed="false">Theo ngày</button></div>'
   +'<button type="button" class="btn" data-act="copy">Sao chép báo cáo</button>'
-  +'<button type="button" class="btn" data-act="x-xlsx" data-k="week">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="week">Xuất PDF</button></div>'
+  +'<button type="button" class="btn" data-act="sum-open" data-k="week">Bảng tổng hợp</button><button type="button" class="btn" data-act="x-xlsx" data-k="week">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="week">Xuất PDF</button></div>'
 
   +'<section class="summary" aria-label="Tiến độ trong tuần"><div class="sum-line" id="sum-line"></div><div class="bar-s" id="sum-bar" role="img" aria-label="Tỷ lệ trạng thái"></div><ul class="legend" id="sum-legend"></ul></section>'
 
@@ -488,6 +497,7 @@ function buildShell(){
   +'<label><span>Kế hoạch tuần sau</span><textarea id="n-plan" placeholder="Các đầu việc dự kiến"></textarea></label></div>'
   +'<div id="notes-view" hidden></div></section>'
 
+  +'<section id="sum-week" class="panel" hidden aria-label="Bảng tổng hợp kết quả"><h2>Bảng tổng hợp kết quả</h2><div id="sum-body-week"></div><div class="actions"><button type="button" class="btn primary" data-act="sum-copy" data-k="week">Sao chép</button><button type="button" class="btn link" data-act="sum-close" data-k="week">Đóng</button><span class="msg" id="sum-msg-week" role="status"></span></div></section>'
   +'<section id="report-panel" class="panel" hidden aria-label="Báo cáo dạng văn bản"><h2>Báo cáo dạng văn bản</h2>'
   +'<textarea class="report-box" id="report-text" readonly></textarea><div class="actions"><button type="button" class="btn primary" data-act="copy-now">Sao chép</button>'
   +'<button type="button" class="btn link" data-act="report-close">Đóng</button><span class="msg" id="report-msg" role="status"></span></div></section></section>'
@@ -518,7 +528,7 @@ function buildAdmin(){
 
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
   +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="80" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
-  +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên.</p></section></div>'
+  +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên.<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
 
   +'<div id="adm-types" class="app" hidden><section class="panel"><h2>Loại việc</h2>'
   +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="80" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
@@ -526,7 +536,7 @@ function buildAdmin(){
 
   +'<div id="adm-tpls" class="app" hidden><section class="panel"><h2>Việc mẫu</h2>'
   +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
-  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="300" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
+  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="300" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><input id="t-label" maxlength="80" placeholder="Nhãn số lượng (mặc định: Số lượng)" aria-label="Nhãn số lượng"><label class="tpl-noq"><input type="checkbox" id="t-noq">Không ghi số lượng</label><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
   +'<div class="actions"><button type="button" class="btn" data-act="tpl-import">Lấy từ các việc đã nhập</button>'
   +'<button type="button" class="btn" data-act="tpl-sort">Sắp xếp theo hệ thống</button>'
   +'<label class="who">Xem theo <select id="tpl-filter" aria-label="Lọc theo hệ thống"></select></label><span class="msg" id="tpl-msg" role="status"></span></div>'
@@ -598,7 +608,10 @@ function renderQuickSelects(){
   sel.value=S.qTpl;applyTplMode();
 }
 const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
-function applyTplMode(){const f=$('q-titlef');if(f)f.hidden=!!curTpl()}
+function applyTplMode(){
+  const f=$('q-titlef');if(!f)return;const tp=curTpl();f.hidden=!!tp;
+  const ql=$('q-qty').parentElement;ql.hidden=!!(tp&&tp.noQty);ql.firstElementChild.textContent=(tp&&tp.label?tp.label:'Số lượng')+' (không bắt buộc)';
+}
 function pill(t,canEdit){
   return '<label class="pillwrap s-'+(ST[t.status]?t.status:'wait')+'"><select data-status="'+esc(t.id)+'" aria-label="Trạng thái: '+esc(t.title)+'"'+(canEdit?'':' disabled')+'>'
     +STATUS.map(s=>'<option value="'+s.id+'"'+(s.id===t.status?' selected':'')+'>'+s.label+'</option>').join('')+'</select></label>';
@@ -661,6 +674,7 @@ function renderReport(){
   if(!S.loadedTasks&&!n){el.innerHTML='<div class="emptybox">Đang tải dữ liệu…</div>'}
   else if(!n){el.innerHTML='<div class="emptybox">Tuần này chưa có việc nào'+(S.who===S.user.uid?'. Hãy thêm việc đầu tiên ở khung phía trên.':'.')+'</div>'}
   else el.innerHTML=S.view==='system'?bySystem(list):byDay(list);
+  renderSummary('week');
 }
 function noteOf(uid){return S.notes.find(n=>n.uid===uid)||{}}
 function renderNotes(){
@@ -745,7 +759,7 @@ async function submitQuick(){
   if(!$('q-system').value||!$('q-type').value){msg.className='msg';msg.textContent='Chưa có hệ thống hoặc loại việc. Hãy nhờ quản trị viên thêm.';return}
   const dv=$('q-date').value==='__other'?$('q-dateother').value:$('q-date').value;
   if(!dv){msg.className='msg';msg.textContent='Hãy chọn ngày thực hiện.';return}
-  const qv=$('q-qty').value.trim();let qty=null;
+  const qv=(tp&&tp.noQty)?'':$('q-qty').value.trim();let qty=null;
   if(qv!==''){qty=Number(qv.replace(',','.'));if(!isFinite(qty)||qty<0){msg.className='msg';msg.textContent='Số lượng phải là số không âm.';$('q-qty').focus();return}}
   const id=S.editing?S.editing.id:newId();
   const body={uid:S.user.uid,date:dv,system:$('q-system').value,type:$('q-type').value,status:$('q-status').value,title:title,
@@ -809,8 +823,9 @@ function buildStats(){
   +'<button type="button" class="btn" data-act="m-next">Tháng sau ›</button><button type="button" class="btn link" id="m-now" data-act="m-now">Tháng này</button></div>'
   +'<label class="who">Thống kê của <select id="m-who"></select></label>'
   +'<button type="button" class="btn" data-act="s-copy">Sao chép thống kê</button>'
-  +'<button type="button" class="btn" data-act="x-xlsx" data-k="month">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="month">Xuất PDF</button></div>'
+  +'<button type="button" class="btn" data-act="sum-open" data-k="month">Bảng tổng hợp</button><button type="button" class="btn" data-act="x-xlsx" data-k="month">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="month">Xuất PDF</button></div>'
   +'<div id="stats-body" class="app"></div>'
+  +'<section id="sum-month" class="panel" hidden aria-label="Bảng tổng hợp kết quả"><h2>Bảng tổng hợp kết quả</h2><div id="sum-body-month"></div><div class="actions"><button type="button" class="btn primary" data-act="sum-copy" data-k="month">Sao chép</button><button type="button" class="btn link" data-act="sum-close" data-k="month">Đóng</button><span class="msg" id="sum-msg-month" role="status"></span></div></section>'
   +'<section id="s-panel" class="panel" hidden aria-label="Thống kê dạng văn bản"><h2>Thống kê dạng văn bản</h2><textarea class="report-box" id="s-text" readonly></textarea>'
   +'<div class="actions"><button type="button" class="btn primary" data-act="s-copy-now">Sao chép</button><button type="button" class="btn link" data-act="s-close">Đóng</button><span class="msg" id="s-msg" role="status"></span></div></section></section>';
 }
@@ -884,6 +899,7 @@ function renderStats(){
   h+='<section class="panel"><h2>Theo ngày</h2>'+dayChart(list)+'</section>';
   if(S.mWho==='all')h+='<section class="panel"><h2>Theo người</h2>'+statTable('Người báo cáo',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'))+'</section>';
   $('stats-body').innerHTML=h;
+  renderSummary('month');
 }
 function statsText(){
   const list=monthTasks(),c=counts(list),n=list.length,m=S.month,L=[];
@@ -911,6 +927,95 @@ async function copyStats(){
 }
 
 
+
+/* ===== Bảng tổng hợp kết quả (theo hệ thống, theo từng người) ===== */
+const autoGroup=n=>{n=String(n||'').trim();if(/^ipcc\b/i.test(n))return 'IPCC';if(/^(ccos|obtt)$/i.test(n))return 'CCOS';return n};
+const sysGroup=sy=>(sy&&String(sy.group||'').trim())||autoGroup(sy?sy.name:'');
+const qtyText=n=>n===0?'0':(Number.isInteger(n)&&n>0&&n<10?'0'+n:fmtQ(n));
+function summaryBlocks(list){
+  const tpls=S.tpls.filter(x=>x.active!==false),sharedKeys=new Set(tpls.filter(x=>!x.system).map(x=>titleKey(x.name)));
+  const blocks=[];
+  const tplLines=(arr,tasks,start)=>{
+    let i=start;const out=[];
+    arr.forEach(tp=>{
+      const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
+      const lab=tp.label||'Số lượng';
+      out.push(i+'. '+tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+qtyText(qs.reduce((a,t)=>a+t.qty,0)):'')));i++;
+    });
+    return {lines:out,next:i};
+  };
+  const extraLines=(tasks,start,skip)=>{
+    const g=new Map();
+    tasks.forEach(t=>{const k=titleKey(t.title);if(!k||skip.has(k))return;let o=g.get(k);if(!o){o={name:String(t.title).trim(),q:0,has:false};g.set(k,o)}if(hasQty(t)){o.q+=t.qty;o.has=true}});
+    let i=start;const out=[];
+    g.forEach(o=>{out.push(i+'. '+o.name+'.'+(o.has?' Số lượng: '+qtyText(o.q):''));i++});
+    return out;
+  };
+  const notesOf=tasks=>{const seen=new Set(),out=[];tasks.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);out.push('- '+n)}});return out};
+  const known=new Set(S.systems.map(x=>x.id));
+  /* Gom các hệ thống cùng nhóm báo cáo (ví dụ mọi hệ thống IPCC thành "IPCC") thành một khối */
+  const groups=new Map();
+  S.systems.forEach(sy=>{const g=sysGroup(sy);if(!groups.has(g))groups.set(g,new Set());groups.get(g).add(sy.id)});
+  groups.forEach((ids,gname)=>{
+    const seenK=new Set(),arr=tpls.filter(x=>ids.has(x.system)).filter(x=>{const k=titleKey(x.name);if(seenK.has(k))return false;seenK.add(k);return true});
+    const tasks=list.filter(t=>ids.has(t.system)&&!sharedKeys.has(titleKey(t.title)));
+    if(!arr.length&&!tasks.length)return;
+    const a=tplLines(arr,tasks,1),tk=new Set(arr.map(x=>titleKey(x.name)));
+    blocks.push({name:gname,lines:a.lines.concat(extraLines(tasks,a.next,tk)),notes:notesOf(tasks)});
+  });
+  const shared=tpls.filter(x=>!x.system),sTasks=list.filter(t=>sharedKeys.has(titleKey(t.title)));
+  if(shared.length){const a=tplLines(shared,sTasks,1);blocks.push({name:'Dùng chung',lines:a.lines,notes:notesOf(sTasks)})}
+  const lost=list.filter(t=>!known.has(t.system)&&!sharedKeys.has(titleKey(t.title)));
+  if(lost.length)blocks.push({name:'(Hệ thống đã xóa)',lines:extraLines(lost,1,new Set()),notes:notesOf(lost)});
+  return blocks;
+}
+function summaryDocs(x){
+  const title=x.kind==='week'?'TỔNG HỢP KẾT QUẢ THỰC HIỆN TUẦN '+x.title.replace('Báo cáo tuần ','')+' ('+x.period+')':'TỔNG HỢP KẾT QUẢ THỰC HIỆN '+x.period.toUpperCase();
+  const docs=x.all?S.users.filter(u=>x.list.some(t=>t.uid===u.uid)).map(u=>({person:u.name||u.username,blocks:summaryBlocks(x.list.filter(t=>t.uid===u.uid))}))
+    :[{person:x.who,blocks:summaryBlocks(x.list)}];
+  return {title:title,docs:docs};
+}
+function summaryText(sd){
+  const L=[];
+  sd.docs.forEach(d=>{
+    L.push(sd.title,d.person,'');
+    if(!d.blocks.length)L.push('(Chưa có việc nào trong kỳ)','');
+    d.blocks.forEach(b=>{L.push('['+b.name+']');b.lines.forEach(l=>L.push(l));if(b.notes.length){L.push('Ghi chú:');b.notes.forEach(n=>L.push(n))}L.push('')});
+  });
+  return L.join('\n').replace(/\n+$/,'');
+}
+function summaryHtml(sd){
+  if(!sd.docs.length)return '<p class="muted">Chưa có việc nào trong kỳ này.</p>';
+  return sd.docs.map(d=>'<div class="tscroll"><table class="sumtbl"><thead><tr><th>'+esc(sd.title)+' – '+esc(d.person)+'</th><th>Ghi chú</th></tr></thead><tbody>'
+    +(d.blocks.length?d.blocks.map(b=>'<tr class="band"><td colspan="2">'+esc(b.name)+'</td></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2" class="muted">Chưa có việc nào trong kỳ này.</td></tr>')
+    +'</tbody></table></div>').join('');
+}
+function summarySheet(x){
+  const sd=summaryDocs(x),rows=[],heights={},merges=[];
+  const est=(txt,w)=>String(txt).split('\n').reduce((a,l)=>a+Math.max(1,Math.ceil(l.length/w)),0);
+  sd.docs.forEach((d,di)=>{
+    if(di>0)rows.push([]);
+    rows.push([{v:sd.title+' – '+d.person,s:5},{v:'Ghi chú',s:5}]);heights[rows.length-1]=24;
+    if(!d.blocks.length){rows.push([{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}])}
+    d.blocks.forEach(b=>{
+      rows.push([{v:b.name,s:6},{v:'',s:6}]);merges.push('A'+rows.length+':B'+rows.length);heights[rows.length-1]=20;
+      rows.push([{v:b.lines.join('\n'),s:2},{v:b.notes.join('\n'),s:2}]);
+      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),100),est(b.notes.join('\n'),42))*15+6);
+    });
+  });
+  if(!rows.length)rows.push([{v:sd.title,s:5},{v:'Ghi chú',s:5}],[{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}]);
+  return {name:'Tổng hợp kết quả',rows:rows,widths:[100,42],heights:heights,merges:merges};
+}
+function renderSummary(kind){
+  const pn=$('sum-'+kind);if(!pn||pn.hidden)return;
+  $('sum-body-'+kind).innerHTML=summaryHtml(summaryDocs(exportCtx(kind)));
+}
+async function copySummary(kind){
+  const m=$('sum-msg-'+kind),txt=summaryText(summaryDocs(exportCtx(kind)));
+  try{await navigator.clipboard.writeText(txt);m.className='msg ok';m.textContent='Đã sao chép bảng tổng hợp.'}
+  catch(e){m.className='msg';m.textContent='Không sao chép được, hãy bôi đen bảng và nhấn Ctrl+C.'}
+}
+
 /* ===== Xuất Excel / PDF ===== */
 const CRC_T=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
 function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC_T[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
@@ -937,8 +1042,14 @@ function sheetXml(sh){
   if(widths.length)x+='<cols>'+widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('')+'</cols>';
   x+='<sheetData>';
   sh.rows.forEach((r,ri)=>{
-    x+='<row r="'+(ri+1)+'">';
+    x+='<row r="'+(ri+1)+'"'+(sh.heights&&sh.heights[ri]?' ht="'+sh.heights[ri]+'" customHeight="1"':'')+'>';
     r.forEach((v,ci)=>{
+      if(v&&typeof v==='object'){
+        const rf=colL(ci)+(ri+1);
+        if(v.v===''||v.v==null)x+='<c r="'+rf+'" s="'+v.s+'"/>';
+        else x+='<c r="'+rf+'" s="'+v.s+'" t="inlineStr"><is><t xml:space="preserve">'+xe(String(v.v).replace(/^- /gm,'• '))+'</t></is></c>';
+        return;
+      }
       if(v===null||v===undefined||v==='')return;
       const ref=colL(ci)+(ri+1),hd=sh.headRows&&sh.headRows.indexOf(ri)>=0,ti=sh.titleRows&&sh.titleRows.indexOf(ri)>=0;
       const st=ti?3:hd?1:2;
@@ -951,7 +1062,9 @@ function sheetXml(sh){
     });
     x+='</row>';
   });
-  return x+'</sheetData></worksheet>';
+  x+='</sheetData>';
+  if(sh.merges&&sh.merges.length)x+='<mergeCells count="'+sh.merges.length+'">'+sh.merges.map(m=>'<mergeCell ref="'+m+'"/>').join('')+'</mergeCells>';
+  return x+'</worksheet>';
 }
 function makeXlsx(sheets){
   const files=[];
@@ -959,7 +1072,7 @@ function makeXlsx(sheets){
   files.push({name:'_rels/.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'});
   files.push({name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map((s,i)=>'<sheet name="'+xe(s.name.replace(/[\[\]:*?\/\\]/g,' ').slice(0,31))+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>'});
   files.push({name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'});
-  files.push({name:'xl/styles.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" quotePrefix="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'});
+  files.push({name:'xl/styles.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><b/><sz val="12"/><name val="Calibri"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF9DC3E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" quotePrefix="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'});
   sheets.forEach((s,i)=>files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:sheetXml(s)}));
   return zipStore(files);
 }
@@ -1022,6 +1135,7 @@ function buildXlsx(x){
   const ov=[[x.title],['Kỳ báo cáo',x.period],['Người báo cáo',x.who],['Ngày xuất',full(new Date())],[],
     ['Tổng số việc',n],['Hoàn thành',c.done],['Đang làm',c.doing],['Chờ',c.wait],['Vướng',c.block],['Tỷ lệ hoàn thành (%)',pct]];
   if(x.kind==='month')ov.push(['Số ngày có việc',new Set(x.list.map(t=>t.date)).size]);
+  sheets.push(summarySheet(x));
   sheets.push({name:'Tổng quan',rows:ov,widths:[26,40],titleRows:[0]});
   const tt=taskTableRows(x.list,x.all);
   sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,40,13,14,30,22]});
@@ -1040,6 +1154,9 @@ function buildPrintHtml(x){
   const tbl=(head,rows,cls)=>'<table'+(cls?' class="'+cls+'"':'')+'><thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
   let h='<h1>'+esc(x.title)+'</h1><p class="meta">'+esc(x.period)+' · '+esc(x.who)+' · Ngày xuất '+full(new Date())+'</p>'
     +'<p class="sum"><b>'+n+'</b> việc · <b>'+c.done+'</b> hoàn thành ('+pct+'%) · '+c.doing+' đang làm · '+c.wait+' chờ · '+c.block+' vướng'+(x.kind==='month'?' · '+new Set(x.list.map(t=>t.date)).size+' ngày có việc':'')+'</p>';
+  summaryDocs(x).docs.forEach(d=>{
+    h+='<h2>Bảng tổng hợp kết quả – '+esc(d.person)+'</h2><table class="stk"><thead><tr><th>Nội dung thực hiện</th><th>Ghi chú</th></tr></thead><tbody>'
+      +(d.blocks.length?d.blocks.map(b=>'<tr><th colspan="2" class="bd">'+esc(b.name)+'</th></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2">Chưa có việc nào trong kỳ.</td></tr>')+'</tbody></table>'});
   if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
   const qv=qtyView(x.list,x.kind==='month');
   if(qv.rows.length)h+='<h2>Số lượng theo đầu việc'+(qv.sys?' – '+esc(sysName(qv.sys)):'')+'</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qv.rows.map(c=>{const q=qtyCells(c);return [q[0],q[1],q[2]===''?'':fmtQ(q[2])]}));
@@ -1058,7 +1175,7 @@ function buildPrintHtml(x){
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/1.45 "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
     +'h1{font-size:19px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;break-after:avoid}.meta{color:#555;margin:0 0 8px}.sum{margin:0 0 6px;font-size:12px}'
     +'table{width:100%;border-collapse:collapse;margin:0 0 4px}th,td{border:1px solid #999;padding:3px 5px;text-align:left;vertical-align:top;word-break:break-word}'
-    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}tr{break-inside:avoid}thead{display:table-header-group}'
+    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:70%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}thead{display:table-header-group}'
     +'</style></head><body>'+h+'</body></html>';
 }
 function printHtml(html){
@@ -1094,8 +1211,9 @@ function renderAdminUsers(){
 function renderCatalog(kind){
   const el=$('cat-'+kind);if(!el)return;
   const list=S[kind];
-  el.innerHTML=list.map((x,i)=>'<div class="crow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
+  el.innerHTML=list.map((x,i)=>'<div class="crow'+(kind==='systems'?' sys':'')+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
     +'<input data-catname="'+kind+'" data-id="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="80" aria-label="Tên">'
+    +(kind==='systems'?'<input data-sysgroup="'+esc(x.id)+'" value="'+esc(x.group||'')+'" maxlength="80" placeholder="Nhóm báo cáo: '+esc(autoGroup(x.name))+'" aria-label="Nhóm báo cáo">':'')
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="1"'+(i===list.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button></div>').join('')
@@ -1120,7 +1238,8 @@ function renderTplAdmin(){
     +'<input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên đầu việc">'
     +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống">'+opt(S.systems,'— Tất cả hệ thống —',x.system)+'</select>'
     +'<select data-tpltype="'+esc(x.id)+'" aria-label="Loại việc">'+opt(S.types,'— Không gắn loại việc —',x.type)+'</select>'
-    +'<span class="tbtns"><button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
+    +'<input data-tpllabel="'+esc(x.id)+'" value="'+esc(x.label||'')+'" maxlength="80" placeholder="Nhãn số lượng" aria-label="Nhãn số lượng">'
+    +'<span class="tbtns"><label class="tpl-noq"><input type="checkbox" data-tplnoq="'+esc(x.id)+'"'+(x.noQty?' checked':'')+'>Không SL</label><button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="1"'+(i===vis.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="tpl-toggle" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
     +'<button type="button" class="btn sm" data-act="tpl-del" data-id="'+esc(x.id)+'">Xóa</button></span></div>'}).join('')
@@ -1192,6 +1311,9 @@ root.addEventListener('click',async e=>{
       S.view=b.dataset.v;
       document.querySelectorAll('[data-act="view"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===S.view)));renderReport();return;
     }
+    if(act==='sum-open'){const k=b.dataset.k,pn=$('sum-'+k);pn.hidden=false;renderSummary(k);pn.scrollIntoView({block:'start'});return}
+    if(act==='sum-close'){$('sum-'+b.dataset.k).hidden=true;return}
+    if(act==='sum-copy'){await copySummary(b.dataset.k);return}
     if(act==='x-xlsx'||act==='x-pdf'){exportReport(b.dataset.k,act==='x-xlsx'?'xlsx':'pdf');return}
     if(act==='copy'){const p=$('report-panel');$('report-text').value=reportText();p.hidden=false;$('report-msg').textContent='';p.scrollIntoView({block:'center'});copyReport();return}
     if(act==='copy-now'){await copyReport();return}
@@ -1296,6 +1418,9 @@ root.addEventListener('change',async e=>{
       const uid=t.dataset.role;if(uid===S.user.uid)return;
       try{await updateDoc(doc(db,'users',uid),{role:t.value})}catch(err){flash(fsMsg(err));renderAdminUsers()}return;
     }
+    if(t.matches&&t.matches('input[data-sysgroup]')){
+      try{await updateDoc(doc(db,'systems',t.dataset.sysgroup),{group:t.value.trim()})}catch(err){flash(fsMsg(err));renderCatalog('systems')}return;
+    }
     if(t.matches&&t.matches('input[data-catname]')){
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
@@ -1315,8 +1440,9 @@ root.addEventListener('change',async e=>{
       }
       applyTplMode();if(!tp)$('q-title').focus();return;
     }
-    if(t.matches&&t.matches('input[data-tplname],select[data-tplsys],select[data-tpltype]')){
-      const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype,patch={};
+    if(t.matches&&t.matches('input[data-tplname],select[data-tplsys],select[data-tpltype],input[data-tpllabel],input[data-tplnoq]')){
+      const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype||t.dataset.tpllabel||t.dataset.tplnoq,patch={};
+      if(t.dataset.tpllabel!==undefined)patch.label=t.value.trim();else if(t.dataset.tplnoq!==undefined)patch.noQty=t.checked;else
       if(t.dataset.tplname){const n=t.value.trim();if(!n){renderTplAdmin();return}patch.name=n}
       else if(t.dataset.tplsys!==undefined)patch.system=t.value;else patch.type=t.value;
       try{await saveTpls(S.tpls.map(x=>x.id===id?Object.assign({},x,patch):x))}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
@@ -1387,7 +1513,7 @@ root.addEventListener('submit',async e=>{
   if(id==='f-addtpl'){
     const n=$('t-name').value.trim().replace(/\s+/g,' ');if(!n)return;
     if(S.tpls.some(x=>x.name.trim().toLowerCase()===n.toLowerCase())){flash('Việc mẫu này đã có trong danh sách.');return}
-    try{await saveTpls(S.tpls.concat({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,active:true}));$('t-name').value='';$('t-name').focus()}
+    try{await saveTpls(S.tpls.concat({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,label:$('t-label').value.trim(),noQty:$('t-noq').checked,active:true}));$('t-name').value='';$('t-label').value='';$('t-noq').checked=false;$('t-name').focus()}
     catch(err){flash(fsMsg(err))}
     return;
   }
