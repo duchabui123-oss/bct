@@ -151,6 +151,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .nblock p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.92rem}
 .nwho{font-family:var(--font-display);font-weight:800;font-size:1.05rem;margin:4px 0}
 .notes-head{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;justify-content:space-between}
+.ngrp{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-right:auto}
 .notes-head h2{font-family:var(--font-display);font-weight:800;font-size:1.3rem}
 .save-state{font-size:.78rem;color:var(--ink-2)}
 .report-box{min-height:16rem;font-family:var(--font-mono);font-size:.82rem;line-height:1.55}
@@ -474,7 +475,7 @@ function buildShell(){
 
   +'<div id="list" class="list"></div>'
 
-  +'<section class="notes-wrap"><div class="notes-head"><h2>Tổng kết tuần</h2><span class="save-state mono" id="save-state"></span></div>'
+  +'<section class="notes-wrap"><div class="notes-head"><h2>Tổng kết tuần</h2><span class="ngrp"><button type="button" class="btn sm" id="n-suggest" data-act="n-suggest">Gợi ý từ việc trong tuần</button><span class="msg" id="n-msg" role="status"></span></span><span class="save-state mono" id="save-state"></span></div>'
   +'<div id="notes-edit" class="notes-grid">'
   +'<label><span>Kết quả nổi bật</span><textarea id="n-highlights" placeholder="Những việc đáng ghi nhận trong tuần"></textarea></label>'
   +'<label><span>Tồn đọng, rủi ro, cần hỗ trợ</span><textarea id="n-issues" placeholder="Việc chưa xong, rủi ro, đề nghị phối hợp"></textarea></label>'
@@ -505,6 +506,8 @@ function buildAdmin(){
   +'<label class="field"><span>Quyền</span><select id="u-role"><option value="user">Người dùng</option><option value="admin">Quản trị</option></select></label></div>'
   +'<div class="actions"><button type="submit" class="btn primary">Tạo tài khoản</button><span class="msg" id="u-msg" role="status" aria-live="polite"></span></div></form>'
   +'<section class="panel"><h2>Danh sách người dùng</h2><div class="tbl" id="user-list"></div>'
+  +'<label class="check" style="margin-top:12px"><input type="checkbox" id="del-data"><span>Khi xóa người dùng, xóa luôn toàn bộ báo cáo của người đó<br><small class="muted">Nếu không chọn, báo cáo cũ vẫn được giữ lại và hiện tên "(Không rõ)" khi xem tất cả mọi người.</small></span></label>'
+  +'<p class="muted">Xóa người dùng sẽ gỡ hồ sơ, người đó không đăng nhập được nữa. Muốn đặt lại đúng tên đăng nhập cũ cho người khác, cần xóa thêm tài khoản đó trong Firebase (Authentication > Users). Nếu chỉ cần ngừng cho dùng tạm thời, hãy dùng nút Khóa.</p>'
   +'<p class="muted">Khóa tài khoản để người đó không đăng nhập được nữa mà vẫn giữ nguyên báo cáo cũ.</p></section></div>'
 
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
@@ -657,7 +660,7 @@ function noteOf(uid){return S.notes.find(n=>n.uid===uid)||{}}
 function renderNotes(){
   if(!$('notes-edit'))return;
   const own=S.who===S.user.uid,wk=iso(S.weekStart);
-  $('notes-edit').hidden=!own;$('notes-view').hidden=own;
+  $('notes-edit').hidden=!own;$('notes-view').hidden=own;$('n-suggest').hidden=!own;
   if(own){
     const d=noteOf(S.user.uid);
     if(!notePending[wk])[['n-highlights','highlights'],['n-issues','issues'],['n-plan','plan']].forEach(p=>{
@@ -672,6 +675,28 @@ function renderNotes(){
     }).join('');
     $('notes-view').innerHTML=h||'<p class="muted">Chưa có tổng kết cho tuần này.</p>';
   }
+}
+function suggestNotes(){
+  const m=$('n-msg');
+  const mine=S.tasks.filter(t=>t.uid===S.user.uid).sort(cmp);
+  if(!mine.length){m.className='msg';m.textContent='Tuần này chưa có việc nào để gợi ý.';return}
+  const label=t=>'['+sysName(t.system)+'] ';
+  const agg=new Map();
+  mine.filter(t=>t.status==='done').forEach(t=>{
+    const k=t.system+'|'+String(t.title||'').trim().toLowerCase();let g=agg.get(k);
+    if(!g){g={sys:t.system,title:String(t.title||'').trim(),n:0,q:0,hasQ:false,res:''};agg.set(k,g)}
+    g.n++;if(hasQty(t)){g.q+=t.qty;g.hasQ=true}if(t.result&&!g.res)g.res=t.result;
+  });
+  const hi=[...agg.values()].map(g=>'- ['+sysName(g.sys)+'] '+g.title+(g.hasQ?': '+fmtQ(g.q)+(g.n>1?' ('+g.n+' lần)':''):(g.n>1?' ('+g.n+' lần)':''))+(g.res&&g.n===1?' → '+g.res:'')).join('\n');
+  const open=mine.filter(t=>t.status!=='done');
+  const stl=t=>(ST[t.status]?ST[t.status].label:'Chờ');
+  const is=open.map(t=>'- '+label(t)+t.title+' ('+stl(t).toLowerCase()+')'+(t.note?': '+t.note:'')).join('\n');
+  const pl=open.map(t=>'- Tiếp tục: '+label(t)+t.title).join('\n');
+  const sugg=[['n-highlights',hi],['n-issues',is],['n-plan',pl]],filled=[];
+  sugg.forEach(x=>{const el=$(x[0]);if(x[1]&&!el.value.trim()){el.value=x[1];filled.push(x[0])}});
+  if(!filled.length){m.className='msg';m.textContent=sugg.some(x=>x[1])?'Các ô đã có nội dung nên không ghi đè. Hãy xóa nội dung ô muốn gợi ý lại rồi bấm lại.':'Chưa có việc phù hợp để gợi ý.';return}
+  m.className='msg ok';m.textContent='Đã điền '+filled.length+' ô. Bạn xem lại và chỉnh sửa nếu cần.';
+  queueNote();
 }
 function queueNote(){
   const wk=iso(S.weekStart),uid=S.user.uid;
@@ -1034,7 +1059,8 @@ function renderAdminUsers(){
      return '<div class="urow'+(u.active===false?' off':'')+'" data-uid="'+esc(u.uid)+'"><span class="nm">'+esc(u.name||'')+(self?' (bạn)':'')+(u.active===false?' · đã khóa':'')+'</span>'
       +'<span class="mono">'+esc(u.username||'')+'</span><span>'+esc(u.unit||'')+'</span>'
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
-      +'<button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button></div>';
+      +'<span class="tbtns"><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
+      +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span></div>';
    }).join('');
 }
 function renderCatalog(kind){
@@ -1148,6 +1174,7 @@ root.addEventListener('click',async e=>{
     if(act==='s-copy'){const p=$('s-panel');$('s-text').value=statsText();p.hidden=false;$('s-msg').textContent='';p.scrollIntoView({block:'center'});copyStats();return}
     if(act==='s-copy-now'){await copyStats();return}
     if(act==='s-close'){$('s-panel').hidden=true;return}
+    if(act==='n-suggest'){suggestNotes();return}
     if(act==='goto-week'){setWeek(mondayOf(parse(b.dataset.d)));$('q-goto').hidden=true;return}
     if(act==='cancel-edit'){resetQuick();return}
     if(act==='edit'||act==='del'){
@@ -1159,6 +1186,30 @@ root.addEventListener('click',async e=>{
         b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');
         setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},3000);
       }
+      return;
+    }
+    if(act==='user-del'){
+      const u=S.users.find(x=>x.uid===b.dataset.uid);if(!u||u.uid===S.user.uid)return;
+      if(!b.dataset.armed){
+        b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');
+        setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},3500);
+        return;
+      }
+      b.disabled=true;b.textContent='Đang xóa…';
+      let info='';
+      try{
+        if($('del-data')&&$('del-data').checked){
+          let nt=0;const ts=await getDocs(query(collection(db,'tasks'),where('uid','==',u.uid)));
+          for(let i=0;i<ts.docs.length;i+=400){const bt=writeBatch(db);ts.docs.slice(i,i+400).forEach(d=>bt.delete(doc(db,'tasks',d.id)));await bt.commit();nt+=Math.min(400,ts.docs.length-i)}
+          info=' và '+nt+' việc';
+          try{
+            const ns=await getDocs(query(collection(db,'weeknotes'),where('uid','==',u.uid)));
+            for(let i=0;i<ns.docs.length;i+=400){const bn=writeBatch(db);ns.docs.slice(i,i+400).forEach(d=>bn.delete(doc(db,'weeknotes',d.id)));await bn.commit()}
+          }catch(err2){info+=' (tổng kết tuần chưa xóa được, cần cập nhật luật Firestore mới)'}
+        }
+        await deleteDoc(doc(db,'users',u.uid));
+        flash('Đã xóa người dùng '+(u.name||u.username)+info+'.',true);
+      }catch(err){flash(fsMsg(err));b.disabled=false;b.textContent='Xóa';delete b.dataset.armed;b.classList.remove('danger')}
       return;
     }
     if(act==='user-toggle'){
