@@ -133,6 +133,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .r-result{color:var(--ink-2);font-size:.9rem;overflow-wrap:anywhere}
 .r-meta{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:.8rem;color:var(--ink-2)}
 .r-meta .note{overflow-wrap:anywhere}
+.chip.qty{color:var(--ink);font-weight:700}
 .chip{font-size:.72rem;font-weight:500;color:var(--ink-2);border:1px solid var(--line);border-radius:4px;padding:.02rem .4rem}
 .chip.who-chip{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
 .r-act{display:flex;gap:2px}
@@ -174,6 +175,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .tscroll{overflow-x:auto}
 .stbl{min-width:34rem;display:flex;flex-direction:column}
 .srow{display:grid;grid-template-columns:minmax(8rem,1.8fr) repeat(5,minmax(3.2rem,.55fr)) minmax(7rem,1.2fr);gap:8px;align-items:center;padding:.55rem 0;border-top:1px solid var(--line);font-size:.9rem}
+.srow.qrow{grid-template-columns:minmax(10rem,3fr) minmax(4rem,.6fr) minmax(6rem,.8fr)}
 .srow.head{font-size:.76rem;font-weight:700;color:var(--ink-2);border-top:0}
 .srow .nm{font-weight:600;overflow-wrap:anywhere}
 .srow .bad{color:var(--block);font-weight:700}
@@ -451,6 +453,7 @@ function buildShell(){
   +'<label class="field"><span>Hệ thống</span><select id="q-system"></select></label>'
   +'<label class="field"><span>Loại việc</span><select id="q-type"></select></label>'
   +'<label class="field"><span>Trạng thái</span><select id="q-status">'+STATUS.map(s=>'<option value="'+s.id+'">'+s.label+'</option>').join('')+'</select></label>'
+  +'<label class="field"><span>Số lượng (không bắt buộc)</span><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Ví dụ: 25"></label>'
   +'<label class="field wide"><span>Đầu việc</span><input id="q-title" maxlength="300" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
   +'<details class="more" id="q-more"><summary>Thêm kết quả, mã phiếu, ghi chú</summary><div class="grid">'
   +'<label class="field"><span>Kết quả / số liệu</span><input id="q-result" maxlength="400" autocomplete="off" placeholder="Ví dụ: 12/12 phiếu đã đóng"></label>'
@@ -567,6 +570,7 @@ function row(t,mode){
    +(t.result?'<div class="r-result">'+esc(t.result)+'</div>':'')
    +'<div class="r-meta">'+(S.who==='all'?'<span class="chip who-chip">'+esc(userName(t.uid))+'</span>':'')
    +'<span class="chip">'+esc(typeName(t.type))+'</span>'
+   +(hasQty(t)?'<span class="chip qty">Số lượng: '+fmtQ(t.qty)+'</span>':'')
    +(t.ticket?'<span class="mono">'+esc(t.ticket)+'</span>':'')
    +(t.note?'<span class="note">'+esc(t.note)+'</span>':'')+'</div></div>'
    +'<div class="r-status">'+pill(t,mine)+'</div>'
@@ -648,7 +652,7 @@ function queueNote(){
 
 /* ===== Thêm / sửa / xóa việc ===== */
 function resetQuick(keep){
-  S.editing=null;$('q-title').value='';$('q-result').value='';$('q-ticket').value='';$('q-note').value='';
+  S.editing=null;$('q-title').value='';$('q-result').value='';$('q-ticket').value='';$('q-note').value='';$('q-qty').value='';
   $('q-save').textContent='Thêm việc';$('q-cancel').hidden=true;$('quick').querySelector('h2').textContent='Thêm việc';
   if(!keep)$('q-msg').textContent='';
 }
@@ -663,7 +667,7 @@ function startEdit(t){
     s.value=p[2];
   });
   $('q-status').value=ST[t.status]?t.status:'wait';
-  $('q-title').value=t.title||'';$('q-result').value=t.result||'';$('q-ticket').value=t.ticket||'';$('q-note').value=t.note||'';
+  $('q-title').value=t.title||'';$('q-result').value=t.result||'';$('q-ticket').value=t.ticket||'';$('q-note').value=t.note||'';$('q-qty').value=t.qty!=null?t.qty:'';
   if(t.result||t.ticket||t.note)$('q-more').open=true;
   $('q-save').textContent='Lưu thay đổi';$('q-cancel').hidden=false;
   $('quick').querySelector('h2').textContent='Sửa việc';$('q-msg').textContent='';
@@ -673,9 +677,12 @@ async function submitQuick(){
   const title=$('q-title').value.trim(),msg=$('q-msg');
   if(!title){msg.className='msg';msg.textContent='Hãy nhập đầu việc.';$('q-title').focus();return}
   if(!$('q-system').value||!$('q-type').value){msg.className='msg';msg.textContent='Chưa có hệ thống hoặc loại việc. Hãy nhờ quản trị viên thêm.';return}
+  const qv=$('q-qty').value.trim();let qty=null;
+  if(qv!==''){qty=Number(qv.replace(',','.'));if(!isFinite(qty)||qty<0){msg.className='msg';msg.textContent='Số lượng phải là số không âm.';$('q-qty').focus();return}}
   const id=S.editing?S.editing.id:newId();
   const body={uid:S.user.uid,date:$('q-date').value,system:$('q-system').value,type:$('q-type').value,status:$('q-status').value,title:title,
     result:$('q-result').value.trim(),ticket:$('q-ticket').value.trim(),note:$('q-note').value.trim(),ts:S.editing&&S.editing.ts?S.editing.ts:Date.now()};
+  if(qty!==null)body.qty=qty;
   $('q-save').disabled=true;msg.className='msg';msg.textContent='Đang lưu…';
   try{
     await setDoc(doc(db,'tasks',id),body);
@@ -713,7 +720,7 @@ function reportText(){
 }
 function lineOf(t){
   const wd=(parse(t.date).getDay()+6)%7;
-  return '   - '+DS[wd]+' '+dm(t.date)+' · '+typeName(t.type)+': '+t.title+(t.result?' → '+t.result:'')+' ['+(ST[t.status]?ST[t.status].label:'Chờ')+']'
+  return '   - '+DS[wd]+' '+dm(t.date)+' · '+typeName(t.type)+': '+t.title+(hasQty(t)?' (SL: '+fmtQ(t.qty)+')':'')+(t.result?' → '+t.result:'')+' ['+(ST[t.status]?ST[t.status].label:'Chờ')+']'
     +(t.ticket?' (Mã: '+t.ticket+')':'')+(t.note?' – Ghi chú: '+t.note:'')+(S.who==='all'?' – '+userName(t.uid):'');
 }
 async function copyReport(){
@@ -790,6 +797,10 @@ function renderStats(){
     +'<ul class="legend">'+STATUS.map(s=>'<li><span class="dot b-'+s.id+'"></span>'+s.label+' <span class="mono">'+c[s.id]+'</span></li>').join('')+'</ul></section>';
   h+='<section class="panel"><h2>Theo hệ thống</h2>'+statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'))+'</section>';
   h+='<section class="panel"><h2>Theo loại việc</h2>'+statTable('Loại việc',groupRows(list,'type',S.types,'Khác'))+'</section>';
+  const qg=qtyGroups(list);
+  if(qg.length)h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="tscroll"><div class="stbl"><div class="srow head qrow"><span>Đầu việc</span><span>Số lần</span><span>Tổng số lượng</span></div>'
+    +qg.map(g=>'<div class="srow qrow"><span class="nm">'+esc(g.name)+'</span><span class="mono">'+g.n+'</span><span class="mono"><b>'+fmtQ(g.sum)+'</b></span></div>').join('')
+    +'</div></div><p class="muted">Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p></section>';
   h+='<section class="panel"><h2>Theo ngày</h2>'+dayChart(list)+'</section>';
   if(S.mWho==='all')h+='<section class="panel"><h2>Theo người</h2>'+statTable('Người báo cáo',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'))+'</section>';
   $('stats-body').innerHTML=h;
@@ -808,6 +819,8 @@ function statsText(){
   };
   sect('THEO HỆ THỐNG',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'));
   sect('THEO LOẠI VIỆC',groupRows(list,'type',S.types,'Khác'));
+  const qg=qtyGroups(list);
+  if(qg.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC');qg.forEach(g=>L.push('- '+g.name+': '+fmtQ(g.sum)+' ('+g.n+' lần ghi nhận)'));L.push('')}
   if(S.mWho==='all')sect('THEO NGƯỜI',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'));
   return L.join('\n').replace(/\n+$/,'');
 }
@@ -882,13 +895,20 @@ function exportCtx(kind){
     title:'Thống kê tháng '+(m.getMonth()+1)+'/'+m.getFullYear(),period:'Tháng '+(m.getMonth()+1)+'/'+m.getFullYear(),
     file:'ThongKe_Thang_'+pad(m.getMonth()+1)+'-'+m.getFullYear()};
 }
+const hasQty=t=>typeof t.qty==='number'&&isFinite(t.qty);
+const fmtQ=n=>String(Math.round(n*1000)/1000).replace('.',',');
+function qtyGroups(list){
+  const m=new Map();
+  list.forEach(t=>{if(!hasQty(t))return;const k=String(t.title||'').trim().replace(/\s+/g,' ').toLowerCase();let g=m.get(k);if(!g){g={name:String(t.title||'').trim(),n:0,sum:0};m.set(k,g)}g.n++;g.sum+=t.qty});
+  return [...m.values()].sort((a,b)=>b.sum-a.sum);
+}
 const dmy=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]+'/'+p[0]};
 const wdName=s=>DAYS[(parse(s).getDay()+6)%7];
 const stLabel=id=>ST[id]?ST[id].label:'Chờ';
 function taskTableRows(list,all){
-  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Kết quả','Trạng thái','Mã phiếu','Ghi chú'].concat(all?['Người thực hiện']:[]);
+  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Số lượng','Kết quả','Trạng thái','Mã phiếu','Ghi chú'].concat(all?['Người thực hiện']:[]);
   const rows=list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0)))
-    .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]));
+    .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',hasQty(t)?t.qty:'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]));
   return {head:head,rows:rows};
 }
 function groupStat(list,key,items,rest){
@@ -909,8 +929,10 @@ function buildXlsx(x){
   if(x.kind==='month')ov.push(['Số ngày có việc',new Set(x.list.map(t=>t.date)).size]);
   sheets.push({name:'Tổng quan',rows:ov,widths:[26,40],titleRows:[0]});
   const tt=taskTableRows(x.list,x.all);
-  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,40,13,14,30,22]});
+  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,40,13,14,30,22]});
   statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
+  const qg=qtyGroups(x.list);
+  if(qg.length)sheets.push({name:'Số lượng theo đầu việc',rows:[['Đầu việc','Số lần ghi nhận','Tổng số lượng']].concat(qg.map(g=>[g.name,g.n,Math.round(g.sum*1000)/1000])),headRows:[0],freeze:1,widths:[56,16,16]});
   if(x.kind==='week'){
     const nr=[['Người báo cáo','Kết quả nổi bật','Tồn đọng, rủi ro, cần hỗ trợ','Kế hoạch tuần sau']];
     noteIds(x).forEach(uid=>{const d=noteOf(uid);if(d.highlights||d.issues||d.plan)nr.push([userName(uid),d.highlights||'',d.issues||'',d.plan||''])});
@@ -924,6 +946,8 @@ function buildPrintHtml(x){
   let h='<h1>'+esc(x.title)+'</h1><p class="meta">'+esc(x.period)+' · '+esc(x.who)+' · Ngày xuất '+full(new Date())+'</p>'
     +'<p class="sum"><b>'+n+'</b> việc · <b>'+c.done+'</b> hoàn thành ('+pct+'%) · '+c.doing+' đang làm · '+c.wait+' chờ · '+c.block+' vướng'+(x.kind==='month'?' · '+new Set(x.list.map(t=>t.date)).size+' ngày có việc':'')+'</p>';
   if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
+  const qg=qtyGroups(x.list);
+  if(qg.length)h+='<h2>Số lượng theo đầu việc</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qg.map(g=>[g.name,g.n,fmtQ(g.sum)]));
   if(x.kind==='week'){
     let k=0;const seen=new Set();
     S.systems.forEach(sy=>{const l=x.list.filter(t=>t.system===sy.id);if(!l.length)return;seen.add(sy.id);k++;const tt=taskTableRows(l,x.all);
