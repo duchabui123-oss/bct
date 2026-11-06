@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<!-- Phiên bản 1.12 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -179,6 +180,13 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .qf details{flex:1 1 20rem;min-width:0}
 .qf summary{cursor:pointer;font-weight:600;color:var(--accent)}
 .qf-list{max-height:16rem;overflow:auto;display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.ver{font:600 .62rem/1 var(--font-body,inherit);color:var(--ink-2);opacity:.7;margin-left:4px;vertical-align:middle}
+.usys{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:.84rem;color:var(--ink-2)}
+.usys .qf-chip{font-size:.84rem}
+.qdays{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:6px}
+.qf-sys{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;flex:1 1 100%}
+.qf-chip{display:inline-flex;gap:6px;align-items:center;font-size:.88rem}
+.qf-chip input{width:auto;padding:0;margin:0}
 .qf-item{display:flex;gap:8px;align-items:flex-start;font-size:.88rem;min-width:0}
 .qf-item input{width:auto;padding:0;margin-top:.25rem;flex:none}
 .tgroup{margin:.9rem 0 .2rem;font-size:.78rem;font-weight:700;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase}
@@ -279,7 +287,7 @@ const isConfigured=!/DÁN/.test(firebaseConfig.apiKey||'DÁN');
 let auth=null,db=null;
 
 /* ===== Trạng thái ===== */
-const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:'',qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
+const S={user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
   editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
@@ -397,13 +405,14 @@ async function boot(){
     const mine=S.users.find(u=>u.uid===S.user.uid);
     if(mine){
       if(mine.active===false){doLogout();return}
-      S.profile=Object.assign({},mine);const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
+      const oldSys=JSON.stringify((S.profile&&S.profile.systems)||[]);
+      S.profile=Object.assign({},mine);if(oldSys!==JSON.stringify(mine.systems||[]))setTimeout(renderQuickSelects,0);const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
     }
     renderWho();renderReport();renderNotes();renderAdminUsers();
   }));
   unsubs.push(listen(collection(db,'systems'),snap=>{
     S.systems=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
-    renderQuickSelects();renderReport();renderCatalog('systems');renderTplAdmin();
+    renderQuickSelects();renderReport();renderCatalog('systems');renderTplAdmin();renderAdminUsers();
   }));
   unsubs.push(listen(collection(db,'types'),snap=>{
     S.types=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
@@ -477,6 +486,7 @@ function buildShell(){
   +'<form id="quick" class="panel"><h2 id="q-heading">Thêm việc</h2><div class="grid">'
   +'<label class="field"><span>Ngày</span><select id="q-date"></select><input id="q-dateother" type="date" hidden aria-label="Chọn ngày khác"></label>'
   +'<label class="field"><span>Hệ thống</span><select id="q-system"></select></label>'
+  +'<details class="field wide" id="q-multi"><summary>Nhập cùng một việc cho nhiều ngày trong tuần</summary><div class="qdays" id="q-days"></div><small class="muted">Tích các ngày cần nhập. Mỗi ngày được tạo thành một việc riêng; nếu không tích ngày nào thì dùng ngày đã chọn ở trên.</small></details>'
   +'<label class="field"><span>Loại việc</span><select id="q-type"></select></label>'
   +'<label class="field"><span>Trạng thái</span><select id="q-status">'+STATUS.map(s=>'<option value="'+s.id+'">'+s.label+'</option>').join('')+'</select></label>'
   +'<label class="field"><span>Số lượng (không bắt buộc)</span><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Ví dụ: 25"></label>'
@@ -548,7 +558,11 @@ function buildAdmin(){
   +'<div class="field" style="margin-top:18px"><label for="week-start"><b>Tuần báo cáo bắt đầu từ</b></label>'
   +'<select id="week-start"><option value="1">Thứ 2 (tuần 7 ngày, kết thúc Chủ nhật)</option><option value="2">Thứ 3</option><option value="3">Thứ 4</option><option value="4">Thứ 5</option><option value="5">Thứ 6 (kết thúc Thứ 5)</option><option value="6">Thứ 7</option><option value="0">Chủ nhật</option></select>'
   +'<small class="muted">Áp dụng cho mọi người dùng: khung ngày của từng tuần, số tuần và nội dung sao chép báo cáo. Với tuần bắt đầu khác Thứ 2, số tuần được tính theo ngày kết thúc: tuần chứa ngày 01/01 là tuần 1.</small></div>'
-  +'<span class="msg" id="set-msg" role="status"></span></section></div></section>';
+  +'<span class="msg" id="set-msg" role="status"></span></section>'
+  +'<section class="panel" style="margin-top:14px"><h2>Sao lưu dữ liệu</h2><p class="muted">Tải toàn bộ dữ liệu (người dùng, hệ thống, loại việc, việc mẫu, đầu việc, tổng kết tuần, cài đặt) về máy thành một tệp JSON. Nên sao lưu định kỳ, ví dụ mỗi tuần. Tài khoản đăng nhập (mật khẩu) do Firebase quản lý nên không nằm trong tệp.</p>'
+  +'<div class="actions"><button type="button" class="btn" data-act="bk-export">Tải bản sao lưu</button>'
+  +'<label class="btn" style="cursor:pointer">Khôi phục từ tệp…<input type="file" id="bk-file" accept=".json,application/json" hidden></label></div>'
+  +'<small class="muted">Khôi phục sẽ ghi đè các bản ghi cùng mã và thêm lại bản ghi bị xóa; không xóa dữ liệu hiện có khác.</small><span class="msg" id="bk-msg" role="status"></span></section></div></section>';
 }
 
 /* ===== Dữ liệu hiển thị ===== */
@@ -589,10 +603,12 @@ function renderQuickSelects(){
   const t=iso(new Date()),a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   const want=S.qDate&&S.qDate>=a&&S.qDate<=b?S.qDate:(t>=a&&t<=b?t:a);
   dsel.value=want;
+  $('q-days').innerHTML=Array.from({length:7},(_,i)=>{const d=iso(addDays(S.weekStart,i));return '<label class="qf-chip"><input type="checkbox" data-qd="'+d+'"> '+dayName(i)+' '+dm(d)+'</label>'}).join('');
   const act=l=>l.filter(x=>x.active!==false);
   const fill=(id,list,cur)=>{const s=$(id);s.innerHTML=list.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
     if(cur&&list.some(x=>x.id===cur))s.value=cur;};
-  fill('q-system',act(S.systems),S.qSystem||$('q-system').value);
+  const mine=(S.profile&&Array.isArray(S.profile.systems)?S.profile.systems:[]),allS=act(S.systems),mineL=allS.filter(x=>mine.indexOf(x.id)>=0);
+  fill('q-system',mineL.length?mineL:allS,S.qSystem||$('q-system').value);
   fill('q-type',act(S.types),S.qType||$('q-type').value);
   $('q-status').value=S.qStatus;
   const tl=act(S.tpls),sel=$('q-tpl');
@@ -732,7 +748,7 @@ function queueNote(){
 /* ===== Thêm / sửa / xóa việc ===== */
 function resetQuick(keep){
   S.editing=null;$('q-title').value='';$('q-result').value='';$('q-ticket').value='';$('q-note').value='';$('q-qty').value='';
-  $('q-save').textContent='Thêm việc';$('q-cancel').hidden=true;$('quick').querySelector('h2').textContent='Thêm việc';
+  $('q-multi').hidden=false;$('q-save').textContent='Thêm việc';$('q-cancel').hidden=true;$('quick').querySelector('h2').textContent='Thêm việc';
   if(!keep){$('q-msg').textContent='';$('q-goto').hidden=true}
 }
 function startEdit(t){
@@ -749,7 +765,7 @@ function startEdit(t){
   $('q-status').value=ST[t.status]?t.status:'wait';
   $('q-title').value=t.title||'';$('q-result').value=t.result||'';$('q-ticket').value=t.ticket||'';$('q-note').value=t.note||'';$('q-qty').value=t.qty!=null?t.qty:'';
   if(t.result||t.ticket||t.note)$('q-more').open=true;
-  $('q-save').textContent='Lưu thay đổi';$('q-cancel').hidden=false;
+  $('q-multi').hidden=true;$('q-save').textContent='Lưu thay đổi';$('q-cancel').hidden=false;
   $('quick').querySelector('h2').textContent='Sửa việc';$('q-msg').textContent='';$('q-goto').hidden=true;
   $('quick').scrollIntoView({block:'center'});$('q-title').focus();
 }
@@ -761,17 +777,20 @@ async function submitQuick(){
   if(!dv){msg.className='msg';msg.textContent='Hãy chọn ngày thực hiện.';return}
   const qv=(tp&&tp.noQty)?'':$('q-qty').value.trim();let qty=null;
   if(qv!==''){qty=Number(qv.replace(',','.'));if(!isFinite(qty)||qty<0){msg.className='msg';msg.textContent='Số lượng phải là số không âm.';$('q-qty').focus();return}}
+  const picked=S.editing?[]:[...document.querySelectorAll('#q-days input[data-qd]:checked')].map(x=>x.dataset.qd);
+  const dates=picked.length?picked:[dv];
   const id=S.editing?S.editing.id:newId();
-  const body={uid:S.user.uid,date:dv,system:$('q-system').value,type:$('q-type').value,status:$('q-status').value,title:title,
+  const body={uid:S.user.uid,date:dates[0],system:$('q-system').value,type:$('q-type').value,status:$('q-status').value,title:title,
     result:$('q-result').value.trim(),ticket:$('q-ticket').value.trim(),note:$('q-note').value.trim(),ts:S.editing&&S.editing.ts?S.editing.ts:Date.now()};
   if(qty!==null)body.qty=qty;
   $('q-save').disabled=true;msg.className='msg';msg.textContent='Đang lưu…';
   try{
     await setDoc(doc(db,'tasks',id),body);
+    for(let i=1;i<dates.length;i++)await setDoc(doc(db,'tasks',newId()),Object.assign({},body,{date:dates[i],ts:Date.now()+i}));
     S.qDate=body.date;S.qSystem=body.system;S.qType=body.type;S.qStatus=body.status;
     const wasEdit=!!S.editing;
     resetQuick(true);renderQuickSelects();
-    msg.className='msg ok';msg.textContent=wasEdit?'Đã lưu thay đổi.':'Đã thêm. Nhập việc tiếp theo.';
+    msg.className='msg ok';msg.textContent=wasEdit?'Đã lưu thay đổi.':(dates.length>1?'Đã thêm '+dates.length+' việc (mỗi ngày một việc). Nhập việc tiếp theo.':'Đã thêm. Nhập việc tiếp theo.');
     const g=$('q-goto'),wa=iso(S.weekStart),wb=iso(addDays(S.weekStart,6));
     if(body.date<wa||body.date>wb){
       msg.textContent=(wasEdit?'Đã chuyển việc sang ngày ':'Đã thêm việc vào ngày ')+dmy(body.date)+' (tuần '+weekNo(mondayOf(parse(body.date)))+'), nên không hiện ở tuần đang xem.';
@@ -888,7 +907,7 @@ function renderStats(){
   const qv=qtyView(list,true);
   const checked=c=>qv.isDefault?c.n>0:qv.sel.has(c.key);
   h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="qf">'
-    +'<label class="who">Hệ thống <select id="qf-system"><option value="">Tất cả hệ thống</option>'+S.systems.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===S.qfSys?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select></label>'
+    +'<div class="qf-sys"><b>Hệ thống:</b> <label class="qf-chip"><input type="checkbox" data-qfs=""'+(S.qfSys.size?'':' checked')+'> Tất cả hệ thống</label>'+S.systems.map(x=>'<label class="qf-chip"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(S.qfSys.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')+'</div>'
     +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc đã thực hiện':qv.sel.size+' đã chọn')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qf-default">Mặc định</button><button type="button" class="btn sm" data-act="qf-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="qf-none">Bỏ chọn tất cả</button></div>'
     +'<div class="qf-list">'+(qv.catalog.map(c=>'<label class="qf-item"><input type="checkbox" data-qfk="'+esc(c.key)+'"'+(checked(c)?' checked':'')+'><span>'+esc(c.name)+' <span class="muted">('+c.n+' lần)</span></span></label>').join('')||'<span class="muted">Chưa có đầu việc nào.</span>')+'</div></details></div>'
@@ -916,7 +935,7 @@ function statsText(){
   sect('THEO HỆ THỐNG',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'));
   sect('THEO LOẠI VIỆC',groupRows(list,'type',S.types,'Khác'));
   const qv=qtyView(list,true);
-  if(qv.rows.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC'+(qv.sys?' – '+sysName(qv.sys):''));qv.rows.forEach(c=>L.push('- '+c.name+': '+(c.hasSum?fmtQ(c.sum):'(trống)')+(c.n?' ('+c.n+' lần ghi nhận)':'')));L.push('')}
+  if(qv.rows.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC'+(qv.sys.length?' – '+sysLabel(qv.sys):''));qv.rows.forEach(c=>L.push('- '+c.name+': '+(c.hasSum?fmtQ(c.sum):'(trống)')+(c.n?' ('+c.n+' lần ghi nhận)':'')));L.push('')}
   if(S.mWho==='all')sect('THEO NGƯỜI',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'));
   return L.join('\n').replace(/\n+$/,'');
 }
@@ -1075,6 +1094,33 @@ function makeXlsx(sheets){
   sheets.forEach((s,i)=>files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:sheetXml(s)}));
   return zipStore(files);
 }
+const BK_COLS=['users','systems','types','tasks','weeknotes','settings'];
+async function backupExport(){
+  const m=$('bk-msg');m.className='msg';m.textContent='Đang đọc dữ liệu…';
+  try{
+    const out={app:'bao-cao-tuan',exported:new Date().toISOString(),data:{}};let n=0;
+    for(const c of BK_COLS){const sn=await getDocs(collection(db,c));out.data[c]={};sn.docs.forEach(d=>{out.data[c][d.id]=d.data();n++})}
+    const t=new Date(),pad=x=>String(x).padStart(2,'0');
+    download(new Blob([JSON.stringify(out)],{type:'application/json'}),'sao-luu-bao-cao-tuan-'+t.getFullYear()+pad(t.getMonth()+1)+pad(t.getDate())+'.json');
+    m.className='msg ok';m.textContent='Đã tải bản sao lưu ('+n+' bản ghi).';
+  }catch(e){m.className='msg';m.textContent=fsMsg(e)}
+}
+async function backupRestore(file){
+  const m=$('bk-msg');m.className='msg';
+  try{
+    const j=JSON.parse(await file.text());
+    if(!j||j.app!=='bao-cao-tuan'||!j.data)throw new Error('Tệp không phải bản sao lưu của Báo cáo tuần.');
+    let total=0;BK_COLS.forEach(c=>total+=Object.keys(j.data[c]||{}).length);
+    if(!confirm('Khôi phục '+total+' bản ghi từ tệp sao lưu ngày '+String(j.exported||'').slice(0,10)+'? Các bản ghi cùng mã sẽ bị ghi đè.'))return;
+    m.textContent='Đang khôi phục…';let done=0;
+    for(const c of BK_COLS){
+      const ids=Object.keys(j.data[c]||{});
+      for(let i=0;i<ids.length;i+=400){const b=writeBatch(db);ids.slice(i,i+400).forEach(id=>b.set(doc(db,c,id),j.data[c][id]));await b.commit();done+=Math.min(400,ids.length-i);m.textContent='Đang khôi phục… '+done+'/'+total}
+    }
+    m.className='msg ok';m.textContent='Đã khôi phục '+total+' bản ghi.';
+  }catch(e){m.className='msg';m.textContent=e&&e.message&&!e.code?e.message:fsMsg(e)}
+  $('bk-file').value='';
+}
 function download(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
@@ -1095,18 +1141,19 @@ const hasQty=t=>typeof t.qty==='number'&&isFinite(t.qty);
 const fmtQ=n=>String(Math.round(n*1000)/1000).replace('.',',');
 const titleKey=t=>String(t||'').trim().replace(/\s+/g,' ').toLowerCase();
 /* Số lượng theo đầu việc: lọc theo hệ thống, chọn đầu việc. useFilter=false thì dùng chế độ mặc định (các việc có số lượng) */
+const sysLabel=a=>a.map(sysName).join(', ');
 function qtyView(list,useFilter){
-  const sys=useFilter?S.qfSys:'',sel=useFilter?S.qfSel:null;
-  const data=sys?list.filter(t=>t.system===sys):list;
+  const sys=useFilter?new Set(S.qfSys):new Set(),sel=useFilter?S.qfSel:null;
+  const data=sys.size?list.filter(t=>sys.has(t.system)):list;
   const cat=new Map();
   const add=(name,isTpl)=>{const k=titleKey(name);if(k&&!cat.has(k))cat.set(k,{key:k,name:String(name).trim().replace(/\s+/g,' '),n:0,sum:0,hasSum:false})};
-  S.tpls.filter(x=>x.active!==false&&(!sys||!x.system||x.system===sys)).forEach(x=>add(x.name));
+  S.tpls.filter(x=>x.active!==false&&(!sys.size||!x.system||sys.has(x.system))).forEach(x=>add(x.name));
   const extra=[];data.forEach(t=>{const k=titleKey(t.title);if(k&&!cat.has(k)){add(t.title);extra.push(k)}});
   data.forEach(t=>{const c=cat.get(titleKey(t.title));if(!c)return;c.n++;if(hasQty(t)){c.sum+=t.qty;c.hasSum=true}});
   const tplKeys=[...cat.keys()].filter(k=>extra.indexOf(k)<0),ex=extra.sort((a,b)=>cat.get(a).name.localeCompare(cat.get(b).name,'vi'));
   const catalog=tplKeys.concat(ex).map(k=>cat.get(k));
   const rows=sel===null?catalog.filter(c=>c.n>0).sort((a,b)=>(b.hasSum-a.hasSum)||(b.sum-a.sum)||(b.n-a.n)):catalog.filter(c=>sel.has(c.key));
-  return {catalog:catalog,rows:rows,isDefault:sel===null,sys:sys,sel:sel};
+  return {catalog:catalog,rows:rows,isDefault:sel===null,sys:[...sys],sel:sel};
 }
 const qtyCells=c=>[c.name,c.n?c.n:'',c.hasSum?Math.round(c.sum*1000)/1000:''];
 const dmy=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]+'/'+p[0]};
@@ -1140,7 +1187,7 @@ function buildXlsx(x){
   sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,40,13,14,30,22]});
   statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
   const qv=qtyView(x.list,x.kind==='month');
-  if(qv.rows.length||!qv.isDefault)sheets.push({name:'Số lượng theo đầu việc',rows:[['Hệ thống',qv.sys?sysName(qv.sys):'Tất cả hệ thống'],[],['Đầu việc','Số lần ghi nhận','Tổng số lượng']].concat(qv.rows.map(qtyCells)),headRows:[2],freeze:3,widths:[56,16,16]});
+  if(qv.rows.length||!qv.isDefault)sheets.push({name:'Số lượng theo đầu việc',rows:[['Hệ thống',qv.sys.length?sysLabel(qv.sys):'Tất cả hệ thống'],[],['Đầu việc','Số lần ghi nhận','Tổng số lượng']].concat(qv.rows.map(qtyCells)),headRows:[2],freeze:3,widths:[56,16,16]});
   if(x.kind==='week'){
     const nr=[['Người báo cáo','Kết quả nổi bật','Tồn đọng, rủi ro, cần hỗ trợ','Kế hoạch tuần sau']];
     noteIds(x).forEach(uid=>{const d=noteOf(uid);if(d.highlights||d.issues||d.plan)nr.push([userName(uid),d.highlights||'',d.issues||'',d.plan||''])});
@@ -1158,7 +1205,7 @@ function buildPrintHtml(x){
       +(d.blocks.length?d.blocks.map(b=>'<tr><th colspan="2" class="bd">'+esc(b.name)+'</th></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2">Chưa có việc nào trong kỳ.</td></tr>')+'</tbody></table>'});
   if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
   const qv=qtyView(x.list,x.kind==='month');
-  if(qv.rows.length)h+='<h2>Số lượng theo đầu việc'+(qv.sys?' – '+esc(sysName(qv.sys)):'')+'</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qv.rows.map(c=>{const q=qtyCells(c);return [q[0],q[1],q[2]===''?'':fmtQ(q[2])]}));
+  if(qv.rows.length)h+='<h2>Số lượng theo đầu việc'+(qv.sys.length?' – '+esc(sysLabel(qv.sys)):'')+'</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qv.rows.map(c=>{const q=qtyCells(c);return [q[0],q[1],q[2]===''?'':fmtQ(q[2])]}));
   if(x.kind==='week'){
     let k=0;const seen=new Set();
     S.systems.forEach(sy=>{const l=x.list.filter(t=>t.system===sy.id);if(!l.length)return;seen.add(sy.id);k++;const tt=taskTableRows(l,x.all);
@@ -1204,7 +1251,8 @@ function renderAdminUsers(){
       +'<span class="mono">'+esc(u.username||'')+'</span><span>'+esc(u.unit||'')+'</span>'
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
       +'<span class="tbtns"><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
-      +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span></div>';
+      +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span>'
+      +'<div class="usys"><b>Hệ thống phụ trách</b> '+(S.systems.filter(x=>x.active!==false).map(x=>'<label class="qf-chip"><input type="checkbox" data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"'+((u.systems||[]).indexOf(x.id)>=0?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'')+'<small>(không tích = thấy tất cả hệ thống)</small></div></div>';
    }).join('');
 }
 function renderCatalog(kind){
@@ -1291,10 +1339,11 @@ root.addEventListener('click',async e=>{
       document.querySelectorAll('.tabs [data-act="tab"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.tab)));
       $('tab-report').hidden=S.tab!=='report';$('tab-stats').hidden=S.tab!=='stats';const ta=$('tab-admin');if(ta)ta.hidden=S.tab!=='admin';
       if(S.tab==='stats'){if(!monthUnsubs.length)subMonth();renderStats()}
+      if(S.tab==='admin')renderSettings();
       return;
     }
     if(act==='adm'){
-      S.admTab=b.dataset.t;
+      S.admTab=b.dataset.t;if(S.admTab==='settings')renderSettings();
       document.querySelectorAll('[data-act="adm"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.admTab)));
       ['users','systems','types','tpls','settings'].forEach(k=>{const p=$('adm-'+k);if(p)p.hidden=k!==S.admTab});return;
     }
@@ -1340,6 +1389,7 @@ root.addEventListener('click',async e=>{
       }
       return;
     }
+    if(act==='bk-export'){backupExport();return}
     if(act==='user-del'){
       const u=S.users.find(x=>x.uid===b.dataset.uid);if(!u||u.uid===S.user.uid)return;
       if(!b.dataset.armed){
@@ -1413,6 +1463,11 @@ root.addEventListener('change',async e=>{
       const task=S.tasks.find(x=>x.id===t.dataset.status);if(!task||!isMine(task)){renderReport();return}
       try{await updateDoc(doc(db,'tasks',task.id),{status:t.value})}catch(err){flash(fsMsg(err));renderReport()}return;
     }
+    if(t.matches&&t.matches('input[data-usys]')){
+      const uid=t.dataset.usys,u=S.users.find(x=>x.uid===uid);if(!u)return;
+      const n=new Set(u.systems||[]);t.checked?n.add(t.dataset.sid):n.delete(t.dataset.sid);
+      try{await updateDoc(doc(db,'users',uid),{systems:[...n]})}catch(err){flash(fsMsg(err));renderAdminUsers()}return;
+    }
     if(t.matches&&t.matches('select[data-role]')){
       const uid=t.dataset.role;if(uid===S.user.uid)return;
       try{await updateDoc(doc(db,'users',uid),{role:t.value})}catch(err){flash(fsMsg(err));renderAdminUsers()}return;
@@ -1424,7 +1479,7 @@ root.addEventListener('change',async e=>{
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
     }
-    if(t.id==='qf-system'){S.qfSys=t.value;S.qfSel=null;renderStats();return}
+    if(t.matches&&t.matches('input[data-qfs]')){const v=t.dataset.qfs;if(!v)S.qfSys=new Set();else{const n=new Set(S.qfSys);t.checked?n.add(v):n.delete(v);S.qfSys=n}S.qfSel=null;renderStats();return}
     if(t.matches&&t.matches('input[data-qfk]')){
       const v=qtyView(monthTasks(),true),sel=S.qfSel?new Set(S.qfSel):new Set(v.catalog.filter(c=>c.n>0).map(c=>c.key));
       if(t.checked)sel.add(t.dataset.qfk);else sel.delete(t.dataset.qfk);
@@ -1456,6 +1511,7 @@ root.addEventListener('change',async e=>{
       try{await setDoc(doc(db,'settings','app'),{allowSignup:t.checked},{merge:true});m.className='msg ok';m.textContent='Đã lưu cài đặt.'}
       catch(err){m.className='msg';m.textContent=fsMsg(err);t.checked=!t.checked}return;
     }
+    if(t.id==='bk-file'){if(t.files&&t.files[0])backupRestore(t.files[0]);return}
     if(t.id==='q-status'){S.qStatus=t.value}
     if(t.id==='q-date'){
       const o=$('q-dateother');
