@@ -1075,7 +1075,8 @@ function renderTplAdmin(){
 function applyWeekSetting(){
   const w=Number.isInteger(S.settings.weekStart)&&S.settings.weekStart>=0&&S.settings.weekStart<=6?S.settings.weekStart:1;
   if(w===WK)return;
-  WK=w;S.weekStart=mondayOf(S.weekStart);
+  const wasCurrent=iso(S.weekStart)===iso(mondayOf(new Date()));
+  WK=w;S.weekStart=wasCurrent?mondayOf(new Date()):mondayOf(S.weekStart);
   if($('quick'))setWeek(S.weekStart);
 }
 function renderSettings(){
