@@ -240,7 +240,10 @@ const pad=n=>String(n).padStart(2,'0');
 const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const parse=s=>{const p=String(s).split('-').map(Number);return new Date(p[0],(p[1]||1)-1,p[2]||1)};
 const addDays=(d,n)=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x};
-const mondayOf=d=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());return addDays(x,-((x.getDay()+6)%7))};
+let WK=1; /* ngày bắt đầu tuần: 0=Chủ nhật, 1=Thứ 2 … 6=Thứ 7 (cài đặt trong Quản lý) */
+const mondayOf=d=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());return addDays(x,-((x.getDay()-WK+7)%7))};
+const dayName=i=>DAYS[((WK+i)%7+6)%7];
+const weekNo=ws=>{if(WK===1)return isoWeek(ws);const e=addDays(ws,6);const doy=Math.round((new Date(e.getFullYear(),e.getMonth(),e.getDate())-new Date(e.getFullYear(),0,1))/86400000)+1;return Math.ceil(doy/7)};
 const dm=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]};
 const full=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
 const isoWeek=d=>{const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));const ys=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-ys)/86400000+1)/7)};
@@ -382,7 +385,7 @@ async function boot(){
     S.types=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
     renderQuickSelects();renderReport();renderCatalog('types');
   }));
-  unsubs.push(listen(doc(db,'settings','app'),snap=>{S.settings=snap.exists()?snap.data():{};renderSettings()}));
+  unsubs.push(listen(doc(db,'settings','app'),snap=>{S.settings=snap.exists()?snap.data():{};renderSettings();applyWeekSetting()}));
   subWeek();
   renderQuickSelects();renderWho();renderReport();renderNotes();
   if(isAdmin)ensureDefaults();
@@ -438,11 +441,12 @@ function buildShell(){
   +'<button type="button" class="btn" data-act="wk-next">Tuần sau ›</button><button type="button" class="btn link" id="wk-today" data-act="wk-today">Tuần này</button></div>'
   +'<label class="who">Xem báo cáo của <select id="who"></select></label>'
   +'<div class="seg" role="group" aria-label="Kiểu xem"><button type="button" data-act="view" data-v="system" aria-pressed="true">Theo hệ thống</button><button type="button" data-act="view" data-v="day" aria-pressed="false">Theo ngày</button></div>'
-  +'<button type="button" class="btn" data-act="copy">Sao chép báo cáo</button></div>'
+  +'<button type="button" class="btn" data-act="copy">Sao chép báo cáo</button>'
+  +'<button type="button" class="btn" data-act="x-xlsx" data-k="week">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="week">Xuất PDF</button></div>'
 
   +'<section class="summary" aria-label="Tiến độ trong tuần"><div class="sum-line" id="sum-line"></div><div class="bar-s" id="sum-bar" role="img" aria-label="Tỷ lệ trạng thái"></div><ul class="legend" id="sum-legend"></ul></section>'
 
-  +'<form id="quick" class="panel"><h2 id="q-title">Thêm việc</h2><div class="grid">'
+  +'<form id="quick" class="panel"><h2 id="q-heading">Thêm việc</h2><div class="grid">'
   +'<label class="field"><span>Ngày</span><select id="q-date"></select></label>'
   +'<label class="field"><span>Hệ thống</span><select id="q-system"></select></label>'
   +'<label class="field"><span>Loại việc</span><select id="q-type"></select></label>'
@@ -498,6 +502,9 @@ function buildAdmin(){
 
   +'<div id="adm-settings" class="app" hidden><section class="panel"><h2>Cài đặt</h2>'
   +'<label class="check"><input type="checkbox" id="allow-signup"><span>Cho phép người dùng tự tạo tài khoản<br><small class="muted">Người dùng nhập họ tên, đơn vị, tên đăng nhập và mật khẩu ngay ở màn hình đăng nhập. Tài khoản tự tạo luôn có quyền Người dùng.</small></span></label>'
+  +'<div class="field" style="margin-top:18px"><label for="week-start"><b>Tuần báo cáo bắt đầu từ</b></label>'
+  +'<select id="week-start"><option value="1">Thứ 2 (tuần 7 ngày, kết thúc Chủ nhật)</option><option value="2">Thứ 3</option><option value="3">Thứ 4</option><option value="4">Thứ 5</option><option value="5">Thứ 6 (kết thúc Thứ 5)</option><option value="6">Thứ 7</option><option value="0">Chủ nhật</option></select>'
+  +'<small class="muted">Áp dụng cho mọi người dùng: khung ngày của từng tuần, số tuần và nội dung sao chép báo cáo. Với tuần bắt đầu khác Thứ 2, số tuần được tính theo ngày kết thúc: tuần chứa ngày 01/01 là tuần 1.</small></div>'
   +'<span class="msg" id="set-msg" role="status"></span></section></div></section>';
 }
 
@@ -534,7 +541,7 @@ function renderWho(){
 }
 function renderQuickSelects(){
   if(!$('q-date'))return;
-  const days=Array.from({length:7},(_,i)=>{const d=iso(addDays(S.weekStart,i));return '<option value="'+d+'">'+DAYS[i]+' · '+dm(d)+'</option>'}).join('');
+  const days=Array.from({length:7},(_,i)=>{const d=iso(addDays(S.weekStart,i));return '<option value="'+d+'">'+dayName(i)+' · '+dm(d)+'</option>'}).join('');
   const dsel=$('q-date');dsel.innerHTML=days;
   const t=iso(new Date()),a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   const want=S.qDate&&S.qDate>=a&&S.qDate<=b?S.qDate:(t>=a&&t<=b?t:a);
@@ -587,7 +594,7 @@ function byDay(list){
     const d=iso(addDays(S.weekStart,i)),l=list.filter(t=>t.date===d);
     if(i>=5&&!l.length)continue;
     const c=counts(l);
-    out.push('<section class="day"><header><h3>'+DAYS[i]+'</h3><span class="mono count">'+dm(d)+'</span>'+(d===today?'<span class="today">Hôm nay</span>':'')
+    out.push('<section class="day"><header><h3>'+dayName(i)+'</h3><span class="mono count">'+dm(d)+'</span>'+(d===today?'<span class="today">Hôm nay</span>':'')
       +'<span class="head-end">'+(c.block?'<span class="flag">'+c.block+' vướng</span>':'')+'<span class="count mono">'+c.done+'/'+l.length+'</span></span></header>'
       +'<div class="byday">'+(l.length?l.map(t=>row(t,'day')).join(''):'<div class="row"><div class="r-main muted">Chưa có việc.</div></div>')+'</div></section>');
   }
@@ -596,7 +603,7 @@ function byDay(list){
 function renderReport(){
   if(!$('list'))return;
   const ws=S.weekStart;
-  $('wk-label').textContent='Tuần '+isoWeek(ws)+' · '+dm(iso(ws))+' – '+full(addDays(ws,6));
+  $('wk-label').textContent='Tuần '+weekNo(ws)+' · '+dm(iso(ws))+' – '+full(addDays(ws,6));
   $('wk-today').disabled=iso(ws)===iso(mondayOf(new Date()));
   const list=visibleTasks(),c=counts(list),n=list.length,pct=n?Math.round(c.done*100/n):0;
   $('sum-line').innerHTML=n?'<span class="mono">'+c.done+'/'+n+'</span> việc hoàn thành · <span class="mono">'+pct+'%</span>':(S.loadedTasks?'Tuần này chưa có việc nào':'Đang tải dữ liệu…');
@@ -684,7 +691,7 @@ async function submitQuick(){
 /* ===== Báo cáo văn bản ===== */
 function reportText(){
   const list=visibleTasks(),c=counts(list),L=[];
-  L.push('BÁO CÁO TUẦN '+isoWeek(S.weekStart)+' ('+dm(iso(S.weekStart))+' – '+full(addDays(S.weekStart,6))+')');
+  L.push('BÁO CÁO TUẦN '+weekNo(S.weekStart)+' ('+dm(iso(S.weekStart))+' – '+full(addDays(S.weekStart,6))+')');
   if(S.who==='all')L.push('Tất cả mọi người');
   else{const u=S.users.find(x=>x.uid===S.who);if(u)L.push([u.name||u.username,u.unit].filter(Boolean).join(' – '))}
   L.push('Tổng '+list.length+' việc: '+c.done+' hoàn thành, '+c.doing+' đang làm, '+c.wait+' chờ, '+c.block+' vướng.','');
@@ -721,7 +728,8 @@ function buildStats(){
   +'<div class="toolbar"><div class="weeknav"><button type="button" class="btn" data-act="m-prev">‹ Tháng trước</button><div class="wk-label mono" id="m-label"></div>'
   +'<button type="button" class="btn" data-act="m-next">Tháng sau ›</button><button type="button" class="btn link" id="m-now" data-act="m-now">Tháng này</button></div>'
   +'<label class="who">Thống kê của <select id="m-who"></select></label>'
-  +'<button type="button" class="btn" data-act="s-copy">Sao chép thống kê</button></div>'
+  +'<button type="button" class="btn" data-act="s-copy">Sao chép thống kê</button>'
+  +'<button type="button" class="btn" data-act="x-xlsx" data-k="month">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="month">Xuất PDF</button></div>'
   +'<div id="stats-body" class="app"></div>'
   +'<section id="s-panel" class="panel" hidden aria-label="Thống kê dạng văn bản"><h2>Thống kê dạng văn bản</h2><textarea class="report-box" id="s-text" readonly></textarea>'
   +'<div class="actions"><button type="button" class="btn primary" data-act="s-copy-now">Sao chép</button><button type="button" class="btn link" data-act="s-close">Đóng</button><span class="msg" id="s-msg" role="status"></span></div></section></section>';
@@ -809,6 +817,147 @@ async function copyStats(){
   catch(e){ta.focus();ta.select();mm.className='msg';mm.textContent='Hãy nhấn Ctrl+C (hoặc giữ ngón tay) để sao chép phần đã chọn.'}
 }
 
+
+/* ===== Xuất Excel / PDF ===== */
+const CRC_T=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC_T[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function zipStore(files){
+  const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  const u16=n=>[n&255,(n>>>8)&255],u32=n=>[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+  files.forEach(f=>{
+    const name=enc.encode(f.name),data=enc.encode(f.data),crc=crc32(data);
+    const lh=new Uint8Array([0x50,0x4b,3,4,20,0,0,8,0,0,0,0,0x21,0].concat(u32(crc),u32(data.length),u32(data.length),u16(name.length),[0,0]));
+    parts.push(lh,name,data);
+    cen.push(new Uint8Array([0x50,0x4b,1,2,20,0,20,0,0,8,0,0,0,0,0x21,0].concat(u32(crc),u32(data.length),u32(data.length),u16(name.length),[0,0,0,0,0,0,0,0,0,0,0,0],u32(off))),name);
+    off+=lh.length+name.length+data.length;
+  });
+  let cs=0;cen.forEach(c=>{cs+=c.length});
+  const end=new Uint8Array([0x50,0x4b,5,6,0,0,0,0].concat(u16(files.length),u16(files.length),u32(cs),u32(off),[0,0]));
+  return new Blob(parts.concat(cen,[end]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+const xe=v=>String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const colL=i=>{let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+function sheetXml(sh){
+  const widths=sh.widths||[];
+  let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+  if(sh.freeze)x+='<sheetViews><sheetView workbookViewId="0"><pane ySplit="'+sh.freeze+'" topLeftCell="A'+(sh.freeze+1)+'" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+  if(widths.length)x+='<cols>'+widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('')+'</cols>';
+  x+='<sheetData>';
+  sh.rows.forEach((r,ri)=>{
+    x+='<row r="'+(ri+1)+'">';
+    r.forEach((v,ci)=>{
+      if(v===null||v===undefined||v==='')return;
+      const ref=colL(ci)+(ri+1),hd=sh.headRows&&sh.headRows.indexOf(ri)>=0,ti=sh.titleRows&&sh.titleRows.indexOf(ri)>=0;
+      const st=ti?3:hd?1:2;
+      if(typeof v==='number')x+='<c r="'+ref+'" s="'+st+'"><v>'+v+'</v></c>';
+      else x+='<c r="'+ref+'" s="'+st+'" t="inlineStr"><is><t xml:space="preserve">'+xe(v)+'</t></is></c>';
+    });
+    x+='</row>';
+  });
+  return x+'</sheetData></worksheet>';
+}
+function makeXlsx(sheets){
+  const files=[];
+  files.push({name:'[Content_Types].xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'});
+  files.push({name:'_rels/.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'});
+  files.push({name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map((s,i)=>'<sheet name="'+xe(s.name.replace(/[\[\]:*?\/\\]/g,' ').slice(0,31))+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>'});
+  files.push({name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'});
+  files.push({name:'xl/styles.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'});
+  sheets.forEach((s,i)=>files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:sheetXml(s)}));
+  return zipStore(files);
+}
+function download(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+function exportCtx(kind){
+  if(kind==='week'){
+    const ws=S.weekStart,list=visibleTasks(),who=S.who==='all'?'Tất cả mọi người':userName(S.who);
+    return {kind:kind,list:list,all:S.who==='all',who:who,
+      title:'Báo cáo tuần '+weekNo(ws),period:dm(iso(ws))+' – '+full(addDays(ws,6)),
+      file:'BaoCao_Tuan'+weekNo(ws)+'_'+pad(ws.getDate())+'-'+pad(ws.getMonth()+1)+'-'+ws.getFullYear()};
+  }
+  const m=S.month,list=monthTasks(),who=S.mWho==='all'?'Tất cả mọi người':userName(S.mWho);
+  return {kind:kind,list:list,all:S.mWho==='all',who:who,
+    title:'Thống kê tháng '+(m.getMonth()+1)+'/'+m.getFullYear(),period:'Tháng '+(m.getMonth()+1)+'/'+m.getFullYear(),
+    file:'ThongKe_Thang_'+pad(m.getMonth()+1)+'-'+m.getFullYear()};
+}
+const dmy=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]+'/'+p[0]};
+const wdName=s=>DAYS[(parse(s).getDay()+6)%7];
+const stLabel=id=>ST[id]?ST[id].label:'Chờ';
+function taskTableRows(list,all){
+  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Kết quả','Trạng thái','Mã phiếu','Ghi chú'].concat(all?['Người thực hiện']:[]);
+  const rows=list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0)))
+    .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]));
+  return {head:head,rows:rows};
+}
+function groupStat(list,key,items,rest){
+  return groupRows(list,key,items,rest).map(r=>{const c=counts(r.list),n=r.list.length;return {name:r.name,n:n,c:c,p:n?Math.round(c.done*100/n):0}});
+}
+function statSets(x){
+  const sets=[['Theo hệ thống','Hệ thống',groupStat(x.list,'system',S.systems,'(Hệ thống đã xóa)')],['Theo loại việc','Loại việc',groupStat(x.list,'type',S.types,'Khác')]];
+  if(x.all)sets.push(['Theo người','Người báo cáo',groupStat(x.list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)')]);
+  return sets;
+}
+const statHead=f=>[f,'Tổng','Hoàn thành','Đang làm','Chờ','Vướng','Tỷ lệ hoàn thành (%)'];
+const statRow=r=>[r.name,r.n,r.c.done,r.c.doing,r.c.wait,r.c.block,r.p];
+function noteIds(x){return x.kind==='week'?(x.all?S.users.map(u=>u.uid):[S.who]):[]}
+function buildXlsx(x){
+  const c=counts(x.list),n=x.list.length,pct=n?Math.round(c.done*100/n):0,sheets=[];
+  const ov=[[x.title],['Kỳ báo cáo',x.period],['Người báo cáo',x.who],['Ngày xuất',full(new Date())],[],
+    ['Tổng số việc',n],['Hoàn thành',c.done],['Đang làm',c.doing],['Chờ',c.wait],['Vướng',c.block],['Tỷ lệ hoàn thành (%)',pct]];
+  if(x.kind==='month')ov.push(['Số ngày có việc',new Set(x.list.map(t=>t.date)).size]);
+  sheets.push({name:'Tổng quan',rows:ov,widths:[26,40],titleRows:[0]});
+  const tt=taskTableRows(x.list,x.all);
+  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,40,13,14,30,22]});
+  statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
+  if(x.kind==='week'){
+    const nr=[['Người báo cáo','Kết quả nổi bật','Tồn đọng, rủi ro, cần hỗ trợ','Kế hoạch tuần sau']];
+    noteIds(x).forEach(uid=>{const d=noteOf(uid);if(d.highlights||d.issues||d.plan)nr.push([userName(uid),d.highlights||'',d.issues||'',d.plan||''])});
+    if(nr.length>1)sheets.push({name:'Tổng kết tuần',rows:nr,headRows:[0],freeze:1,widths:[22,50,50,50]});
+  }
+  return makeXlsx(sheets);
+}
+function buildPrintHtml(x){
+  const c=counts(x.list),n=x.list.length,pct=n?Math.round(c.done*100/n):0;
+  const tbl=(head,rows,cls)=>'<table'+(cls?' class="'+cls+'"':'')+'><thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+  let h='<h1>'+esc(x.title)+'</h1><p class="meta">'+esc(x.period)+' · '+esc(x.who)+' · Ngày xuất '+full(new Date())+'</p>'
+    +'<p class="sum"><b>'+n+'</b> việc · <b>'+c.done+'</b> hoàn thành ('+pct+'%) · '+c.doing+' đang làm · '+c.wait+' chờ · '+c.block+' vướng'+(x.kind==='month'?' · '+new Set(x.list.map(t=>t.date)).size+' ngày có việc':'')+'</p>';
+  if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
+  if(x.kind==='week'){
+    let k=0;const seen=new Set();
+    S.systems.forEach(sy=>{const l=x.list.filter(t=>t.system===sy.id);if(!l.length)return;seen.add(sy.id);k++;const tt=taskTableRows(l,x.all);
+      h+='<h2>'+k+'. '+esc(sy.name)+' ('+l.length+' việc)</h2>'+tbl(tt.head.filter(v=>v!=='Hệ thống'),tt.rows.map(r=>r.filter((v,i)=>i!==2)),'tk')});
+    const rest=x.list.filter(t=>!seen.has(t.system));
+    if(rest.length){const tt=taskTableRows(rest,x.all);h+='<h2>(Hệ thống đã xóa)</h2>'+tbl(tt.head,tt.rows,'tk')}
+    noteIds(x).forEach(uid=>{const d=noteOf(uid);if(!(d.highlights||d.issues||d.plan))return;
+      h+='<h2>Tổng kết tuần'+(x.all?' – '+esc(userName(uid)):'')+'</h2>'+tbl(['Kết quả nổi bật','Tồn đọng, rủi ro, cần hỗ trợ','Kế hoạch tuần sau'],[[d.highlights||'',d.issues||'',d.plan||'']])});
+  }else{
+    const tt=taskTableRows(x.list,x.all);h+='<h2>Danh sách công việc ('+n+')</h2>'+tbl(tt.head,tt.rows,'tk');
+  }
+  return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(x.file)+'</title><style>'
+    +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/1.45 "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
+    +'h1{font-size:19px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;break-after:avoid}.meta{color:#555;margin:0 0 8px}.sum{margin:0 0 6px;font-size:12px}'
+    +'table{width:100%;border-collapse:collapse;margin:0 0 4px}th,td{border:1px solid #999;padding:3px 5px;text-align:left;vertical-align:top;word-break:break-word}'
+    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}tr{break-inside:avoid}thead{display:table-header-group}'
+    +'</style></head><body>'+h+'</body></html>';
+}
+function printHtml(html){
+  const f=document.createElement('iframe');
+  f.setAttribute('aria-hidden','true');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const d=f.contentWindow.document;d.open();d.write(html);d.close();
+  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){flash('Trình duyệt không mở được hộp thoại in.')}setTimeout(()=>f.remove(),60000)},400);
+}
+function exportReport(kind,fmt){
+  const x=exportCtx(kind);
+  if(!x.list.length){flash('Chưa có việc nào trong kỳ này để xuất.');return}
+  try{
+    if(fmt==='xlsx'){download(buildXlsx(x),x.file+'.xlsx');flash('Đã tạo file Excel.',true)}
+    else{printHtml(buildPrintHtml(x));flash('Trong hộp thoại in, chọn "Lưu dưới dạng PDF" (Save as PDF) ở mục Máy in.',true)}
+  }catch(e){flash('Không xuất được: '+(e&&e.message?e.message:e))}
+}
+
 /* ===== Quản lý ===== */
 function renderAdminUsers(){
   const el=$('user-list');if(!el)return;
@@ -832,7 +981,14 @@ function renderCatalog(kind){
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button></div>').join('')
     ||'<p class="muted">Chưa có mục nào.</p>';
 }
+function applyWeekSetting(){
+  const w=Number.isInteger(S.settings.weekStart)&&S.settings.weekStart>=0&&S.settings.weekStart<=6?S.settings.weekStart:1;
+  if(w===WK)return;
+  WK=w;S.weekStart=mondayOf(S.weekStart);
+  if($('quick'))setWeek(S.weekStart);
+}
 function renderSettings(){
+  const ws=$('week-start');if(ws)ws.value=String(WK);
   const c=$('allow-signup');if(c)c.checked=!!S.settings.allowSignup;
 }
 async function createUserAsAdmin(name,username,password,unit,role){
@@ -890,6 +1046,7 @@ root.addEventListener('click',async e=>{
       S.view=b.dataset.v;
       document.querySelectorAll('[data-act="view"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===S.view)));renderReport();return;
     }
+    if(act==='x-xlsx'||act==='x-pdf'){exportReport(b.dataset.k,act==='x-xlsx'?'xlsx':'pdf');return}
     if(act==='copy'){const p=$('report-panel');$('report-text').value=reportText();p.hidden=false;$('report-msg').textContent='';p.scrollIntoView({block:'center'});copyReport();return}
     if(act==='copy-now'){await copyReport();return}
     if(act==='report-close'){$('report-panel').hidden=true;return}
@@ -938,6 +1095,11 @@ root.addEventListener('change',async e=>{
     if(t.matches&&t.matches('input[data-catname]')){
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
+    }
+    if(t.id==='week-start'){
+      const m=$('set-msg'),v=parseInt(t.value,10);
+      try{await setDoc(doc(db,'settings','app'),{weekStart:v},{merge:true});m.className='msg ok';m.textContent='Đã lưu cách tính tuần.'}
+      catch(err){m.className='msg';m.textContent=fsMsg(err);t.value=String(WK)}return;
     }
     if(t.id==='allow-signup'){
       const m=$('set-msg');
