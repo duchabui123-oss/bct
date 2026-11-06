@@ -886,16 +886,16 @@ function renderStats(){
   h+='<section class="panel"><h2>Theo hệ thống</h2>'+statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'))+'</section>';
   h+='<section class="panel"><h2>Theo loại việc</h2>'+statTable('Loại việc',groupRows(list,'type',S.types,'Khác'))+'</section>';
   const qv=qtyView(list,true);
-  const checked=c=>qv.isDefault?c.hasSum:qv.sel.has(c.key);
+  const checked=c=>qv.isDefault?c.n>0:qv.sel.has(c.key);
   h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="qf">'
     +'<label class="who">Hệ thống <select id="qf-system"><option value="">Tất cả hệ thống</option>'+S.systems.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===S.qfSys?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select></label>'
-    +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc có số lượng':qv.sel.size+' đã chọn')+')</summary>'
+    +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc đã thực hiện':qv.sel.size+' đã chọn')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qf-default">Mặc định</button><button type="button" class="btn sm" data-act="qf-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="qf-none">Bỏ chọn tất cả</button></div>'
     +'<div class="qf-list">'+(qv.catalog.map(c=>'<label class="qf-item"><input type="checkbox" data-qfk="'+esc(c.key)+'"'+(checked(c)?' checked':'')+'><span>'+esc(c.name)+' <span class="muted">('+c.n+' lần)</span></span></label>').join('')||'<span class="muted">Chưa có đầu việc nào.</span>')+'</div></details></div>'
     +(qv.rows.length?'<div class="tscroll"><div class="stbl"><div class="srow head qrow"><span>Đầu việc</span><span>Số lần</span><span>Tổng số lượng</span></div>'
       +qv.rows.map(c=>{const q=qtyCells(c);return '<div class="srow qrow"><span class="nm">'+esc(q[0])+'</span><span class="mono">'+q[1]+'</span><span class="mono"><b>'+(q[2]===''?'':fmtQ(q[2]))+'</b></span></div>'}).join('')
-      +'</div></div>':'<p class="muted">'+(qv.isDefault?'Chưa có việc nào ghi số lượng. Hãy mở "Chọn đầu việc" để chọn các đầu việc muốn xem.':'Chưa chọn đầu việc nào.')+'</p>')
-    +'<p class="muted">Mặc định hiện các đầu việc có ghi số lượng. Đầu việc được chọn mà chưa có số liệu thì để trống. Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p></section>';
+      +'</div></div>':'<p class="muted">'+(qv.isDefault?'Chưa có việc nào trong kỳ này. Hãy mở "Chọn đầu việc" để chọn các đầu việc muốn xem.':'Chưa chọn đầu việc nào.')+'</p>')
+    +'<p class="muted">Mặc định hiện mọi đầu việc đã thực hiện trong kỳ, việc không ghi số lượng thì cột tổng số lượng để trống. Đầu việc được chọn mà chưa có số liệu thì để trống. Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p></section>';
   h+='<section class="panel"><h2>Theo ngày</h2>'+dayChart(list)+'</section>';
   if(S.mWho==='all')h+='<section class="panel"><h2>Theo người</h2>'+statTable('Người báo cáo',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'))+'</section>';
   $('stats-body').innerHTML=h;
@@ -933,7 +933,7 @@ const autoGroup=n=>{n=String(n||'').trim();if(/^ipcc\b/i.test(n))return 'IPCC';i
 const sysGroup=sy=>(sy&&String(sy.group||'').trim())||autoGroup(sy?sy.name:'');
 const qtyText=n=>n===0?'0':(Number.isInteger(n)&&n>0&&n<10?'0'+n:fmtQ(n));
 function summaryBlocks(list){
-  const tpls=S.tpls.filter(x=>x.active!==false),sharedKeys=new Set(tpls.filter(x=>!x.system).map(x=>titleKey(x.name)));
+  const tpls=S.tpls.filter(x=>x.active!==false);
   const blocks=[];
   const tplLines=(arr,tasks,start)=>{
     let i=start;const out=[];
@@ -957,15 +957,14 @@ function summaryBlocks(list){
   const groups=new Map();
   S.systems.forEach(sy=>{const g=sysGroup(sy);if(!groups.has(g))groups.set(g,new Set());groups.get(g).add(sy.id)});
   groups.forEach((ids,gname)=>{
-    const seenK=new Set(),arr=tpls.filter(x=>ids.has(x.system)).filter(x=>{const k=titleKey(x.name);if(seenK.has(k))return false;seenK.add(k);return true});
-    const tasks=list.filter(t=>ids.has(t.system)&&!sharedKeys.has(titleKey(t.title)));
+    /* việc mẫu dùng chung (không gắn hệ thống) xuất hiện ở mọi khối, số liệu chỉ tính trong khối đó */
+    const seenK=new Set(),arr=tpls.filter(x=>!x.system||ids.has(x.system)).filter(x=>{const k=titleKey(x.name);if(seenK.has(k))return false;seenK.add(k);return true});
+    const tasks=list.filter(t=>ids.has(t.system));
     if(!arr.length&&!tasks.length)return;
     const a=tplLines(arr,tasks,1),tk=new Set(arr.map(x=>titleKey(x.name)));
     blocks.push({name:gname,lines:a.lines.concat(extraLines(tasks,a.next,tk)),notes:notesOf(tasks)});
   });
-  const shared=tpls.filter(x=>!x.system),sTasks=list.filter(t=>sharedKeys.has(titleKey(t.title)));
-  if(shared.length){const a=tplLines(shared,sTasks,1);blocks.push({name:'Dùng chung',lines:a.lines,notes:notesOf(sTasks)})}
-  const lost=list.filter(t=>!known.has(t.system)&&!sharedKeys.has(titleKey(t.title)));
+  const lost=list.filter(t=>!known.has(t.system));
   if(lost.length)blocks.push({name:'(Hệ thống đã xóa)',lines:extraLines(lost,1,new Set()),notes:notesOf(lost)});
   return blocks;
 }
@@ -1106,7 +1105,7 @@ function qtyView(list,useFilter){
   data.forEach(t=>{const c=cat.get(titleKey(t.title));if(!c)return;c.n++;if(hasQty(t)){c.sum+=t.qty;c.hasSum=true}});
   const tplKeys=[...cat.keys()].filter(k=>extra.indexOf(k)<0),ex=extra.sort((a,b)=>cat.get(a).name.localeCompare(cat.get(b).name,'vi'));
   const catalog=tplKeys.concat(ex).map(k=>cat.get(k));
-  const rows=sel===null?catalog.filter(c=>c.hasSum).sort((a,b)=>b.sum-a.sum):catalog.filter(c=>sel.has(c.key));
+  const rows=sel===null?catalog.filter(c=>c.n>0).sort((a,b)=>(b.hasSum-a.hasSum)||(b.sum-a.sum)||(b.n-a.n)):catalog.filter(c=>sel.has(c.key));
   return {catalog:catalog,rows:rows,isDefault:sel===null,sys:sys,sel:sel};
 }
 const qtyCells=c=>[c.name,c.n?c.n:'',c.hasSum?Math.round(c.sum*1000)/1000:''];
@@ -1427,7 +1426,7 @@ root.addEventListener('change',async e=>{
     }
     if(t.id==='qf-system'){S.qfSys=t.value;S.qfSel=null;renderStats();return}
     if(t.matches&&t.matches('input[data-qfk]')){
-      const v=qtyView(monthTasks(),true),sel=S.qfSel?new Set(S.qfSel):new Set(v.catalog.filter(c=>c.hasSum).map(c=>c.key));
+      const v=qtyView(monthTasks(),true),sel=S.qfSel?new Set(S.qfSel):new Set(v.catalog.filter(c=>c.n>0).map(c=>c.key));
       if(t.checked)sel.add(t.dataset.qfk);else sel.delete(t.dataset.qfk);
       S.qfSel=sel;renderStats();return;
     }
