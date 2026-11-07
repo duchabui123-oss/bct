@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.15 -->
+<!-- Phiên bản 1.17 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -391,7 +391,7 @@ function teardown(){
 }
 function listen(ref,cb){
   const u=onSnapshot(ref,cb,err=>{
-    const n=$('net');if(n){n.textContent=err&&err.code==='permission-denied'?'Tài khoản chưa có quyền xem dữ liệu này.':'Không đọc được dữ liệu. Hãy kiểm tra mạng rồi tải lại trang.';n.hidden=false}
+    const n=$('net');if(n){n.textContent=err&&err.code==='permission-denied'?'Tài khoản chưa có quyền xem dữ liệu này.':err&&err.code==='failed-precondition'?'Cần tạo chỉ mục Firestore (tasks: system tăng dần, date tăng dần). Xem HUONG-DAN.md.':'Không đọc được dữ liệu. Hãy kiểm tra mạng rồi tải lại trang.';n.hidden=false}
     S.loadedTasks=true;S.loadedM=true;renderReport();renderStats();
   });
   return u;
@@ -408,9 +408,9 @@ async function boot(){
     if(mine){
       if(mine.active===false){doLogout();return}
       const oldSys=JSON.stringify((S.profile&&S.profile.systems)||[]);
-      S.profile=Object.assign({},mine);if(oldSys!==JSON.stringify(mine.systems||[]))setTimeout(renderQuickSelects,0);const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
+      S.profile=Object.assign({},mine);if(oldSys!==JSON.stringify(mine.systems||[]))setTimeout(()=>{subWeek();if(monthUnsubs.length)subMonth();renderQuickSelects()},0);const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
     }
-    renderWho();renderReport();renderNotes();renderAdminUsers();
+    renderWho();renderReport();renderNotes();renderAdminUsers();if($('stats-body'))renderStats();
   }));
   unsubs.push(listen(collection(db,'systems'),snap=>{
     S.systems=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
@@ -429,13 +429,26 @@ async function boot(){
   renderQuickSelects();renderWho();renderReport();renderNotes();
   if(isAdmin)ensureDefaults();
 }
+/* Đọc việc theo khoảng ngày. Người được gán "Hệ thống phụ trách" chỉ được đọc việc của các hệ thống đó (luật Firestore chặn phần còn lại),
+   nên mỗi hệ thống một truy vấn (cần chỉ mục system + date, xem HUONG-DAN.md); không được gán thì một truy vấn như cũ. */
+function listenTasks(a,b,cb){
+  const al=allowedSys(),col=collection(db,'tasks'),un=[];
+  const qs=al?[...al].map(id=>query(col,where('system','==',id),where('date','>=',a),where('date','<=',b))):[query(col,where('date','>=',a),where('date','<=',b))];
+  const parts=new Array(qs.length).fill(null);
+  qs.forEach((q,i)=>un.push(listen(q,snap=>{
+    parts[i]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
+    if(parts.every(x=>x))cb([].concat(...parts),snap);
+  })));
+  if(!qs.length)cb([],null);
+  return ()=>un.forEach(f=>{try{f()}catch(e){}});
+}
 function subWeek(){
   weekUnsubs.forEach(f=>{try{f()}catch(e){}});weekUnsubs=[];
   S.loadedTasks=false;
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
-  weekUnsubs.push(listen(query(collection(db,'tasks'),where('date','>=',a),where('date','<=',b)),snap=>{
-    S.tasks=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.loadedTasks=true;
-    const n=$('net');if(n&&!snap.metadata.fromCache)n.hidden=true;
+  weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
+    S.tasks=list;S.loadedTasks=true;
+    const n=$('net');if(n&&(!snap||!snap.metadata.fromCache))n.hidden=true;
     renderReport();
   }));
   weekUnsubs.push(listen(query(collection(db,'weeknotes'),where('week','==',a)),snap=>{
@@ -574,7 +587,7 @@ const userName=uid=>{const u=S.users.find(x=>x.uid===uid);return u?(u.name||u.us
 const sysIdx=id=>{const i=S.systems.findIndex(x=>x.id===id);return i<0?99:i};
 const cmp=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0));
 function visibleTasks(){
-  let l=S.tasks.slice();
+  let l=S.tasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
   if(S.who!=='all')l=l.filter(t=>t.uid===S.who);
   return l.sort(cmp);
 }
@@ -613,7 +626,7 @@ function renderQuickSelects(){
   fill('q-system',mineL.length?mineL:allS,S.qSystem||$('q-system').value);
   fill('q-type',act(S.types),S.qType||$('q-type').value);
   $('q-status').value=S.qStatus;
-  const tl=act(S.tpls),sel=$('q-tpl');
+  const hsT=hiddenSys(),tl=act(S.tpls).filter(x=>!hsT.has(x.system)),sel=$('q-tpl');
   $('q-tplf').hidden=!tl.length;
   const o1=x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>';
   let og='';const used=new Set();
@@ -663,7 +676,7 @@ function bySystem(list){
      +'<span class="head-end">'+(c.block?'<span class="flag">'+c.block+' vướng</span>':'')+'<span class="mini" aria-hidden="true"><i style="width:'+pct+'%"></i></span>'
      +'<span class="count mono">'+c.done+'/'+g.list.length+'</span></span></summary><div>'+g.list.map(t=>row(t,'system')).join('')+'</div></details>';
   }).join('');
-  const empty=S.systems.filter(s=>s.active!==false&&!seen.has(s.id)).map(s=>s.name);
+  const hs=hiddenSys(list),empty=S.systems.filter(s=>s.active!==false&&!seen.has(s.id)&&!hs.has(s.id)).map(s=>s.name);
   if(groups.length&&empty.length)h+='<p class="muted">Chưa có việc: '+empty.map(esc).join(', ')+'.</p>';
   return h;
 }
@@ -717,7 +730,7 @@ function renderNotes(){
 }
 function suggestNotes(){
   const m=$('n-msg');
-  const mine=S.tasks.filter(t=>t.uid===S.user.uid).sort(cmp);
+  const alw=allowedSys(),mine=S.tasks.filter(t=>t.uid===S.user.uid&&(!alw||alw.has(t.system))).sort(cmp);
   if(!mine.length){m.className='msg';m.textContent='Tuần này chưa có việc nào để gợi ý.';return}
   const label=t=>'['+sysName(t.system)+'] ';
   const agg=new Map();
@@ -856,13 +869,13 @@ function subMonth(){
   S.loadedM=false;
   const y=S.month.getFullYear(),mo=S.month.getMonth();
   const a=iso(new Date(y,mo,1)),b=iso(new Date(y,mo+1,0));
-  monthUnsubs.push(listen(query(collection(db,'tasks'),where('date','>=',a),where('date','<=',b)),snap=>{
-    S.mTasks=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.loadedM=true;renderStats();
+  monthUnsubs.push(listenTasks(a,b,list=>{
+    S.mTasks=list;S.loadedM=true;renderStats();
   }));
 }
 function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
 function monthTasks(){
-  let l=S.mTasks.slice();
+  let l=S.mTasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
   if(S.mWho!=='all')l=l.filter(t=>t.uid===S.mWho);
   return l;
 }
@@ -912,7 +925,7 @@ function renderStats(){
   h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="qf">'
     +'<details id="qf-sdet"'+(S.qfSOpen?' open':'')+'><summary>Chọn hệ thống ('+(S.qfSys.size?S.qfSys.size+' đã chọn':'tất cả hệ thống')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qfs-all">Chọn tất cả hệ thống</button></div>'
-    +'<div class="qf-list">'+S.systems.map(x=>'<label class="qf-item"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(!S.qfSys.size||S.qfSys.has(x.id)?' checked':'')+'><span>'+esc(x.name)+'</span></label>').join('')+'</div></details>'
+    +'<div class="qf-list">'+S.systems.filter(x=>!hiddenSys(list).has(x.id)).map(x=>'<label class="qf-item"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(!S.qfSys.size||S.qfSys.has(x.id)?' checked':'')+'><span>'+esc(x.name)+'</span></label>').join('')+'</div></details>'
     +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc đã thực hiện':qv.sel.size+' đã chọn')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qf-default">Mặc định</button><button type="button" class="btn sm" data-act="qf-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="qf-none">Bỏ chọn tất cả</button></div>'
     +'<div class="qf-list">'+(qv.catalog.map(c=>'<label class="qf-item"><input type="checkbox" data-qfk="'+esc(c.key)+'"'+(checked(c)?' checked':'')+'><span>'+esc(c.name)+' <span class="muted">('+c.n+' lần)</span></span></label>').join('')||'<span class="muted">Chưa có đầu việc nào.</span>')+'</div></details></div>'
@@ -956,8 +969,18 @@ async function copyStats(){
 const autoGroup=n=>{n=String(n||'').trim();if(/^ipcc\b/i.test(n))return 'IPCC';if(/^(ccos|obtt)$/i.test(n))return 'CCOS';return n};
 const sysGroup=sy=>(sy&&String(sy.group||'').trim())||autoGroup(sy?sy.name:'');
 const qtyText=n=>n===0?'0':(Number.isInteger(n)&&n>0&&n<10?'0'+n:fmtQ(n));
+/* Quyền xem theo hệ thống: nếu quản trị đã khai báo "Hệ thống phụ trách" cho tài khoản này thì chỉ thấy các hệ thống đó (không khai báo = thấy tất cả) */
+function allowedSys(){
+  const mine=(S.profile&&Array.isArray(S.profile.systems)?S.profile.systems:[]);
+  return mine.length?new Set(mine):null;
+}
+function hiddenSys(){
+  const a=allowedSys();
+  return a?new Set(S.systems.filter(x=>!a.has(x.id)).map(x=>x.id)):new Set();
+}
 function summaryBlocks(list){
-  const tpls=S.tpls.filter(x=>x.active!==false);
+  const hid=hiddenSys(list);
+  const tpls=S.tpls.filter(x=>x.active!==false&&!hid.has(x.system));
   const blocks=[];
   const tplLines=(arr,tasks,start)=>{
     let i=start;const out=[];
@@ -979,7 +1002,7 @@ function summaryBlocks(list){
   const known=new Set(S.systems.map(x=>x.id));
   /* Gom các hệ thống cùng nhóm báo cáo (ví dụ mọi hệ thống IPCC thành "IPCC") thành một khối */
   const groups=new Map();
-  S.systems.forEach(sy=>{const g=sysGroup(sy);if(!groups.has(g))groups.set(g,new Set());groups.get(g).add(sy.id)});
+  S.systems.filter(sy=>!hid.has(sy.id)).forEach(sy=>{const g=sysGroup(sy);if(!groups.has(g))groups.set(g,new Set());groups.get(g).add(sy.id)});
   groups.forEach((ids,gname)=>{
     /* việc mẫu dùng chung (không gắn hệ thống) xuất hiện ở mọi khối, số liệu chỉ tính trong khối đó */
     const seenK=new Set(),arr=tpls.filter(x=>!x.system||ids.has(x.system)).filter(x=>{const k=titleKey(x.name);if(seenK.has(k))return false;seenK.add(k);return true});
@@ -1104,10 +1127,16 @@ async function backupExport(){
   const m=$('bk-msg');m.className='msg';m.textContent='Đang đọc dữ liệu…';
   try{
     const out={app:'bao-cao-tuan',exported:new Date().toISOString(),data:{}};let n=0;
-    for(const c of BK_COLS){const sn=await getDocs(collection(db,c));out.data[c]={};sn.docs.forEach(d=>{out.data[c][d.id]=d.data();n++})}
+    const al=allowedSys();
+    for(const c of BK_COLS){
+      const qs=(c==='tasks'&&al)?[...al].map(id=>query(collection(db,'tasks'),where('system','==',id))):[collection(db,c)];
+      out.data[c]={};
+      for(const q of qs){const sn=await getDocs(q);sn.docs.forEach(d=>{out.data[c][d.id]=d.data();n++})}
+    }
+    if(al)out.partial='Chỉ gồm việc của các hệ thống được gán cho tài khoản sao lưu.';
     const t=new Date(),pad=x=>String(x).padStart(2,'0');
     download(new Blob([JSON.stringify(out)],{type:'application/json'}),'sao-luu-bao-cao-tuan-'+t.getFullYear()+pad(t.getMonth()+1)+pad(t.getDate())+'.json');
-    m.className='msg ok';m.textContent='Đã tải bản sao lưu ('+n+' bản ghi).';
+    m.className='msg ok';m.textContent='Đã tải bản sao lưu ('+n+' bản ghi).'+(al?' Lưu ý: chỉ gồm việc của các hệ thống được gán cho tài khoản này; muốn sao lưu đầy đủ hãy dùng tài khoản quản trị không bị giới hạn hệ thống.':'');
   }catch(e){m.className='msg';m.textContent=fsMsg(e)}
 }
 async function backupRestore(file){
@@ -1152,7 +1181,7 @@ function qtyView(list,useFilter){
   const data=sys.size?list.filter(t=>sys.has(t.system)):list;
   const cat=new Map();
   const add=(name,isTpl)=>{const k=titleKey(name);if(k&&!cat.has(k))cat.set(k,{key:k,name:String(name).trim().replace(/\s+/g,' '),n:0,sum:0,hasSum:false})};
-  S.tpls.filter(x=>x.active!==false&&(!sys.size||!x.system||sys.has(x.system))).forEach(x=>add(x.name));
+  S.tpls.filter(x=>x.active!==false&&!hiddenSys(list).has(x.system)&&(!sys.size||!x.system||sys.has(x.system))).forEach(x=>add(x.name));
   const extra=[];data.forEach(t=>{const k=titleKey(t.title);if(k&&!cat.has(k)){add(t.title);extra.push(k)}});
   data.forEach(t=>{const c=cat.get(titleKey(t.title));if(!c)return;c.n++;if(hasQty(t)){c.sum+=t.qty;c.hasSum=true}});
   const tplKeys=[...cat.keys()].filter(k=>extra.indexOf(k)<0),ex=extra.sort((a,b)=>cat.get(a).name.localeCompare(cat.get(b).name,'vi'));
@@ -1407,7 +1436,8 @@ root.addEventListener('click',async e=>{
       let info='';
       try{
         if($('del-data')&&$('del-data').checked){
-          let nt=0;const ts=await getDocs(query(collection(db,'tasks'),where('uid','==',u.uid)));
+          let nt=0;const al=allowedSys(),ts={docs:[]};
+          for(const q of (al?[...al].map(id=>query(collection(db,'tasks'),where('uid','==',u.uid),where('system','==',id))):[query(collection(db,'tasks'),where('uid','==',u.uid))]))ts.docs.push(...(await getDocs(q)).docs);
           for(let i=0;i<ts.docs.length;i+=400){const bt=writeBatch(db);ts.docs.slice(i,i+400).forEach(d=>bt.delete(doc(db,'tasks',d.id)));await bt.commit();nt+=Math.min(400,ts.docs.length-i)}
           info=' và '+nt+' việc';
           try{
@@ -1485,7 +1515,7 @@ root.addEventListener('change',async e=>{
       const name=t.value.trim();if(!name){renderCatalog(t.dataset.catname);return}
       try{await updateDoc(doc(db,t.dataset.catname,t.dataset.id),{name:name})}catch(err){flash(fsMsg(err));renderCatalog(t.dataset.catname)}return;
     }
-    if(t.matches&&t.matches('input[data-qfs]')){if(!t.isConnected)return;const all=S.systems.map(x=>x.id),n=new Set(S.qfSys.size?S.qfSys:all);t.checked?n.add(t.dataset.qfs):n.delete(t.dataset.qfs);S.qfSys=(n.size===0||n.size===all.length)?new Set():n;S.qfSel=null;renderStats();return}
+    if(t.matches&&t.matches('input[data-qfs]')){if(!t.isConnected)return;const hs=hiddenSys(monthTasks()),all=S.systems.filter(x=>!hs.has(x.id)).map(x=>x.id),n=new Set(S.qfSys.size?S.qfSys:all);t.checked?n.add(t.dataset.qfs):n.delete(t.dataset.qfs);S.qfSys=(n.size===0||n.size===all.length)?new Set():n;S.qfSel=null;renderStats();return}
     if(t.matches&&t.matches('input[data-qfk]')){
       const v=qtyView(monthTasks(),true),sel=S.qfSel?new Set(S.qfSel):new Set(v.catalog.filter(c=>c.n>0).map(c=>c.key));
       if(t.checked)sel.add(t.dataset.qfk);else sel.delete(t.dataset.qfk);
