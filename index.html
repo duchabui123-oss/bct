@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.32 -->
+<!-- Phiên bản 1.33 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1057,6 +1057,7 @@ function summaryBlocks(list,grp){
     let i=start;const out=[];
     arr.forEach(tp=>{
       const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
+      if(!m.length)return; /* chỉ liệt kê đầu việc đã có người nhập */
       const lab=tp.label||'Số lượng';
       out.push(i+'. '+tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+qtyText(qs.reduce((a,t)=>a+t.qty,0)):'')));i++;
     });
@@ -1078,7 +1079,7 @@ function summaryBlocks(list,grp){
     /* việc mẫu dùng chung (không gắn hệ thống) xuất hiện ở mọi khối, số liệu chỉ tính trong khối đó */
     const seenK=new Set(),arr=tpls.filter(x=>!x.system||ids.has(x.system)).filter(x=>{const k=titleKey(x.name);if(seenK.has(k))return false;seenK.add(k);return true});
     const tasks=list.filter(t=>ids.has(t.system));
-    if(!arr.length&&!tasks.length)return;
+    if(!tasks.length)return;
     const a=tplLines(arr,tasks,1),tk=new Set(arr.map(x=>titleKey(x.name)));
     blocks.push({name:gname,lines:a.lines.concat(extraLines(tasks,a.next,tk)),notes:notesOf(tasks)});
   });
@@ -1155,15 +1156,18 @@ const colL=i=>{let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65
 function sheetXml(sh){
   const widths=sh.widths||[];
   let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+  if(sh.levels)x+='<sheetPr><outlinePr summaryBelow="0"/></sheetPr>';
   if(sh.freeze)x+='<sheetViews><sheetView workbookViewId="0"><pane ySplit="'+sh.freeze+'" topLeftCell="A'+(sh.freeze+1)+'" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+  if(sh.levels)x+='<sheetFormatPr defaultRowHeight="15" outlineLevelRow="'+Math.max.apply(null,sh.levels.concat([0]))+'"/>';
   if(widths.length)x+='<cols>'+widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('')+'</cols>';
   x+='<sheetData>';
   sh.rows.forEach((r,ri)=>{
-    x+='<row r="'+(ri+1)+'"'+(sh.heights&&sh.heights[ri]?' ht="'+sh.heights[ri]+'" customHeight="1"':'')+'>';
+    x+='<row r="'+(ri+1)+'"'+(sh.levels&&sh.levels[ri]?' outlineLevel="'+sh.levels[ri]+'"':'')+(sh.heights&&sh.heights[ri]?' ht="'+sh.heights[ri]+'" customHeight="1"':'')+'>';
     r.forEach((v,ci)=>{
       if(v&&typeof v==='object'){
         const rf=colL(ci)+(ri+1);
         if(v.v===''||v.v==null)x+='<c r="'+rf+'" s="'+v.s+'"/>';
+        else if(typeof v.v==='number')x+='<c r="'+rf+'" s="'+v.s+'"><v>'+v.v+'</v></c>';
         else x+='<c r="'+rf+'" s="'+v.s+'" t="inlineStr"><is><t xml:space="preserve">'+xe(String(v.v).replace(/^- /gm,'• '))+'</t></is></c>';
         return;
       }
@@ -1189,7 +1193,7 @@ function makeXlsx(sheets){
   files.push({name:'_rels/.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'});
   files.push({name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map((s,i)=>'<sheet name="'+xe(s.name.replace(/[\[\]:*?\/\\]/g,' ').slice(0,31))+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>'});
   files.push({name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'});
-  files.push({name:'xl/styles.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><b/><sz val="12"/><name val="Calibri"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF9DC3E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" quotePrefix="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'});
+  files.push({name:'xl/styles.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><b/><sz val="12"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF9DC3E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D8A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="10"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" quotePrefix="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1" indent="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1" indent="3"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'});
   sheets.forEach((s,i)=>files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:sheetXml(s)}));
   return zipStore(files);
 }
@@ -1300,10 +1304,11 @@ const qtyCells=c=>[c.name,c.n?c.n:'',c.hasSum?Math.round(c.sum*1000)/1000:''];
 const dmy=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]+'/'+p[0]};
 const wdName=s=>DAYS[(parse(s).getDay()+6)%7];
 const stLabel=id=>ST[id]?ST[id].label:'Chờ';
-function taskTableRows(list,all){
-  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Số lượng','Kết quả','Trạng thái','Mã phiếu','Ghi chú'].concat(all?['Người thực hiện']:[]);
+const sysGroupOf=id=>{const sy=S.systems.find(x=>x.id===id);return sy?sysGroup(sy):'(Hệ thống đã xóa)'};
+function taskTableRows(list,all,withGroup){
+  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Số lượng','Kết quả','Trạng thái','Mã phiếu','Ghi chú'].concat(all?['Người thực hiện']:[]).concat(withGroup?['Nhóm hệ thống']:[]);
   const rows=list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0)))
-    .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',hasQty(t)?t.qty:'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]));
+    .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',hasQty(t)?t.qty:'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]).concat(withGroup?[sysGroupOf(t.system)]:[]));
   return {head:head,rows:rows};
 }
 function groupStat(list,key,items,rest){
@@ -1317,6 +1322,31 @@ function statSets(x){
 const statHead=f=>[f,'Tổng','Hoàn thành','Đang làm','Chờ','Vướng','Tỷ lệ hoàn thành (%)'];
 const statRow=r=>[r.name,r.n,r.c.done,r.c.doing,r.c.wait,r.c.block,r.p];
 function noteIds(x){return x.kind==='week'?(x.all?S.users.map(u=>u.uid):[S.who]):[]}
+/* Bảng dạng PivotTable: Nhóm hệ thống (IPCC, CCOS…) > Loại việc > Đầu việc, có nút thu gọn/mở rộng từng cấp.
+   Chỉ tính các việc đã nhập; số lần = số lần ghi nhận, số lượng = tổng các số lượng đã nhập. */
+function pivotSheet(list){
+  const tree=new Map();
+  list.forEach(t=>{
+    const g=sysGroupOf(t.system),ty=typeName(t.type),k=titleKey(t.title)||'(không có đầu việc)';
+    let G=tree.get(g);if(!G){G={name:g,ord:99,n:0,q:0,hq:false,types:new Map()};tree.set(g,G)}
+    G.ord=Math.min(G.ord,sysIdx(t.system));
+    let T=G.types.get(ty);if(!T){T={name:ty,ord:S.types.findIndex(y=>y.id===t.type),n:0,q:0,hq:false,items:new Map()};if(T.ord<0)T.ord=999;G.types.set(ty,T)}
+    let I=T.items.get(k);if(!I){I={name:String(t.title||'').trim()||'(không có đầu việc)',n:0,q:0,hq:false};T.items.set(k,I)}
+    [G,T,I].forEach(o=>{o.n++;if(hasQty(t)){o.q+=t.qty;o.hq=true}});
+  });
+  const rows=[['Nhãn dòng','Số lần ghi nhận','Tổng số lượng']],levels=[0];
+  const qv=o=>o.hq?Math.round(o.q*1000)/1000:'';
+  let tn=0,tq=0,thq=false;
+  [...tree.values()].sort((a,b)=>a.ord-b.ord||a.name.localeCompare(b.name,'vi')).forEach(G=>{
+    rows.push([{v:G.name,s:5},{v:G.n,s:5},{v:qv(G),s:5}]);levels.push(0);tn+=G.n;if(G.hq){tq+=G.q;thq=true}
+    [...G.types.values()].sort((a,b)=>a.ord-b.ord||a.name.localeCompare(b.name,'vi')).forEach(T=>{
+      rows.push([{v:T.name,s:8},{v:T.n,s:8},{v:qv(T),s:8}]);levels.push(1);
+      [...T.items.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,'vi')).forEach(I=>{rows.push([{v:I.name,s:9},{v:I.n,s:2},{v:qv(I),s:2}]);levels.push(2)});
+    });
+  });
+  rows.push([{v:'Tổng cộng',s:5},{v:tn,s:5},{v:thq?Math.round(tq*1000)/1000:'',s:5}]);levels.push(0);
+  return {name:'Pivot theo nhóm hệ thống',rows:rows,levels:levels,headRows:[0],freeze:1,widths:[78,16,16]};
+}
 function buildXlsx(x){
   const c=counts(x.list),n=x.list.length,pct=n?Math.round(c.done*100/n):0,sheets=[];
   const ov=[[x.title],['Kỳ báo cáo',x.period],['Người báo cáo',x.who],['Ngày xuất',full(new Date())],[],
@@ -1324,8 +1354,9 @@ function buildXlsx(x){
   if(x.kind==='month')ov.push(['Số ngày có việc',new Set(x.list.map(t=>t.date)).size]);
   sheets.push(summarySheet(x));
   sheets.push({name:'Tổng quan',rows:ov,widths:[26,40],titleRows:[0]});
-  const tt=taskTableRows(x.list,x.all);
-  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,40,13,14,30,22]});
+  const tt=taskTableRows(x.list,x.all,true);
+  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,40,13,14,30,22,22]});
+  sheets.push(pivotSheet(x.list));
   statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
   const qv=qtyView(x.list,x.kind==='month',x.kind);
   if(qv.rows.length||!qv.isDefault)sheets.push({name:'Số lượng theo đầu việc',rows:[['Hệ thống',qv.sys.length?sysLabel(qv.sys):'Tất cả hệ thống'],[],['Đầu việc','Số lần ghi nhận','Tổng số lượng']].concat(qv.rows.map(qtyCells)),headRows:[2],freeze:3,widths:[56,16,16]});
