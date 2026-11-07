@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.22 -->
+<!-- Phiên bản 1.24 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -193,9 +193,11 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .qf-chip input{width:auto;padding:0;margin:0}
 .qf-item{display:flex;gap:8px;align-items:flex-start;font-size:.88rem;min-width:0}
 .qf-item input{width:auto;padding:0;margin-top:.25rem;flex:none}
-.tgroup{margin:.9rem 0 .2rem;font-size:.78rem;font-weight:700;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase}
+.tgroup{margin:1rem 0 .2rem;font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em;text-transform:uppercase}
+.tnm{display:flex;align-items:center;gap:8px;min-width:0}.tnm .no{flex:none;min-width:1.8em;text-align:right;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}.tnm input{flex:1 1 auto;min-width:0;font-weight:700}
+.inline-add .tgrp{flex:1 1 100%}.inline-add .qf-chip input,.inline-add .tpl-noq input{flex:none}
 .inline-add select{flex:1 1 10rem}
-@media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
+@media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow .tnm,.trow>input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
 .crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .crow.off input{opacity:.55}
 .crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto}
@@ -423,7 +425,7 @@ async function boot(){
   unsubs.push(listen(collection(db,'groups'),snap=>{
     S.groups=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
     const k=effSig();
-    if(!S.groupsReady){S.groupsReady=true;S.effKey=k;if(S.profile.group)subWeek()}
+    if(!S.groupsReady){S.groupsReady=true;S.effKey=k;if(groupsOf(S.profile).length)subWeek()}
     else if(k!==S.effKey){S.effKey=k;subWeek();if(monthUnsubs.length)subMonth()}
     renderQuickSelects();renderWho();renderReport();renderCatalog('groups');renderTplAdmin();renderAdminUsers();if($('stats-body'))renderStats();
   }));
@@ -436,7 +438,7 @@ async function boot(){
     const it=snap.exists()?snap.data().items:[];S.tpls=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
     renderQuickSelects();renderTplAdmin();
   }));
-  if(!S.profile.group)subWeek();
+  if(!groupsOf(S.profile).length)subWeek();
   renderQuickSelects();renderWho();renderReport();renderNotes();
   if(isAdmin)ensureDefaults();
 }
@@ -564,6 +566,8 @@ function buildAdmin(){
   +'<label class="field"><span>Mật khẩu (tối thiểu 6 ký tự)</span><input id="u-pass" type="text" autocomplete="off" minlength="6" required></label>'
   +'<label class="field"><span>Đơn vị</span><input id="u-unit" maxlength="80"></label>'
   +'<label class="field"><span>Quyền</span><select id="u-role"><option value="user">Người dùng</option><option value="admin">Quản trị</option></select></label></div>'
+  +'<div class="usys" style="margin-top:10px"><b>Nhóm</b> <span id="u-gchips"></span></div>'
+  +'<div class="usys" style="margin-top:6px"><b>Hệ thống phụ trách</b> <span id="u-schips"></span> <small>(không tích = theo hệ thống mặc định của các nhóm; không có thì thấy tất cả. Chọn tối đa 5 nhóm.)</small></div>'
   +'<div class="actions"><button type="submit" class="btn primary">Tạo tài khoản</button><span class="msg" id="u-msg" role="status" aria-live="polite"></span></div></form>'
   +'<section class="panel"><h2>Danh sách người dùng</h2><div class="tbl" id="user-list"></div>'
   +'<label class="check" style="margin-top:12px"><input type="checkbox" id="del-data"><span>Khi xóa người dùng, xóa luôn toàn bộ báo cáo của người đó<br><small class="muted">Nếu không chọn, báo cáo cũ vẫn được giữ lại và hiện tên "(Không rõ)" khi xem tất cả mọi người.</small></span></label>'
@@ -615,7 +619,7 @@ const sysIdx=id=>{const i=S.systems.findIndex(x=>x.id===id);return i<0?99:i};
 const cmp=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0));
 function visibleTasks(){
   let l=S.tasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
-  if(S.who!=='all')l=l.filter(t=>t.uid===S.who);else if(S.wGroup)l=l.filter(t=>userGroup(t.uid)===S.wGroup);
+  if(S.who!=='all')l=l.filter(t=>t.uid===S.who);else if(S.wGroup)l=l.filter(t=>userGroup(t.uid).indexOf(S.wGroup)>=0);
   return l.sort(cmp);
 }
 function counts(l){const c={done:0,doing:0,wait:0,block:0};l.forEach(t=>{if(c[t.status]!=null)c[t.status]++;else c.wait++});return c}
@@ -909,7 +913,7 @@ function subMonth(){
 function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
 function monthTasks(){
   let l=S.mTasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
-  if(S.mWho!=='all')l=l.filter(t=>t.uid===S.mWho);else if(S.mGroup)l=l.filter(t=>userGroup(t.uid)===S.mGroup);
+  if(S.mWho!=='all')l=l.filter(t=>t.uid===S.mWho);else if(S.mGroup)l=l.filter(t=>userGroup(t.uid).indexOf(S.mGroup)>=0);
   return l;
 }
 function groupRows(list,key,items,restName){
@@ -1003,18 +1007,20 @@ const autoGroup=n=>{n=String(n||'').trim();if(/^ipcc\b/i.test(n))return 'IPCC';i
 const sysGroup=sy=>(sy&&String(sy.group||'').trim())||autoGroup(sy?sy.name:'');
 const qtyText=n=>n===0?'0':(Number.isInteger(n)&&n>0&&n<10?'0'+n:fmtQ(n));
 /* Quyền xem theo hệ thống: nếu quản trị đã khai báo "Hệ thống phụ trách" cho tài khoản này thì chỉ thấy các hệ thống đó (không khai báo = thấy tất cả) */
+/* Một người có thể thuộc nhiều nhóm (users.groups); hồ sơ cũ chỉ có users.group thì coi là một nhóm */
+const groupsOf=u=>u?(Array.isArray(u.groups)?u.groups:(u.group?[u.group]:[])):[];
 function allowedSys(){
   const own=(S.profile&&Array.isArray(S.profile.systems)?S.profile.systems:[]);
   if(own.length)return new Set(own);
   /* không khai báo riêng thì dùng hệ thống mặc định của nhóm */
-  const g=S.profile&&S.profile.group&&S.groups.find(x=>x.id===S.profile.group);
-  const gs=g&&Array.isArray(g.systems)?g.systems:[];
+  const gs=[];
+  groupsOf(S.profile).forEach(id=>{const g=S.groups.find(x=>x.id===id);if(g&&Array.isArray(g.systems))g.systems.forEach(y=>gs.push(y))});
   return gs.length?new Set(gs):null;
 }
-const userGroup=uid=>{const u=S.users.find(x=>x.uid===uid);return u&&u.group||''};
-const myGroup=()=>S.profile&&S.profile.group||'';
+const userGroup=uid=>groupsOf(S.users.find(x=>x.uid===uid));
+const myGroup=()=>groupsOf(S.profile);
 /* việc mẫu không gắn nhóm = dùng chung; chưa có ngữ cảnh nhóm (g rỗng) = thấy tất cả */
-const tplForGroup=(x,g)=>!g||!(Array.isArray(x.groups)&&x.groups.length)||x.groups.indexOf(g)>=0;
+const tplForGroup=(x,g)=>{const ga=[].concat(g||[]);return !ga.length||!(Array.isArray(x.groups)&&x.groups.length)||ga.some(id=>x.groups.indexOf(id)>=0)};
 const effSig=()=>{const a=allowedSys();return JSON.stringify([a?[...a].sort():null,S.profile&&S.profile.role])};
 function hiddenSys(){
   const a=allowedSys();
@@ -1060,7 +1066,7 @@ function summaryBlocks(list,grp){
 function summaryDocs(x){
   const title=x.kind==='week'?'TỔNG HỢP KẾT QUẢ THỰC HIỆN TUẦN '+x.title.replace('Báo cáo tuần ','')+' ('+x.period+')':'TỔNG HỢP KẾT QUẢ THỰC HIỆN '+x.period.toUpperCase();
   const docs=x.all?S.users.filter(u=>x.list.some(t=>t.uid===u.uid)).map(u=>({person:u.name||u.username,blocks:summaryBlocks(x.list.filter(t=>t.uid===u.uid),userGroup(u.uid))}))
-    :[{person:x.who,blocks:summaryBlocks(x.list,x.uid?userGroup(x.uid):'')}];
+    :[{person:x.who,blocks:summaryBlocks(x.list,x.uid?userGroup(x.uid):[])}];
   return {title:title,docs:docs};
 }
 function summaryText(sd){
@@ -1359,7 +1365,14 @@ function fillMoveSelects(){
   const a=f.value,b=t.value;f.innerHTML=opts;t.innerHTML=opts;
   if(a)f.value=a;if(b)t.value=b;
 }
+function renderAddUserChips(){
+  const g=$('u-gchips'),sy=$('u-schips');if(!g||!sy)return;
+  const kg=new Set([...g.querySelectorAll('input:checked')].map(i=>i.value)),ks=new Set([...sy.querySelectorAll('input:checked')].map(i=>i.value));
+  g.innerHTML=S.groups.filter(x=>x.active!==false).map(x=>'<label class="qf-chip"><input type="checkbox" value="'+esc(x.id)+'"'+(kg.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'<small>(chưa có nhóm nào)</small>';
+  sy.innerHTML=S.systems.filter(x=>x.active!==false).map(x=>'<label class="qf-chip"><input type="checkbox" value="'+esc(x.id)+'"'+(ks.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('');
+}
 function renderAdminUsers(){
+  renderAddUserChips();
   fillMoveSelects();
   const el=$('user-list');if(!el)return;
   const me=S.user.uid;
@@ -1371,7 +1384,7 @@ function renderAdminUsers(){
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
       +'<span class="tbtns"><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
       +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span>'
-      +'<div class="usys"><b>Nhóm</b> <select data-ugroup="'+esc(u.uid)+'" aria-label="Nhóm của '+esc(u.name||u.username)+'"><option value="">— Chưa chọn —</option>'+S.groups.filter(g=>g.active!==false||g.id===u.group).map(g=>'<option value="'+esc(g.id)+'"'+(g.id===u.group?' selected':'')+'>'+esc(g.name)+'</option>').join('')+'</select> <b>Hệ thống phụ trách</b> '+(S.systems.filter(x=>x.active!==false).map(x=>'<label class="qf-chip"><input type="checkbox" data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"'+((u.systems||[]).indexOf(x.id)>=0?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'')+'<small>(không tích = theo hệ thống mặc định của nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
+      +'<div class="usys"><b>Nhóm</b> '+(S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0).map(g=>'<label class="qf-chip"><input type="checkbox" data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"'+(groupsOf(u).indexOf(g.id)>=0?' checked':'')+'> '+esc(g.name)+'</label>').join('')||'<small>(chưa có nhóm nào)</small>')+' <b>Hệ thống phụ trách</b> '+(S.systems.filter(x=>x.active!==false).map(x=>'<label class="qf-chip"><input type="checkbox" data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"'+((u.systems||[]).indexOf(x.id)>=0?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'')+'<small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
    }).join('');
 }
 function renderCatalog(kind){
@@ -1407,12 +1420,12 @@ function renderTplAdmin(){
   if(gc){const keep=new Set([...gc.querySelectorAll('input:checked')].map(i=>i.dataset.tgnew));
     gc.innerHTML=S.groups.filter(g=>g.active!==false).map(g=>'<label class="qf-chip"><input type="checkbox" data-tgnew="'+esc(g.id)+'"'+(keep.has(g.id)?' checked':'')+'> '+esc(g.name)+'</label>').join('')||'<small class="muted">Chưa có nhóm nào. Thêm ở mục Nhóm.</small>'}
   const vis=S.tpls.filter(tplVisible);
-  let prev=null;
+  let prev=null,no=0;
   ls.innerHTML=vis.map((x,i)=>{
     const g=x.system||'',head=(!S.tplFilter&&g!==prev)?'<div class="tgroup">'+(g?esc(sysName(g)):'Dùng chung (không gắn hệ thống)')+'</div>':'';
-    prev=g;
+    if(g!==prev)no=0;no++;prev=g;
     return head+'<div class="trow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
-    +'<input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên đầu việc">'
+    +'<div class="tnm"><span class="no" aria-hidden="true">'+no+'.</span><input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên đầu việc"></div>'
     +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống">'+opt(S.systems,'— Tất cả hệ thống —',x.system)+'</select>'
     +'<select data-tpltype="'+esc(x.id)+'" aria-label="Loại việc">'+opt(S.types,'— Không gắn loại việc —',x.type)+'</select>'
     +'<input data-tpllabel="'+esc(x.id)+'" value="'+esc(x.label||'')+'" maxlength="80" placeholder="Nhãn số lượng" aria-label="Nhãn số lượng">'
@@ -1436,13 +1449,16 @@ function renderSettings(){
   const ws=$('week-start');if(ws)ws.value=String(WK);
   const c=$('allow-signup');if(c)c.checked=!!S.settings.allowSignup;
 }
-async function createUserAsAdmin(name,username,password,unit,role){
+async function createUserAsAdmin(name,username,password,unit,role,groups,systems){
   const sec=getApps().find(a=>a.name==='secondary')||initializeApp(firebaseConfig,'secondary');
   const sAuth=getAuth(sec);
   const cred=await createUserWithEmailAndPassword(sAuth,username+'@'+EMAIL_DOMAIN,password);
   const uid=cred.user.uid;
   await signOut(sAuth);
-  await setDoc(doc(db,'users',uid),{username:username,name:name,unit:unit,role:role,active:true,created:Date.now()});
+  const prof={username:username,name:name,unit:unit,role:role,active:true,created:Date.now()};
+  if(groups&&groups.length){prof.groups=groups;prof.group=groups[0]}
+  if(systems&&systems.length)prof.systems=systems;
+  await setDoc(doc(db,'users',uid),prof);
 }
 async function moveCatalog(kind,id,dir){
   const l=S[kind].slice(),i=l.findIndex(x=>x.id===id),j=i+dir;
@@ -1613,8 +1629,12 @@ root.addEventListener('change',async e=>{
       const n=new Set(g.systems||[]);t.checked?n.add(t.dataset.sid):n.delete(t.dataset.sid);
       try{await updateDoc(doc(db,'groups',gid),{systems:[...n]})}catch(err){flash(fsMsg(err));renderCatalog('groups')}return;
     }
-    if(t.matches&&t.matches('select[data-ugroup]')){
-      try{await updateDoc(doc(db,'users',t.dataset.ugroup),{group:t.value})}catch(err){flash(fsMsg(err));renderAdminUsers()}return;
+    if(t.matches&&t.matches('input[data-ugrp]')){
+      const uid=t.dataset.ugrp,u=S.users.find(x=>x.uid===uid);if(!u)return;
+      const n=new Set(groupsOf(u));t.checked?n.add(t.dataset.gid):n.delete(t.dataset.gid);
+      if(n.size>5){flash('Mỗi người chọn tối đa 5 nhóm.');renderAdminUsers();return}
+      const arr=S.groups.map(g=>g.id).filter(id=>n.has(id));
+      try{await updateDoc(doc(db,'users',uid),{groups:arr,group:arr[0]||''})}catch(err){flash(fsMsg(err));renderAdminUsers()}return;
     }
     if(t.matches&&t.matches('input[data-usys]')){
       const uid=t.dataset.usys,u=S.users.find(x=>x.uid===uid);if(!u)return;
@@ -1718,8 +1738,10 @@ root.addEventListener('submit',async e=>{
     if(!name){m.textContent='Hãy nhập họ tên.';return}
     if(!userOk(user)){m.textContent=USER_HINT;return}
     if(pass.length<6){m.textContent='Mật khẩu cần tối thiểu 6 ký tự.';return}
+    const pg=[...document.querySelectorAll('#u-gchips input:checked')].map(i=>i.value),ps=[...document.querySelectorAll('#u-schips input:checked')].map(i=>i.value);
+    if(pg.length>5){m.textContent='Mỗi người chọn tối đa 5 nhóm.';return}
     m.textContent='Đang tạo…';
-    try{await createUserAsAdmin(name,user,pass,unit,role);$('f-adduser').reset();m.className='msg ok';m.textContent='Đã tạo tài khoản "'+user+'". Hãy gửi tên đăng nhập và mật khẩu cho người dùng.'}
+    try{await createUserAsAdmin(name,user,pass,unit,role,pg,ps);$('f-adduser').reset();renderAddUserChips();m.className='msg ok';m.textContent='Đã tạo tài khoản "'+user+'". Hãy gửi tên đăng nhập và mật khẩu cho người dùng.'}
     catch(err){m.className='msg';m.textContent=authMsg(err)}
     return;
   }
