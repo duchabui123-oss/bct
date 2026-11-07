@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.34 -->
+<!-- Phiên bản 1.36 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -696,6 +696,7 @@ function renderQuickSelects(){
   const mine=allowedSys(),allS=act(S.systems),mineL=mine?allS.filter(x=>mine.has(x.id)):[];
   fill('q-system',mineL.length?mineL:allS,S.qSystem||$('q-system').value);
   fill('q-type',act(S.types),S.qType||$('q-type').value);
+  {const ct=curTpl();qSysBlank(!!(ct&&!ct.system&&!S.qSysPicked))}
   $('q-status').value=S.qStatus;
   setQuickUnit($('q-unit').value);
   const hsT=hiddenSys(),tl=act(S.tpls).filter(x=>!hsT.has(x.system)&&tplForGroup(x,myGroup())),sel=$('q-tpl');
@@ -858,9 +859,14 @@ function startEdit(t){
   $('quick').querySelector('h2').textContent='Sửa việc';$('q-msg').textContent='';$('q-goto').hidden=true;
   $('quick').scrollIntoView({block:'center'});$('q-title').focus();
 }
+/* Việc dùng chung (không gắn hệ thống): ô Hệ thống để trống để người dùng tự chọn. */
+function qSysBlank(on){const s=$('q-system');if(!s)return;const o=[...s.options].find(x=>x.value==='');
+  if(on){if(!o){const b=document.createElement('option');b.value='';b.textContent='— Chọn hệ thống —';s.insertBefore(b,s.firstChild)}s.value=''}
+  else if(o)o.remove()}
 async function submitQuick(){
   const tp=curTpl(),title=tp?tp.name:$('q-title').value.trim(),msg=$('q-msg');
   if(!title){msg.className='msg';msg.textContent='Hãy nhập đầu việc.';$('q-title').focus();return}
+  if(!$('q-system').value&&$('q-system').options.length&&[...$('q-system').options].some(o=>o.value==='')){msg.className='msg';msg.textContent='Việc dùng chung: hãy chọn hệ thống.';$('q-system').focus();return}
   if(!$('q-system').value||!$('q-type').value){msg.className='msg';msg.textContent='Chưa có hệ thống hoặc loại việc. Hãy nhờ quản trị viên thêm.';return}
   const dv=$('q-date').value==='__other'?$('q-dateother').value:$('q-date').value;
   if(!dv){msg.className='msg';msg.textContent='Hãy chọn ngày thực hiện.';return}
@@ -1298,7 +1304,10 @@ const hasQty=t=>typeof t.qty==='number'&&isFinite(t.qty);
 /* Đơn vị tính: lưu theo tên trên từng việc (task.unit) và trên việc mẫu (tpl.unit); việc cũ chưa có thì lấy đơn vị của việc mẫu cùng tên */
 const tplUnit=title=>{const k=titleKey(title);const tp=S.tpls.find(x=>x.unit&&titleKey(x.name)===k);return tp?tp.unit:''};
 const unitOf=t=>t.unit||tplUnit(t.title)||'';
-function sumText(ts,fmt,def){const m=new Map();ts.forEach(t=>{if(!hasQty(t))return;const u=t.unit||def||'';m.set(u,(m.get(u)||0)+t.qty)});return [...m].map(([u,sm])=>fmt(sm)+(u?' '+u:'')).join('; ')}
+/* Gộp số lượng theo đơn vị: không phân biệt hoa/thường; dòng chưa có đơn vị được cộng vào đơn vị duy nhất còn lại. */
+function foldUnits(pairs){const m=new Map();pairs.forEach(([u,q])=>{u=String(u||'').trim().replace(/\s+/g,' ');const k=u.toLowerCase(),e=m.get(k);if(e)e.s+=q;else m.set(k,{u:u,s:q})});
+  const b=m.get('');if(b&&m.size===2){const o=[...m.values()].find(e=>e!==b);o.s+=b.s;m.delete('')}return [...m.values()]}
+function sumText(ts,fmt,def){return foldUnits(ts.filter(hasQty).map(t=>[t.unit||def||'',t.qty])).map(e=>fmt(e.s)+(e.u?' '+e.u:'')).join('; ')}
 const unitOpts=cur=>'<option value="">Đơn vị tính</option>'+S.units.filter(x=>x.active!==false||x.name===cur).map(x=>'<option value="'+esc(x.name)+'"'+(x.name===cur?' selected':'')+'>'+esc(x.name)+(x.active===false?' (đã ẩn)':'')+'</option>').join('')+(cur&&!S.units.some(x=>x.name===cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'');
 const qcell=q=>q[2]===''?'':(typeof q[2]==='number'?fmtQ(q[2])+(q[3]?' '+q[3]:''):q[2]);
 const qtyDisp=c=>c.hasSum?(c.multi?c.multiText:fmtQ(c.sum)+(c.unit?' '+c.unit:'')):'';
@@ -1311,11 +1320,11 @@ function qtyView(list,useFilter,kind){
   const sys=useFilter?new Set(S.qfSys):new Set(),sel=useFilter?S.qfSel:null;
   const data=sys.size?list.filter(t=>sys.has(t.system)):list;
   const cat=new Map();
-  const add=(name,isTpl)=>{const k=titleKey(name);if(k&&!cat.has(k))cat.set(k,{key:k,name:String(name).trim().replace(/\s+/g,' '),n:0,sum:0,hasSum:false,by:new Map()})};
+  const add=(name,isTpl)=>{const k=titleKey(name);if(k&&!cat.has(k))cat.set(k,{key:k,name:String(name).trim().replace(/\s+/g,' '),n:0,sum:0,hasSum:false,raw:[]})};
   S.tpls.filter(x=>x.active!==false&&tplForGroup(x,gctx)&&!hiddenSys(list).has(x.system)&&(!sys.size||!x.system||sys.has(x.system))).forEach(x=>add(x.name));
   const extra=[];data.forEach(t=>{const k=titleKey(t.title);if(k&&!cat.has(k)){add(t.title);extra.push(k)}});
-  data.forEach(t=>{const c=cat.get(titleKey(t.title));if(!c)return;c.n++;if(hasQty(t)){c.sum+=t.qty;c.hasSum=true;const u=unitOf(t);c.by.set(u,(c.by.get(u)||0)+t.qty)}});
-  cat.forEach(c=>{c.multi=c.by.size>1;c.unit=c.by.size===1?[...c.by.keys()][0]:'';c.multiText=[...c.by].map(([u,sm])=>fmtQ(Math.round(sm*1000)/1000)+(u?' '+u:'')).join('; ')});
+  data.forEach(t=>{const c=cat.get(titleKey(t.title));if(!c)return;c.n++;if(hasQty(t)){c.sum+=t.qty;c.hasSum=true;c.raw.push([unitOf(t),t.qty])}});
+  cat.forEach(c=>{const f=foldUnits(c.raw);c.multi=f.length>1;c.unit=f.length===1?f[0].u:'';c.multiText=f.map(e=>fmtQ(Math.round(e.s*1000)/1000)+(e.u?' '+e.u:'')).join('; ')});
   const tplKeys=[...cat.keys()].filter(k=>extra.indexOf(k)<0),ex=extra.sort((a,b)=>cat.get(a).name.localeCompare(cat.get(b).name,'vi'));
   const catalog=tplKeys.concat(ex).map(k=>cat.get(k));
   const rows=sel===null?catalog.filter(c=>c.n>0).sort((a,b)=>(b.hasSum-a.hasSum)||(b.sum-a.sum)||(b.n-a.n)):catalog.filter(c=>sel.has(c.key));
@@ -1347,8 +1356,10 @@ function noteIds(x){return x.kind==='week'?(x.all?S.users.map(u=>u.uid):[S.who])
    Chỉ tính các việc đã nhập; số lần = số lần ghi nhận, số lượng = tổng các số lượng đã nhập. */
 function pivotSheet(list){
   const tree=new Map();
+  const uBy=new Map();list.forEach(t=>{if(!hasQty(t))return;const k=titleKey(t.title)||'',u=String(unitOf(t)||'').trim().replace(/\s+/g,' ');let m=uBy.get(k);if(!m){m=new Map();uBy.set(k,m)}if(u&&!m.has(u.toLowerCase()))m.set(u.toLowerCase(),u)});
+  const unitFor=t=>{if(!hasQty(t)){const m0=uBy.get(titleKey(t.title)||'');return m0&&m0.size===1?[...m0.values()][0]:''}const u=String(unitOf(t)||'').trim().replace(/\s+/g,' '),m=uBy.get(titleKey(t.title)||'');if(!m)return u;if(!u)return m.size===1?[...m.values()][0]:'';return m.get(u.toLowerCase())||u};
   list.forEach(t=>{
-    const g=sysGroupOf(t.system),ty=typeName(t.type),un=hasQty(t)?unitOf(t):'',k=(titleKey(t.title)||'(không có đầu việc)')+'|'+un;
+    const g=sysGroupOf(t.system),ty=typeName(t.type),un=unitFor(t),k=(titleKey(t.title)||'(không có đầu việc)')+'|'+un;
     let G=tree.get(g);if(!G){G={name:g,ord:99,n:0,q:0,hq:false,types:new Map()};tree.set(g,G)}
     G.ord=Math.min(G.ord,sysIdx(t.system));
     let T=G.types.get(ty);if(!T){T={name:ty,ord:S.types.findIndex(y=>y.id===t.type),n:0,q:0,hq:false,items:new Map()};if(T.ord<0)T.ord=999;G.types.set(ty,T)}
@@ -1833,11 +1844,12 @@ root.addEventListener('change',async e=>{
       try{await saveTpls(S.tpls.map(x=>{if(x.id!==t.dataset.tplg)return x;const n=new Set(x.groups||[]);t.checked?n.add(t.dataset.gid):n.delete(t.dataset.gid);return Object.assign({},x,{groups:[...n]})}))}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
     }
     if(t.id==='q-tpl'){
-      S.qTpl=t.value;const tp=curTpl();
+      S.qTpl=t.value;const tp=curTpl();S.qSysPicked=false;
       if(tp){
-        if(tp.system&&[...$('q-system').options].some(o=>o.value===tp.system)){$('q-system').value=tp.system;S.qSystem=tp.system}
+        if(tp.system){qSysBlank(false);if([...$('q-system').options].some(o=>o.value===tp.system)){$('q-system').value=tp.system;S.qSystem=tp.system}}
+        else qSysBlank(true);
         if(tp.type&&[...$('q-type').options].some(o=>o.value===tp.type)){$('q-type').value=tp.type;S.qType=tp.type}
-      }
+      }else{qSysBlank(false);if(S.qSystem&&[...$('q-system').options].some(o=>o.value===S.qSystem))$('q-system').value=S.qSystem}
       setQuickUnit(tp?tp.unit||'':'');applyTplMode();if(!tp)$('q-title').focus();return;
     }
     if(t.matches&&t.matches('input[data-unitname]')){
@@ -1869,7 +1881,7 @@ root.addEventListener('change',async e=>{
       if(t.value==='__other'){o.hidden=false;if(!o.value)o.value=iso(S.weekStart);o.focus()}
       else{o.hidden=true;S.qDate=t.value}
     }
-    if(t.id==='q-system'){S.qSystem=t.value}
+    if(t.id==='q-system'){S.qSystem=t.value;if(t.value){S.qSysPicked=true;qSysBlank(false)}}
     if(t.id==='q-type'){S.qType=t.value}
   }catch(err){flash(fsMsg(err))}
 });
