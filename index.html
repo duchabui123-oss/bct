@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.25 -->
+<!-- Phiên bản 1.26 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -190,7 +190,9 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .msel-p{position:absolute;z-index:30;left:0;top:calc(100% + 3px);min-width:100%;width:max-content;max-width:min(24rem,80vw);max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:4px}
 .msel-p label{display:flex;gap:8px;align-items:center;padding:.38rem .55rem;border-radius:6px;font-size:.88rem;color:var(--ink);cursor:pointer}
 .msel-p label:hover{background:var(--surface-2)}
-.msel-p input{width:auto;padding:0;margin:0;flex:none}
+.msel-p input[type=checkbox]{width:auto;padding:0;margin:0;flex:none}
+.msel-q{position:sticky;top:0;width:100%;margin:0 0 4px;padding:.4rem .6rem;font-size:.88rem;background:var(--bg)}
+.msel-p label[hidden]{display:none}
 .qdays{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:6px}
 .field select.tpl-new{font-weight:700}
 #q-tpl option[value=""]{font-weight:700}
@@ -301,7 +303,7 @@ const isConfigured=!/DÁN/.test(firebaseConfig.apiKey||'DÁN');
 let auth=null,db=null;
 
 /* ===== Trạng thái ===== */
-const S={msOpen:new Set(),user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),groups:[],tplGroup:'',wGroup:'',mGroup:'',tplOpen:new Set(),groupsReady:false,effKey:'',qfSOpen:false,qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
+const S={msOpen:new Set(),msQ:{},user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),groups:[],tplGroup:'',wGroup:'',mGroup:'',tplOpen:new Set(),groupsReady:false,effKey:'',qfSOpen:false,qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
   editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
@@ -592,7 +594,7 @@ function buildAdmin(){
 
   +'<div id="adm-groups" class="app" hidden><section class="panel"><h2>Nhóm (chức danh)</h2>'
   +'<form class="inline-add" data-add="groups"><input id="add-groups" maxlength="80" placeholder="Tên nhóm mới, ví dụ: Chuyên viên vận hành" required><button type="submit" class="btn primary">Thêm nhóm</button></form>'
-  +'<div class="tbl" id="cat-groups"></div><p class="muted">Mỗi người dùng thuộc một nhóm (chọn ở mục Người dùng). Việc mẫu gắn với nhóm nào thì chỉ người trong nhóm đó thấy; việc mẫu không gắn nhóm là dùng chung. Tích <b>Hệ thống mặc định</b> để người trong nhóm tự thấy đúng các hệ thống đó; người nào đã được tích hệ thống riêng thì ưu tiên theo tích riêng. Không tích gì thì thấy tất cả hệ thống.</p></section></div>'
+  +'<div class="tbl" id="cat-groups"></div><p class="muted">Mỗi người dùng thuộc một hoặc nhiều nhóm, tối đa 5 (chọn ở mục Người dùng). Việc mẫu gắn với nhóm nào thì chỉ người trong nhóm đó thấy; việc mẫu không gắn nhóm là dùng chung. Tích <b>Hệ thống mặc định</b> để người trong nhóm tự thấy đúng các hệ thống đó; người nào đã được tích hệ thống riêng thì ưu tiên theo tích riêng. Không tích gì thì thấy tất cả hệ thống.</p></section></div>'
 
   +'<div id="adm-types" class="app" hidden><section class="panel"><h2>Loại việc</h2>'
   +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="80" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
@@ -1374,17 +1376,20 @@ function fillMoveSelects(){
   if(a)f.value=a;if(b)t.value=b;
 }
 /* Danh sách chọn nhiều (combobox có ô tích): key giữ trạng thái mở khi vẽ lại */
+const normQ=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();
 function msel(key,items,sel,attrs,empty){
   const names=items.filter(x=>sel.has(x.id)).map(x=>x.name);
   const txt=!names.length?empty:(names.length<=2?names.join(', '):names.length+' đã chọn');
+  const q=normQ(S.msQ[key]);
   return '<details class="msel" data-mk="'+esc(key)+'"'+(S.msOpen.has(key)?' open':'')+'><summary title="'+esc(names.join(', '))+'">'+esc(txt)+'</summary><div class="msel-p">'
-    +(items.map(x=>'<label><input type="checkbox" '+attrs(x)+(sel.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'<small class="muted" style="padding:.4rem .55rem;display:block">(chưa có mục nào)</small>')+'</div></details>';
+    +'<input type="search" class="msel-q" data-mq="'+esc(key)+'" value="'+esc(S.msQ[key]||'')+'" placeholder="Gõ để tìm…" aria-label="Tìm trong danh sách" autocomplete="off">'
+    +(items.map(x=>'<label'+(q&&normQ(x.name).indexOf(q)<0?' hidden':'')+'><input type="checkbox" '+attrs(x)+(sel.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'<small class="muted" style="padding:.4rem .55rem;display:block">(chưa có mục nào)</small>')+'</div></details>';
 }
 function renderAddUserChips(){
   const g=$('u-gchips'),sy=$('u-schips');if(!g||!sy)return;
   const kg=new Set([...g.querySelectorAll('input:checked')].map(i=>i.value)),ks=new Set([...sy.querySelectorAll('input:checked')].map(i=>i.value));
   g.innerHTML=msel('u-g',S.groups.filter(x=>x.active!==false),kg,x=>'value="'+esc(x.id)+'"','— Chưa chọn —');
-  sy.innerHTML=msel('u-s',S.systems.filter(x=>x.active!==false),ks,x=>'value="'+esc(x.id)+'"','— Chưa chọn —');
+  sy.innerHTML=msel('u-s',S.systems.filter(x=>x.active!==false),ks,x=>'value="'+esc(x.id)+'"','Theo nhóm');
 }
 function renderAdminUsers(){
   renderAddUserChips();
@@ -1399,7 +1404,7 @@ function renderAdminUsers(){
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
       +'<span class="tbtns"><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
       +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span>'
-      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','— Tất cả hệ thống —')+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
+      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm')+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
    }).join('');
 }
 function renderCatalog(kind){
@@ -1491,6 +1496,11 @@ function setWeek(d){
   const ss=$('save-state');if(ss)ss.textContent='';
   subWeek();renderQuickSelects();renderReport();renderNotes();
 }
+root.addEventListener('change',e=>{const t=e.target,d=t&&t.closest&&t.closest('#f-adduser details.msel');if(!d||t.type!=='checkbox')return;
+  const n=[...d.querySelectorAll('input:checked')].map(i=>i.parentNode.textContent.trim()),sm=d.querySelector('summary');
+  sm.textContent=!n.length?(d.dataset.mk==='u-g'?'— Chưa chọn —':'Theo nhóm'):(n.length<=2?n.join(', '):n.length+' đã chọn');sm.title=n.join(', ')});
+root.addEventListener('keydown',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('msel-q')){if(e.key==='Enter')e.preventDefault();if(e.key==='Escape'){const d=e.target.closest('details');d.open=false;S.msOpen.delete(d.dataset.mk)}}});
+root.addEventListener('input',e=>{const t=e.target;if(!t||!t.classList||!t.classList.contains('msel-q'))return;S.msQ[t.dataset.mq]=t.value;const q=normQ(t.value);t.parentNode.querySelectorAll('label').forEach(l=>{l.hidden=!!q&&normQ(l.textContent).indexOf(q)<0})});
 document.addEventListener('click',e=>{document.querySelectorAll('details.msel[open]').forEach(d=>{if(!d.contains(e.target)){d.open=false;S.msOpen.delete(d.dataset.mk)}})});
 root.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
@@ -1719,7 +1729,7 @@ root.addEventListener('input',e=>{
   if(['n-highlights','n-issues','n-plan'].includes(e.target.id))queueNote();
 });
 root.addEventListener('toggle',e=>{
-  if(e.target&&e.target.dataset&&e.target.dataset.mk){const i=e.target.dataset.mk;e.target.open?S.msOpen.add(i):S.msOpen.delete(i);return}
+  if(e.target&&e.target.dataset&&e.target.dataset.mk){const i=e.target.dataset.mk;e.target.open?S.msOpen.add(i):S.msOpen.delete(i);if(e.target.open){const q=e.target.querySelector('.msel-q');if(q)setTimeout(()=>q.focus(),0)}return}
   if(e.target&&e.target.dataset&&e.target.dataset.tgid){const i=e.target.dataset.tgid;e.target.open?S.tplOpen.add(i):S.tplOpen.delete(i);return}
   const d=e.target;if(!d.classList||!d.classList.contains('sys'))return;
   if(d.open)S.collapsed.delete(d.dataset.sys);else S.collapsed.add(d.dataset.sys);
