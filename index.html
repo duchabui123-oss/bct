@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.31 -->
+<!-- Phiên bản 1.32 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1467,6 +1467,12 @@ async function deleteCatalogItem(kind,id){
 async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
 function renderTplAdmin(){
   const sf=$('t-system'),tf=$('t-type'),ls=$('tpl-list');if(!sf||!tf||!ls)return;
+  /* Quản trị mở danh sách mà việc mẫu cùng hệ thống đang nằm rời nhau thì tự gom lại một lần (xếp ổn định, giữ thứ tự trong từng khối) */
+  if(isAdminUser()&&S.systems.length&&S.tpls.length&&!S.tplNorm){
+    const rk=x=>{const k=S.systems.findIndex(y=>y.id===x.system);return x.system&&k>=0?k:(x.system?998:999)};
+    const sorted=S.tpls.map((x,i)=>({x:x,i:i})).sort((a,b)=>rk(a.x)-rk(b.x)||a.i-b.i).map(o=>o.x);
+    if(sorted.some((x,i)=>x.id!==S.tpls[i].id)){S.tplNorm=true;saveTpls(sorted).catch(()=>{}).then(()=>{S.tplNorm=false})}
+  }
   const opt=(list,first,cur)=>'<option value="">'+first+'</option>'+list.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name)+(x.active===false?' (đã ẩn)':'')+'</option>').join('');
   const vs=sf.value,vt=tf.value,on=l=>l.filter(x=>x.active!==false);
   sf.innerHTML=opt(on(S.systems),'— Không gắn hệ thống —',vs);tf.innerHTML=opt(on(S.types),'— Không gắn loại việc —',vt);
