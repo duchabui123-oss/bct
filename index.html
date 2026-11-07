@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.17 -->
+<!-- Phiên bản 1.18 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -389,8 +389,9 @@ function teardown(){
   monthUnsubs.forEach(f=>{try{f()}catch(e){}});monthUnsubs=[];S.mTasks=[];S.loadedM=false;
   S.users=[];S.systems=[];S.types=[];S.tasks=[];S.notes=[];S.loadedTasks=false;S.editing=null;S.tab='report';
 }
-function listen(ref,cb){
+function listen(ref,cb,onErr){
   const u=onSnapshot(ref,cb,err=>{
+    if(onErr)onErr(err);
     const n=$('net');if(n){n.textContent=err&&err.code==='permission-denied'?'Tài khoản chưa có quyền xem dữ liệu này.':err&&err.code==='failed-precondition'?'Cần tạo chỉ mục Firestore (tasks: system tăng dần, date tăng dần). Xem HUONG-DAN.md.':'Không đọc được dữ liệu. Hãy kiểm tra mạng rồi tải lại trang.';n.hidden=false}
     S.loadedTasks=true;S.loadedM=true;renderReport();renderStats();
   });
@@ -438,6 +439,10 @@ function listenTasks(a,b,cb){
   qs.forEach((q,i)=>un.push(listen(q,snap=>{
     parts[i]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
     if(parts.every(x=>x))cb([].concat(...parts),snap);
+  },err=>{
+    /* một hệ thống lỗi (chưa có chỉ mục, thiếu quyền...) thì các hệ thống còn lại vẫn hiển thị */
+    parts[i]=[];if(parts.every(x=>x))cb([].concat(...parts),null);
+    const n=$('net');if(n)setTimeout(()=>{n.textContent+=' [mã lỗi: '+(err&&err.code||'?')+']';n.hidden=false},0);
   })));
   if(!qs.length)cb([],null);
   return ()=>un.forEach(f=>{try{f()}catch(e){}});
