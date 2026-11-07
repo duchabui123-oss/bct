@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.28 -->
+<!-- Phiên bản 1.31 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -219,9 +219,10 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .inline-add .tgrp{flex:1 1 100%}.inline-add .qf-chip input,.inline-add .tpl-noq input{flex:none}
 .inline-add select{flex:1 1 10rem}
 @media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow .tnm,.trow>input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
-.crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .crow.off input{opacity:.55}
-.crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto}
+.crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto auto}
+.crow.typ{grid-template-columns:minmax(0,1fr) auto auto auto auto}
 @media(max-width:600px){.crow.sys{grid-template-columns:1fr 1fr}.crow.sys input{grid-column:1/-1}}
 .inline-add{display:flex;gap:8px;flex-wrap:wrap}
 .inline-add input{flex:1 1 14rem}
@@ -602,15 +603,15 @@ function buildAdmin(){
 
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
   +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="80" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
-  +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên.<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
+  +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên. <b>Xóa</b> hệ thống sẽ gỡ nó khỏi người dùng, nhóm và ẩn các việc mẫu của hệ thống đó; báo cáo cũ hiện là "(Hệ thống đã xóa)".<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
 
   +'<div id="adm-groups" class="app" hidden><section class="panel"><h2>Nhóm (chức danh)</h2>'
   +'<form class="inline-add" data-add="groups"><input id="add-groups" maxlength="80" placeholder="Tên nhóm mới, ví dụ: Chuyên viên vận hành" required><button type="submit" class="btn primary">Thêm nhóm</button></form>'
-  +'<div class="tbl" id="cat-groups"></div><p class="muted">Mỗi người dùng thuộc một hoặc nhiều nhóm, tối đa 5 (chọn ở mục Người dùng). Việc mẫu gắn với nhóm nào thì chỉ người trong nhóm đó thấy; việc mẫu không gắn nhóm là dùng chung. Tích <b>Hệ thống mặc định</b> để người trong nhóm tự thấy đúng các hệ thống đó; người nào đã được tích hệ thống riêng thì ưu tiên theo tích riêng. Không tích gì thì thấy tất cả hệ thống.</p></section></div>'
+  +'<div class="tbl" id="cat-groups"></div><p class="muted">Mỗi người dùng thuộc một hoặc nhiều nhóm, tối đa 5 (chọn ở mục Người dùng). Việc mẫu gắn với nhóm nào thì chỉ người trong nhóm đó thấy; việc mẫu không gắn nhóm là dùng chung. Tích <b>Hệ thống mặc định</b> để người trong nhóm tự thấy đúng các hệ thống đó; người nào đã được tích hệ thống riêng thì ưu tiên theo tích riêng. Không tích gì thì thấy tất cả hệ thống. <b>Xóa</b> nhóm sẽ gỡ nhóm khỏi người dùng và ẩn các việc mẫu chỉ dành cho nhóm đó.</p></section></div>'
 
   +'<div id="adm-types" class="app" hidden><section class="panel"><h2>Loại việc</h2>'
   +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="80" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
-  +'<div class="tbl" id="cat-types"></div></section></div>'
+  +'<div class="tbl" id="cat-types"></div><p class="muted">Ẩn loại việc để người dùng không còn thấy khi thêm việc, báo cáo cũ vẫn giữ nguyên. Xóa loại việc là xóa hẳn khỏi danh sách; các việc đã nhập với loại đó sẽ hiện là "Khác".</p></section></div>'
 
   +'<div id="adm-tpls" class="app" hidden><section class="panel"><h2>Việc mẫu</h2>'
   +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
@@ -1429,6 +1430,7 @@ function renderCatalog(kind){
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="1"'+(i===list.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
+    +'<button type="button" class="btn sm" data-act="cat-del" data-k="'+kind+'" data-id="'+esc(x.id)+'">Xóa</button>'
     +(kind==='groups'?'<div class="usys"><b>Hệ thống mặc định</b> '+msel('gs:'+x.id,S.systems.filter(y=>y.active!==false),new Set(x.systems||[]),y=>'data-gsys="'+esc(x.id)+'" data-sid="'+esc(y.id)+'"','— Tất cả hệ thống —',true)+'</div>':'')
     +'</div>').join('')
     ||'<p class="muted">Chưa có mục nào.</p>';
@@ -1436,6 +1438,32 @@ function renderCatalog(kind){
 const tplVisible=x=>(!S.tplFilter||(S.tplFilter==='none'?!x.system:x.system===S.tplFilter))
   &&(!S.tplGroup||(S.tplGroup==='none'?!(x.groups&&x.groups.length):(x.groups||[]).indexOf(S.tplGroup)>=0));
 const grpSummary=x=>{const g=(x.groups||[]).map(id=>{const o=S.groups.find(y=>y.id===id);return o?o.name:null}).filter(Boolean);return g.length?g.join(', '):'tất cả nhóm'};
+/* Thêm việc mẫu mới: xếp ổn định theo thứ tự hệ thống để việc cùng hệ thống (kể cả "dùng chung") luôn nằm liền một khối */
+function tplsWith(add){
+  const rank=x=>{const k=S.systems.findIndex(y=>y.id===x.system);return x.system&&k>=0?k:(x.system?998:999)};
+  return S.tpls.concat(add).map((x,i)=>({x:x,i:i})).sort((a,b)=>rank(a.x)-rank(b.x)||a.i-b.i).map(o=>o.x);
+}
+/* Xóa một mục danh mục; với hệ thống và nhóm thì gỡ luôn khỏi hồ sơ người dùng, nhóm và việc mẫu để không còn tham chiếu mồ côi */
+async function deleteCatalogItem(kind,id){
+  const b=writeBatch(db);b.delete(doc(db,kind,id));
+  if(kind==='systems'){
+    S.users.forEach(u=>{if((u.systems||[]).indexOf(id)>=0)b.update(doc(db,'users',u.uid),{systems:u.systems.filter(y=>y!==id)})});
+    S.groups.forEach(g=>{if((g.systems||[]).indexOf(id)>=0)b.update(doc(db,'groups',g.id),{systems:g.systems.filter(y=>y!==id)})});
+  }
+  if(kind==='groups'){
+    S.users.forEach(u=>{const gs=groupsOf(u);if(gs.indexOf(id)>=0){const n=gs.filter(y=>y!==id);b.update(doc(db,'users',u.uid),{groups:n,group:n[0]||''})}});
+  }
+  const touched=kind==='systems'?S.tpls.some(x=>x.system===id):kind==='groups'?S.tpls.some(x=>(x.groups||[]).indexOf(id)>=0):false;
+  if(touched){
+    /* việc mẫu của hệ thống đã xóa, hoặc chỉ dành cho nhóm đã xóa, được chuyển sang Ẩn (không xóa) để quản trị xử lý sau */
+    const items=S.tpls.map(x=>{
+      if(kind==='systems'&&x.system===id)return Object.assign({},x,{active:false});
+      if(kind==='groups'&&(x.groups||[]).indexOf(id)>=0){const n=x.groups.filter(y=>y!==id);return n.length?Object.assign({},x,{groups:n}):Object.assign({},x,{groups:[],active:false})}
+      return x});
+    b.set(doc(db,'settings','templates'),{items:items});
+  }
+  await b.commit();
+}
 async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
 function renderTplAdmin(){
   const sf=$('t-system'),tf=$('t-type'),ls=$('tpl-list');if(!sf||!tf||!ls)return;
@@ -1629,6 +1657,13 @@ root.addEventListener('click',async e=>{
       const u=S.users.find(x=>x.uid===b.dataset.uid);if(!u||u.uid===S.user.uid)return;
       await updateDoc(doc(db,'users',u.uid),{active:u.active===false});return;
     }
+    if(act==='cat-del'){
+      const kd=b.dataset.k;if(['types','systems','groups'].indexOf(kd)<0)return;
+      if(b.dataset.armed){await deleteCatalogItem(kd,b.dataset.id)}
+      else{b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');
+        setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},3000)}
+      return;
+    }
     if(act==='cat-toggle'){
       const x=S[b.dataset.k].find(i=>i.id===b.dataset.id);if(!x)return;
       await updateDoc(doc(db,b.dataset.k,x.id),{active:x.active===false});return;
@@ -1659,7 +1694,7 @@ root.addEventListener('click',async e=>{
         add.push({id:newId()+add.length,name:n,system:t.system||'',type:t.type||'',active:true});
       });
       if(!add.length){m.className='msg';m.textContent='Không có đầu việc mới để lấy (dựa trên các việc của tuần và tháng đang xem).';return}
-      await saveTpls(S.tpls.concat(add));m.className='msg ok';m.textContent='Đã thêm '+add.length+' việc mẫu. Bạn có thể sửa tên, hệ thống, loại việc hoặc ẩn bớt.';return;
+      await saveTpls(tplsWith(add));m.className='msg ok';m.textContent='Đã thêm '+add.length+' việc mẫu. Bạn có thể sửa tên, hệ thống, loại việc hoặc ẩn bớt.';return;
     }
     if(act==='cat-move'){await moveCatalog(b.dataset.k,b.dataset.id,Number(b.dataset.d));return}
   }catch(err){flash(fsMsg(err))}
@@ -1801,7 +1836,7 @@ root.addEventListener('submit',async e=>{
   if(id==='f-addtpl'){
     const n=$('t-name').value.trim().replace(/\s+/g,' ');if(!n)return;
     if(S.tpls.some(x=>x.name.trim().toLowerCase()===n.toLowerCase())){flash('Việc mẫu này đã có trong danh sách.');return}
-    try{await saveTpls(S.tpls.concat({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,label:$('t-label').value.trim(),noQty:$('t-noq').checked,groups:[...document.querySelectorAll('#t-gchips input:checked')].map(i=>i.dataset.tgnew),active:true}));document.querySelectorAll('#t-gchips input').forEach(i=>{i.checked=false});$('t-name').value='';$('t-label').value='';$('t-noq').checked=false;$('t-name').focus()}
+    try{await saveTpls(tplsWith({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,label:$('t-label').value.trim(),noQty:$('t-noq').checked,groups:[...document.querySelectorAll('#t-gchips input:checked')].map(i=>i.dataset.tgnew),active:true}));document.querySelectorAll('#t-gchips input').forEach(i=>{i.checked=false});$('t-name').value='';$('t-label').value='';$('t-noq').checked=false;$('t-name').focus()}
     catch(err){flash(fsMsg(err))}
     return;
   }
