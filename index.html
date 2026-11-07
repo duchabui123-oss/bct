@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.18 -->
+<!-- Phiên bản 1.19 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -554,7 +554,11 @@ function buildAdmin(){
   +'<section class="panel"><h2>Danh sách người dùng</h2><div class="tbl" id="user-list"></div>'
   +'<label class="check" style="margin-top:12px"><input type="checkbox" id="del-data"><span>Khi xóa người dùng, xóa luôn toàn bộ báo cáo của người đó<br><small class="muted">Nếu không chọn, báo cáo cũ vẫn được giữ lại và hiện tên "(Không rõ)" khi xem tất cả mọi người.</small></span></label>'
   +'<p class="muted">Xóa người dùng sẽ gỡ hồ sơ, người đó không đăng nhập được nữa. Muốn đặt lại đúng tên đăng nhập cũ cho người khác, cần xóa thêm tài khoản đó trong Firebase (Authentication > Users). Nếu chỉ cần ngừng cho dùng tạm thời, hãy dùng nút Khóa.</p>'
-  +'<p class="muted">Khóa tài khoản để người đó không đăng nhập được nữa mà vẫn giữ nguyên báo cáo cũ.</p></section></div>'
+  +'<p class="muted">Khóa tài khoản để người đó không đăng nhập được nữa mà vẫn giữ nguyên báo cáo cũ.</p></section>'
+  +'<section class="panel" style="margin-top:14px"><h2>Chuyển dữ liệu giữa hai tài khoản</h2>'
+  +'<p class="muted">Chuyển toàn bộ đầu việc và tổng kết tuần từ tài khoản này sang tài khoản khác. Nếu tài khoản nhận đã có tổng kết ở cùng tuần thì nội dung được nối thêm phía sau. Trước khi chuyển, trình duyệt tự tải về một tệp lưu lại dữ liệu sắp chuyển để có thể quay lại.</p>'
+  +'<div class="grid"><label class="field"><span>Từ tài khoản</span><select id="mv-from"></select></label><label class="field"><span>Sang tài khoản</span><select id="mv-to"></select></label></div>'
+  +'<div class="actions"><button type="button" class="btn" data-act="mv-run">Chuyển toàn bộ việc và tổng kết tuần</button><span class="msg" id="mv-msg" role="status"></span></div></section></div>'
 
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
   +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="80" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
@@ -1160,6 +1164,41 @@ async function backupRestore(file){
   }catch(e){m.className='msg';m.textContent=e&&e.message&&!e.code?e.message:fsMsg(e)}
   $('bk-file').value='';
 }
+async function moveData(b){
+  const m=$('mv-msg'),from=$('mv-from').value,to=$('mv-to').value;m.className='msg';
+  if(!from||!to||from===to){m.textContent='Hãy chọn hai tài khoản khác nhau.';return}
+  const fu=S.users.find(u=>u.uid===from),tu=S.users.find(u=>u.uid===to);
+  if(!fu||!tu)return;
+  if(!b.dataset.armed){
+    b.dataset.armed='1';b.textContent='Bấm lại để chuyển từ '+(fu.name||fu.username)+' sang '+(tu.name||tu.username);
+    setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Chuyển toàn bộ việc và tổng kết tuần'}},5000);
+    return;
+  }
+  delete b.dataset.armed;b.disabled=true;b.textContent='Đang chuyển…';m.textContent='Đang đọc dữ liệu…';
+  try{
+    const al=allowedSys(),col=collection(db,'tasks');
+    const qs=al?[...al].map(id=>query(col,where('uid','==',from),where('system','==',id))):[query(col,where('uid','==',from))];
+    const tasks=[];for(const q of qs)(await getDocs(q)).docs.forEach(d=>tasks.push(d));
+    const notes=(await getDocs(query(collection(db,'weeknotes'),where('uid','==',from)))).docs;
+    if(!tasks.length&&!notes.length){m.textContent='Tài khoản nguồn không có dữ liệu để chuyển.';return}
+    /* lưu lại dữ liệu trước khi chuyển */
+    const save={app:'bao-cao-tuan',kind:'chuyen-du-lieu',exported:new Date().toISOString(),from:from,to:to,data:{tasks:{},weeknotes:{}}};
+    tasks.forEach(d=>{save.data.tasks[d.id]=d.data()});notes.forEach(d=>{save.data.weeknotes[d.id]=d.data()});
+    download(new Blob([JSON.stringify(save)],{type:'application/json'}),'truoc-khi-chuyen-'+(fu.username||'nguon')+'.json');
+    m.textContent='Đang chuyển '+tasks.length+' việc…';
+    for(let i=0;i<tasks.length;i+=400){const bt=writeBatch(db);tasks.slice(i,i+400).forEach(d=>bt.update(doc(db,'tasks',d.id),{uid:to}));await bt.commit()}
+    let nn=0,nm=0;
+    for(const d of notes){
+      const o=d.data(),wk=o.week,tid=to+'_'+wk,ex=await getDoc(doc(db,'weeknotes',tid));
+      const join=(x,y)=>[x,y].map(v=>String(v||'').trim()).filter(Boolean).join('\n');
+      const cur=ex.exists()?ex.data():{};if(ex.exists())nm++;
+      await setDoc(doc(db,'weeknotes',tid),{uid:to,week:wk,highlights:join(cur.highlights,o.highlights),issues:join(cur.issues,o.issues),plan:join(cur.plan,o.plan),updated:Date.now()});
+      await deleteDoc(doc(db,'weeknotes',d.id));nn++;
+    }
+    m.className='msg ok';m.textContent='Đã chuyển '+tasks.length+' việc và '+nn+' tổng kết tuần'+(nm?' ('+nm+' tuần được nối vào tổng kết có sẵn)':'')+'.'+(al?' Lưu ý: chỉ chuyển việc của các hệ thống tài khoản này được xem.':'');
+  }catch(e){m.className='msg';m.textContent=fsMsg(e)+' (có thể cần dán luật Firestore mới, xem HUONG-DAN.md)'}
+  b.disabled=false;b.textContent='Chuyển toàn bộ việc và tổng kết tuần';
+}
 function download(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
@@ -1280,7 +1319,14 @@ function exportReport(kind,fmt){
 }
 
 /* ===== Quản lý ===== */
+function fillMoveSelects(){
+  const f=$('mv-from'),t=$('mv-to');if(!f||!t)return;
+  const opts=S.users.map(u=>'<option value="'+esc(u.uid)+'">'+esc((u.name||u.username)+' ('+u.username+')')+'</option>').join('');
+  const a=f.value,b=t.value;f.innerHTML=opts;t.innerHTML=opts;
+  if(a)f.value=a;if(b)t.value=b;
+}
 function renderAdminUsers(){
+  fillMoveSelects();
   const el=$('user-list');if(!el)return;
   const me=S.user.uid;
   el.innerHTML='<div class="urow head"><span>Họ tên</span><span>Tên đăng nhập</span><span>Đơn vị</span><span>Quyền</span><span></span></div>'
@@ -1429,6 +1475,7 @@ root.addEventListener('click',async e=>{
       }
       return;
     }
+    if(act==='mv-run'){await moveData(b);return}
     if(act==='bk-export'){backupExport();return}
     if(act==='user-del'){
       const u=S.users.find(x=>x.uid===b.dataset.uid);if(!u||u.uid===S.user.uid)return;
