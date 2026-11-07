@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.26 -->
+<!-- Phiên bản 1.28 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,6 +91,16 @@ textarea{resize:vertical;min-height:4.5rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:12px}
 .grid .wide{grid-column:1/-1}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* Form Thêm việc gọn: hàng 1 là 5 ô, hàng 2 là việc có sẵn + đầu việc, hàng 3 là các mục mở rộng cùng nút lưu */
+.qg{display:grid;grid-template-columns:minmax(8.5rem,1fr) minmax(10rem,1.3fr) minmax(10rem,1.3fr) minmax(8rem,1fr) minmax(7rem,.8fr);gap:8px 12px}
+.qg2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:8px 12px;margin-top:8px}
+#q-tplf[hidden]+#q-titlef{grid-column:1/-1}
+.qopts{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin-top:10px}
+.qopts>details{flex:none;order:0}.qopts>details[open]{flex:1 1 100%;order:3}
+.qopts>details>summary{margin-bottom:0}.qopts>details[open]>summary{margin-bottom:8px}
+.qopts .actions{order:1;margin-left:auto}
+#quick .field>span{font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:860px){.qg{grid-template-columns:1fr 1fr}.qg2{grid-template-columns:1fr}.qopts .actions{margin-left:0;flex:1 1 100%}}
 details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:.88rem;margin-bottom:8px}
 
 /* Báo cáo */
@@ -193,6 +203,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .msel-p input[type=checkbox]{width:auto;padding:0;margin:0;flex:none}
 .msel-q{position:sticky;top:0;width:100%;margin:0 0 4px;padding:.4rem .6rem;font-size:.88rem;background:var(--bg)}
 .msel-p label[hidden]{display:none}
+.msel-bar{display:flex;gap:6px;margin:0 0 4px}.msel-bar .btn{flex:1;white-space:nowrap}
 .qdays{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:6px}
 .field select.tpl-new{font-weight:700}
 #q-tpl option[value=""]{font-weight:700}
@@ -528,20 +539,21 @@ function buildShell(){
 
   +'<section class="summary" aria-label="Tiến độ trong tuần"><div class="sum-line" id="sum-line"></div><div class="bar-s" id="sum-bar" role="img" aria-label="Tỷ lệ trạng thái"></div><ul class="legend" id="sum-legend"></ul></section>'
 
-  +'<form id="quick" class="panel"><h2 id="q-heading">Thêm việc</h2><div class="grid">'
+  +'<form id="quick" class="panel"><h2 id="q-heading">Thêm việc</h2><div class="qg">'
   +'<label class="field"><span>Ngày</span><select id="q-date"></select><input id="q-dateother" type="date" hidden aria-label="Chọn ngày khác"></label>'
   +'<label class="field"><span>Hệ thống</span><select id="q-system"></select></label>'
-  +'<details class="field wide" id="q-multi"><summary>Nhập cùng một việc cho nhiều ngày trong tuần</summary><div class="qdays" id="q-days"></div><small class="muted">Tích các ngày cần nhập. Mỗi ngày được tạo thành một việc riêng; nếu không tích ngày nào thì dùng ngày đã chọn ở trên.</small></details>'
   +'<label class="field"><span>Loại việc</span><select id="q-type"></select></label>'
   +'<label class="field"><span>Trạng thái</span><select id="q-status">'+STATUS.map(s=>'<option value="'+s.id+'">'+s.label+'</option>').join('')+'</select></label>'
-  +'<label class="field"><span>Số lượng (không bắt buộc)</span><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Ví dụ: 25"></label>'
-  +'<label class="field wide" id="q-tplf" hidden><span>Chọn việc có sẵn</span><select id="q-tpl"></select></label>'
-  +'<label class="field wide" id="q-titlef"><span>Đầu việc</span><input id="q-title" maxlength="300" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
-  +'<details class="more" id="q-more"><summary>Thêm kết quả, mã phiếu, ghi chú</summary><div class="grid">'
+  +'<label class="field"><span>Số lượng</span><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Không bắt buộc" aria-label="Số lượng (không bắt buộc)"></label></div>'
+  +'<div class="qg2"><label class="field" id="q-tplf" hidden><span>Chọn việc có sẵn</span><select id="q-tpl"></select></label>'
+  +'<label class="field" id="q-titlef"><span>Đầu việc</span><input id="q-title" maxlength="300" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
+  +'<div class="qopts">'
+  +'<details class="more" id="q-multi"><summary>Nhiều ngày</summary><div class="qdays" id="q-days"></div><small class="muted">Tích các ngày cần nhập. Mỗi ngày được tạo thành một việc riêng; nếu không tích ngày nào thì dùng ngày đã chọn ở trên.</small></details>'
+  +'<details class="more" id="q-more"><summary>Kết quả, mã phiếu, ghi chú</summary><div class="grid">'
   +'<label class="field"><span>Kết quả / số liệu</span><input id="q-result" maxlength="400" autocomplete="off" placeholder="Ví dụ: 12/12 phiếu đã đóng"></label>'
   +'<label class="field"><span>Mã phiếu / yêu cầu</span><input id="q-ticket" maxlength="120" autocomplete="off" placeholder="Ví dụ: INC-2026-0001"></label>'
   +'<label class="field wide"><span>Ghi chú</span><textarea id="q-note" rows="2" maxlength="800" placeholder="Vướng mắc, người phối hợp, đường dẫn"></textarea></label></div></details>'
-  +'<div class="actions"><button type="submit" class="btn primary" id="q-save">Thêm việc</button><button type="button" class="btn link" id="q-cancel" data-act="cancel-edit" hidden>Hủy sửa</button><span class="msg" id="q-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" id="q-goto" data-act="goto-week" hidden>Xem tuần đó</button></div></form>'
+  +'<div class="actions"><span class="msg" id="q-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" id="q-goto" data-act="goto-week" hidden>Xem tuần đó</button><button type="button" class="btn link" id="q-cancel" data-act="cancel-edit" hidden>Hủy sửa</button><button type="submit" class="btn primary" id="q-save">Thêm việc</button></div></div></form>'
 
   +'<div id="list" class="list"></div>'
 
@@ -689,7 +701,7 @@ const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
 function applyTplMode(){
   const f=$('q-titlef');if(!f)return;const tp=curTpl();f.hidden=!!tp;
   const qs=$('q-tpl');if(qs)qs.classList.toggle('tpl-new',!tp);
-  const ql=$('q-qty').parentElement;ql.hidden=!!(tp&&tp.noQty);ql.firstElementChild.textContent=(tp&&tp.label?tp.label:'Số lượng')+' (không bắt buộc)';
+  const ql=$('q-qty').parentElement;ql.hidden=!!(tp&&tp.noQty);ql.firstElementChild.textContent=(tp&&tp.label?tp.label:'Số lượng');ql.firstElementChild.title='Không bắt buộc';
 }
 function pill(t,canEdit){
   return '<label class="pillwrap s-'+(ST[t.status]?t.status:'wait')+'"><select data-status="'+esc(t.id)+'" aria-label="Trạng thái: '+esc(t.title)+'"'+(canEdit?'':' disabled')+'>'
@@ -1377,11 +1389,12 @@ function fillMoveSelects(){
 }
 /* Danh sách chọn nhiều (combobox có ô tích): key giữ trạng thái mở khi vẽ lại */
 const normQ=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();
-function msel(key,items,sel,attrs,empty){
+function msel(key,items,sel,attrs,empty,bulkAll){
   const names=items.filter(x=>sel.has(x.id)).map(x=>x.name);
   const txt=!names.length?empty:(names.length<=2?names.join(', '):names.length+' đã chọn');
   const q=normQ(S.msQ[key]);
   return '<details class="msel" data-mk="'+esc(key)+'"'+(S.msOpen.has(key)?' open':'')+'><summary title="'+esc(names.join(', '))+'">'+esc(txt)+'</summary><div class="msel-p">'
+     +'<div class="msel-bar">'+(bulkAll?'<button type="button" class="btn sm" data-act="ms-bulk" data-mode="all" data-mk="'+esc(key)+'">Chọn tất cả</button>':'')+'<button type="button" class="btn sm" data-act="ms-bulk" data-mode="none" data-mk="'+esc(key)+'">Bỏ chọn</button></div>'
     +'<input type="search" class="msel-q" data-mq="'+esc(key)+'" value="'+esc(S.msQ[key]||'')+'" placeholder="Gõ để tìm…" aria-label="Tìm trong danh sách" autocomplete="off">'
     +(items.map(x=>'<label'+(q&&normQ(x.name).indexOf(q)<0?' hidden':'')+'><input type="checkbox" '+attrs(x)+(sel.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')||'<small class="muted" style="padding:.4rem .55rem;display:block">(chưa có mục nào)</small>')+'</div></details>';
 }
@@ -1389,7 +1402,7 @@ function renderAddUserChips(){
   const g=$('u-gchips'),sy=$('u-schips');if(!g||!sy)return;
   const kg=new Set([...g.querySelectorAll('input:checked')].map(i=>i.value)),ks=new Set([...sy.querySelectorAll('input:checked')].map(i=>i.value));
   g.innerHTML=msel('u-g',S.groups.filter(x=>x.active!==false),kg,x=>'value="'+esc(x.id)+'"','— Chưa chọn —');
-  sy.innerHTML=msel('u-s',S.systems.filter(x=>x.active!==false),ks,x=>'value="'+esc(x.id)+'"','Theo nhóm');
+  sy.innerHTML=msel('u-s',S.systems.filter(x=>x.active!==false),ks,x=>'value="'+esc(x.id)+'"','Theo nhóm',true);
 }
 function renderAdminUsers(){
   renderAddUserChips();
@@ -1404,7 +1417,7 @@ function renderAdminUsers(){
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
       +'<span class="tbtns"><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
       +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span>'
-      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm')+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
+      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm',true)+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
    }).join('');
 }
 function renderCatalog(kind){
@@ -1416,7 +1429,7 @@ function renderCatalog(kind){
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="1"'+(i===list.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
-    +(kind==='groups'?'<div class="usys"><b>Hệ thống mặc định</b> '+msel('gs:'+x.id,S.systems.filter(y=>y.active!==false),new Set(x.systems||[]),y=>'data-gsys="'+esc(x.id)+'" data-sid="'+esc(y.id)+'"','— Tất cả hệ thống —')+'</div>':'')
+    +(kind==='groups'?'<div class="usys"><b>Hệ thống mặc định</b> '+msel('gs:'+x.id,S.systems.filter(y=>y.active!==false),new Set(x.systems||[]),y=>'data-gsys="'+esc(x.id)+'" data-sid="'+esc(y.id)+'"','— Tất cả hệ thống —',true)+'</div>':'')
     +'</div>').join('')
     ||'<p class="muted">Chưa có mục nào.</p>';
 }
@@ -1501,11 +1514,24 @@ root.addEventListener('change',e=>{const t=e.target,d=t&&t.closest&&t.closest('#
   sm.textContent=!n.length?(d.dataset.mk==='u-g'?'— Chưa chọn —':'Theo nhóm'):(n.length<=2?n.join(', '):n.length+' đã chọn');sm.title=n.join(', ')});
 root.addEventListener('keydown',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('msel-q')){if(e.key==='Enter')e.preventDefault();if(e.key==='Escape'){const d=e.target.closest('details');d.open=false;S.msOpen.delete(d.dataset.mk)}}});
 root.addEventListener('input',e=>{const t=e.target;if(!t||!t.classList||!t.classList.contains('msel-q'))return;S.msQ[t.dataset.mq]=t.value;const q=normQ(t.value);t.parentNode.querySelectorAll('label').forEach(l=>{l.hidden=!!q&&normQ(l.textContent).indexOf(q)<0})});
-document.addEventListener('click',e=>{document.querySelectorAll('details.msel[open]').forEach(d=>{if(!d.contains(e.target)){d.open=false;S.msOpen.delete(d.dataset.mk)}})});
+document.addEventListener('click',e=>{if(!e.target.isConnected)return;document.querySelectorAll('details.msel[open]').forEach(d=>{if(!d.contains(e.target)){d.open=false;S.msOpen.delete(d.dataset.mk)}})});
 root.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const act=b.dataset.act;
   try{
+    if(act==='ms-bulk'){
+      const d=b.closest('details.msel'),key=b.dataset.mk,all=[...d.querySelectorAll('.msel-p input[type=checkbox]')];
+      const idOf=i=>i.dataset.sid||i.dataset.gid||i.value;
+      const vis=all.filter(i=>!i.parentNode.hidden),cur=new Set(all.filter(i=>i.checked).map(idOf));
+      vis.forEach(i=>b.dataset.mode==='all'?cur.add(idOf(i)):cur.delete(idOf(i)));
+      if(key==='u-s'||key==='u-g'){all.forEach(i=>{i.checked=cur.has(idOf(i))});const f=all[0];if(f)f.dispatchEvent(new Event('change',{bubbles:true}));return}
+      try{
+        if(key.indexOf('us:')===0)await updateDoc(doc(db,'users',key.slice(3)),{systems:[...cur]});
+        else if(key.indexOf('gs:')===0)await updateDoc(doc(db,'groups',key.slice(3)),{systems:[...cur]});
+        else if(key.indexOf('ug:')===0){const arr=S.groups.map(g=>g.id).filter(id=>cur.has(id));await updateDoc(doc(db,'users',key.slice(3)),{groups:arr,group:arr[0]||''})}
+      }catch(err){flash(fsMsg(err));renderAdminUsers();renderCatalog('groups')}
+      return;
+    }
     if(act==='go-signup'){showSignup();return}
     if(act==='go-login'){showLogin();return}
     if(act==='logout'){await doLogout();return}
