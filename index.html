@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.19 -->
+<!-- Phiên bản 1.21 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -408,8 +408,8 @@ async function boot(){
     const mine=S.users.find(u=>u.uid===S.user.uid);
     if(mine){
       if(mine.active===false){doLogout();return}
-      const oldSys=JSON.stringify((S.profile&&S.profile.systems)||[]);
-      S.profile=Object.assign({},mine);if(oldSys!==JSON.stringify(mine.systems||[]))setTimeout(()=>{subWeek();if(monthUnsubs.length)subMonth();renderQuickSelects()},0);const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
+      const oldSys=JSON.stringify([(S.profile&&S.profile.systems)||[],S.profile&&S.profile.role]);
+      S.profile=Object.assign({},mine);if(oldSys!==JSON.stringify([mine.systems||[],mine.role]))setTimeout(()=>{subWeek();if(monthUnsubs.length)subMonth();renderQuickSelects()},0);const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
     }
     renderWho();renderReport();renderNotes();renderAdminUsers();if($('stats-body'))renderStats();
   }));
@@ -432,9 +432,12 @@ async function boot(){
 }
 /* Đọc việc theo khoảng ngày. Người được gán "Hệ thống phụ trách" chỉ được đọc việc của các hệ thống đó (luật Firestore chặn phần còn lại),
    nên mỗi hệ thống một truy vấn (cần chỉ mục system + date, xem HUONG-DAN.md); không được gán thì một truy vấn như cũ. */
+const isAdminUser=()=>!!(S.profile&&S.profile.role==='admin');
 function listenTasks(a,b,cb){
   const al=allowedSys(),col=collection(db,'tasks'),un=[];
-  const qs=al?[...al].map(id=>query(col,where('system','==',id),where('date','>=',a),where('date','<=',b))):[query(col,where('date','>=',a),where('date','<=',b))];
+  /* Người dùng thường chỉ đọc việc của chính mình (luật Firestore chặn phần còn lại); quản trị đọc của mọi người */
+  const own=isAdminUser()?[]:[where('uid','==',S.user.uid)];
+  const qs=al?[...al].map(id=>query(col,where('system','==',id),...own,where('date','>=',a),where('date','<=',b))):[query(col,...own,where('date','>=',a),where('date','<=',b))];
   const parts=new Array(qs.length).fill(null);
   qs.forEach((q,i)=>un.push(listen(q,snap=>{
     parts[i]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
@@ -456,7 +459,7 @@ function subWeek(){
     const n=$('net');if(n&&(!snap||!snap.metadata.fromCache))n.hidden=true;
     renderReport();
   }));
-  weekUnsubs.push(listen(query(collection(db,'weeknotes'),where('week','==',a)),snap=>{
+  weekUnsubs.push(listen(isAdminUser()?query(collection(db,'weeknotes'),where('week','==',a)):query(collection(db,'weeknotes'),where('week','==',a),where('uid','==',S.user.uid)),snap=>{
     S.notes=snap.docs.map(d=>Object.assign({id:d.id},d.data()));renderNotes();
   }));
 }
@@ -606,16 +609,18 @@ const isMine=t=>t.uid===S.user.uid;
 function renderWho(){
   const w=$('who');if(!w)return;
   const me=S.user.uid;
-  const others=S.users.filter(u=>u.uid!==me&&u.active!==false);
+  const adm=isAdminUser(),others=adm?S.users.filter(u=>u.uid!==me&&u.active!==false):[];
   let h='<option value="'+esc(me)+'">Của tôi</option>';
   h+=others.map(u=>'<option value="'+esc(u.uid)+'">'+esc(u.name||u.username)+'</option>').join('');
-  h+='<option value="all">Tất cả mọi người</option>';
+  if(adm)h+='<option value="all">Tất cả mọi người</option>';
   w.innerHTML=h;
+  if(!adm){S.who=me;S.mWho=me}
+  const wl=w.closest('label');if(wl)wl.hidden=!adm;
   if(S.who!=='all'&&!S.users.some(u=>u.uid===S.who)&&S.who!==me)S.who=me;
   w.value=S.who;
   const mw=$('m-who');
   if(mw){
-    mw.innerHTML=h;
+    mw.innerHTML=h;const ml=mw.closest('label');if(ml)ml.hidden=!adm;
     if(S.mWho!=='all'&&S.mWho!==me&&!S.users.some(u=>u.uid===S.mWho))S.mWho=me;
     mw.value=S.mWho;renderStats();
   }
@@ -1420,7 +1425,14 @@ root.addEventListener('click',async e=>{
     if(act==='go-login'){showLogin();return}
     if(act==='logout'){await doLogout();return}
     if(act==='tab'){
+      const prevTab=S.tab;
       S.tab=b.dataset.t;
+      /* Bấm menu Báo cáo hoặc đổi sang tab khác rồi quay lại: về trang của chính mình (có form thêm việc), đóng các bảng đang mở */
+      if(S.tab==='report'||prevTab!==S.tab){
+        S.who=S.user.uid;S.mWho=S.user.uid;
+        const sw=$('sum-week');if(sw)sw.hidden=true;const rp=$('report-panel');if(rp)rp.hidden=true;
+        renderWho();renderReport();
+      }
       document.querySelectorAll('.tabs [data-act="tab"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.tab)));
       $('tab-report').hidden=S.tab!=='report';$('tab-stats').hidden=S.tab!=='stats';const ta=$('tab-admin');if(ta)ta.hidden=S.tab!=='admin';
       if(S.tab==='stats'){if(!monthUnsubs.length)subMonth();renderStats()}
