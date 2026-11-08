@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.44 -->
+<!-- Phiên bản 1.45 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1129,14 +1129,14 @@ function summaryText(sd){
   sd.docs.forEach(d=>{
     L.push(sd.title,d.person,'');
     if(!d.blocks.length)L.push('(Chưa có việc nào trong kỳ)','');
-    d.blocks.forEach(b=>{L.push('['+b.name+']');b.secs.forEach(c=>{L.push('» '+c.name);c.lines.forEach(l=>L.push(l));if(c.notes.length){L.push('Ghi chú:');c.notes.forEach(n=>L.push(n))}});L.push('')});
+    d.blocks.forEach(b=>{L.push('['+b.name+']');b.lines.forEach(l=>L.push(l));if(b.notes.length){L.push('Ghi chú:');b.notes.forEach(n=>L.push(n))}L.push('')});
   });
   return L.join('\n').replace(/\n+$/,'');
 }
 function summaryHtml(sd){
   if(!sd.docs.length)return '<p class="muted">Chưa có việc nào trong kỳ này.</p>';
   return sd.docs.map(d=>'<div class="tscroll"><table class="sumtbl"><thead><tr><th>'+esc(sd.title)+' – '+esc(d.person)+'</th><th>Ghi chú</th></tr></thead><tbody>'
-    +(d.blocks.length?d.blocks.map(b=>'<tr class="band"><td colspan="2">'+esc(b.name)+'</td></tr>'+b.secs.map(c=>'<tr><td><b>» '+esc(c.name)+'</b><br>'+c.lines.map(esc).join('<br>')+'</td><td>'+c.notes.map(esc).join('<br>')+'</td></tr>').join('')).join(''):'<tr><td colspan="2" class="muted">Chưa có việc nào trong kỳ này.</td></tr>')
+    +(d.blocks.length?d.blocks.map(b=>'<tr class="band"><td colspan="2">'+esc(b.name)+'</td></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2" class="muted">Chưa có việc nào trong kỳ này.</td></tr>')
     +'</tbody></table></div>').join('');
 }
 function summarySheet(x){
@@ -1148,9 +1148,8 @@ function summarySheet(x){
     if(!d.blocks.length){rows.push([{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}])}
     d.blocks.forEach(b=>{
       rows.push([{v:b.name,s:6},{v:'',s:6}]);merges.push('A'+rows.length+':B'+rows.length);heights[rows.length-1]=20;
-      b.secs.forEach(c=>{const L=['» '+c.name].concat(c.lines).join('\n'),N=c.notes.join('\n');
-        rows.push([{v:L,s:2},{v:N,s:2}]);
-        heights[rows.length-1]=Math.max(20,Math.max(est(L,100),est(N,42))*15+6)});
+      rows.push([{v:b.lines.join('\n'),s:2},{v:b.notes.join('\n'),s:2}]);
+      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),100),est(b.notes.join('\n'),42))*15+6);
     });
   });
   if(!rows.length)rows.push([{v:sd.title,s:5},{v:'Ghi chú',s:5}],[{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}]);
@@ -1424,7 +1423,7 @@ function buildPrintHtml(x){
     +'<p class="sum"><b>'+n+'</b> việc · <b>'+c.done+'</b> hoàn thành ('+pct+'%) · '+c.doing+' đang làm · '+c.wait+' chờ · '+c.block+' vướng'+(x.kind==='month'?' · '+new Set(x.list.map(t=>t.date)).size+' ngày có việc':'')+'</p>';
   summaryDocs(x).docs.forEach(d=>{
     h+='<h2>Bảng tổng hợp kết quả – '+esc(d.person)+'</h2><table class="stk"><thead><tr><th>Nội dung thực hiện</th><th>Ghi chú</th></tr></thead><tbody>'
-      +(d.blocks.length?d.blocks.map(b=>'<tr><th colspan="2" class="bd">'+esc(b.name)+'</th></tr>'+b.secs.map(c=>'<tr><td><b>» '+esc(c.name)+'</b><br>'+c.lines.map(esc).join('<br>')+'</td><td>'+c.notes.map(esc).join('<br>')+'</td></tr>').join('')).join(''):'<tr><td colspan="2">Chưa có việc nào trong kỳ.</td></tr>')+'</tbody></table>'});
+      +(d.blocks.length?d.blocks.map(b=>'<tr><th colspan="2" class="bd">'+esc(b.name)+'</th></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2">Chưa có việc nào trong kỳ.</td></tr>')+'</tbody></table>'});
   if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
   const qv=qtyView(x.list,x.kind==='month',x.kind);
   if(qv.rows.length)h+='<h2>Số lượng theo đầu việc'+(qv.sys.length?' – '+esc(sysLabel(qv.sys)):'')+'</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qv.rows.map(c=>{const q=qtyCells(c);return [q[0],q[1],qcell(q)]}));
