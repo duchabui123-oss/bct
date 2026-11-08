@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.45 -->
+<!-- Phiên bản 1.46 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -185,7 +185,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .sumtbl th,.sumtbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
 .sumtbl thead th{background:var(--accent-soft);font-weight:700}
 .sumtbl tr.band td{background:var(--accent);color:var(--accent-ink);font-weight:700}
-.sumtbl td:first-child{width:68%}
+.sumtbl td:first-child{width:40%}
 .tpl-noq{display:flex;gap:4px;align-items:center;font-size:.78rem;color:var(--ink-2);white-space:nowrap}
 .tpl-noq input{width:auto;padding:0}
 .qf{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start;margin-bottom:12px}
@@ -1149,11 +1149,11 @@ function summarySheet(x){
     d.blocks.forEach(b=>{
       rows.push([{v:b.name,s:6},{v:'',s:6}]);merges.push('A'+rows.length+':B'+rows.length);heights[rows.length-1]=20;
       rows.push([{v:b.lines.join('\n'),s:2},{v:b.notes.join('\n'),s:2}]);
-      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),100),est(b.notes.join('\n'),42))*15+6);
+      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),58),est(b.notes.join('\n'),92))*15+6);
     });
   });
   if(!rows.length)rows.push([{v:sd.title,s:5},{v:'Ghi chú',s:5}],[{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}]);
-  return {name:'Tổng hợp kết quả',rows:rows,widths:[100,42],heights:heights,merges:merges};
+  return {name:'Tổng hợp kết quả',rows:rows,widths:[58,92],heights:heights,merges:merges};
 }
 function renderSummary(kind){
   const pn=$('sum-'+kind);if(!pn||pn.hidden)return;
@@ -1442,7 +1442,7 @@ function buildPrintHtml(x){
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/1.45 "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
     +'h1{font-size:19px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;break-after:avoid}.meta{color:#555;margin:0 0 8px}.sum{margin:0 0 6px;font-size:12px}'
     +'table{width:100%;border-collapse:collapse;margin:0 0 4px}th,td{border:1px solid #999;padding:3px 5px;text-align:left;vertical-align:top;word-break:break-word}'
-    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:70%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}thead{display:table-header-group}'
+    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:40%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}thead{display:table-header-group}'
     +'</style></head><body>'+h+'</body></html>';
 }
 function printHtml(html){
