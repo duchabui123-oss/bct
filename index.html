@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.36 -->
+<!-- Phiên bản 1.37 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -711,7 +711,7 @@ function renderQuickSelects(){
   if(!tl.some(x=>x.id===S.qTpl))S.qTpl='';
   sel.value=S.qTpl;applyTplMode();
 }
-function setQuickUnit(u){const us=$('q-unit');if(!us)return;us.innerHTML=unitOpts(u||'');us.value=u||''}
+function setQuickUnit(u){const us=$('q-unit');if(!us)return;u=canonUnit(u);us.innerHTML=unitOpts(u||'');us.value=u||''}
 const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
 function applyTplMode(){
   const f=$('q-titlef');if(!f)return;const tp=curTpl();f.hidden=!!tp;
@@ -1303,12 +1303,17 @@ function exportCtx(kind){
 const hasQty=t=>typeof t.qty==='number'&&isFinite(t.qty);
 /* Đơn vị tính: lưu theo tên trên từng việc (task.unit) và trên việc mẫu (tpl.unit); việc cũ chưa có thì lấy đơn vị của việc mẫu cùng tên */
 const tplUnit=title=>{const k=titleKey(title);const tp=S.tpls.find(x=>x.unit&&titleKey(x.name)===k);return tp?tp.unit:''};
-const unitOf=t=>t.unit||tplUnit(t.title)||'';
+/* Đơn vị đã đổi tên: tên cũ (lưu trong "alias") được quy về tên hiện tại. */
+function canonUnit(u){u=String(u||'').trim();if(!u)return '';const k=u.toLowerCase();
+  const a=S.units.find(x=>x.name.toLowerCase()===k);if(a)return a.name;
+  const b=S.units.find(x=>Array.isArray(x.alias)&&x.alias.some(n=>String(n).toLowerCase()===k));return b?b.name:u}
+const unitOf=t=>canonUnit(t.unit||tplUnit(t.title)||'');
 /* Gộp số lượng theo đơn vị: không phân biệt hoa/thường; dòng chưa có đơn vị được cộng vào đơn vị duy nhất còn lại. */
-function foldUnits(pairs){const m=new Map();pairs.forEach(([u,q])=>{u=String(u||'').trim().replace(/\s+/g,' ');const k=u.toLowerCase(),e=m.get(k);if(e)e.s+=q;else m.set(k,{u:u,s:q})});
+function foldUnits(pairs){const m=new Map();pairs.forEach(([u,q])=>{u=canonUnit(String(u||'').trim().replace(/\s+/g,' '));const k=u.toLowerCase(),e=m.get(k);if(e)e.s+=q;else m.set(k,{u:u,s:q})});
   const b=m.get('');if(b&&m.size===2){const o=[...m.values()].find(e=>e!==b);o.s+=b.s;m.delete('')}return [...m.values()]}
 function sumText(ts,fmt,def){return foldUnits(ts.filter(hasQty).map(t=>[t.unit||def||'',t.qty])).map(e=>fmt(e.s)+(e.u?' '+e.u:'')).join('; ')}
-const unitOpts=cur=>'<option value="">Đơn vị tính</option>'+S.units.filter(x=>x.active!==false||x.name===cur).map(x=>'<option value="'+esc(x.name)+'"'+(x.name===cur?' selected':'')+'>'+esc(x.name)+(x.active===false?' (đã ẩn)':'')+'</option>').join('')+(cur&&!S.units.some(x=>x.name===cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'');
+const unitOpts=cur=>{cur=canonUnit(cur);return unitOpts0(cur)};
+const unitOpts0=cur=>'<option value="">Đơn vị tính</option>'+S.units.filter(x=>x.active!==false||x.name===cur).map(x=>'<option value="'+esc(x.name)+'"'+(x.name===cur?' selected':'')+'>'+esc(x.name)+(x.active===false?' (đã ẩn)':'')+'</option>').join('')+(cur&&!S.units.some(x=>x.name===cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'');
 const qcell=q=>q[2]===''?'':(typeof q[2]==='number'?fmtQ(q[2])+(q[3]?' '+q[3]:''):q[2]);
 const qtyDisp=c=>c.hasSum?(c.multi?c.multiText:fmtQ(c.sum)+(c.unit?' '+c.unit:'')):'';
 const fmtQ=n=>String(Math.round(n*1000)/1000).replace('.',',');
@@ -1854,7 +1859,7 @@ root.addEventListener('change',async e=>{
     }
     if(t.matches&&t.matches('input[data-unitname]')){
       const n=t.value.trim().replace(/\s+/g,' ');if(!n||S.units.some(x=>x.id!==t.dataset.unitname&&x.name.toLowerCase()===n.toLowerCase())){renderUnits();return}
-      try{await saveUnits(S.units.map(x=>x.id===t.dataset.unitname?Object.assign({},x,{name:n}):x))}catch(err){flash(fsMsg(err));renderUnits()}return;
+      try{await saveUnits(S.units.map(x=>{if(x.id!==t.dataset.unitname)return x;const al=(x.alias||[]).concat(x.name).filter((v,i,a)=>v.toLowerCase()!==n.toLowerCase()&&a.findIndex(w=>w.toLowerCase()===v.toLowerCase())===i);return Object.assign({},x,{name:n,alias:al})}))}catch(err){flash(fsMsg(err));renderUnits()}return;
     }
     if(t.matches&&t.matches('input[data-tplname],select[data-tplsys],select[data-tpltype],select[data-tplunit],input[data-tpllabel],input[data-tplnoq]')){
       const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype||t.dataset.tplunit||t.dataset.tpllabel||t.dataset.tplnoq,patch={};
