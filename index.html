@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.46 -->
+<!-- Phiên bản 1.47 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,6 +47,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 [hidden]{display:none!important}
 
 .app{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.foot{margin-top:24px;padding:20px 0 28px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.foot b{font-size:1.05rem}.foot .fnote,.foot .fstat{color:var(--muted,#5b6b7a);font-size:.9rem}
+.foot .flinks{display:flex;flex-wrap:wrap;gap:6px 18px;margin:6px 0}
+.foot .flinks button{background:none;border:0;padding:4px 0;font:inherit;font-weight:600;color:var(--muted,#5b6b7a);cursor:pointer}
+.foot .flinks button:hover,.foot .flinks button:focus-visible{color:var(--accent,#0f6b63);text-decoration:underline}
 .app .app{max-width:none;width:100%;margin:0}
 .app>*{min-width:0}
 
@@ -185,7 +190,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .sumtbl th,.sumtbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
 .sumtbl thead th{background:var(--accent-soft);font-weight:700}
 .sumtbl tr.band td{background:var(--accent);color:var(--accent-ink);font-weight:700}
-.sumtbl td:first-child{width:40%}
+.sumtbl td:first-child{width:45%}
 .tpl-noq{display:flex;gap:4px;align-items:center;font-size:.78rem;color:var(--ink-2);white-space:nowrap}
 .tpl-noq input{width:auto;padding:0}
 .qf{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start;margin-bottom:12px}
@@ -577,7 +582,14 @@ function buildShell(){
   +'<textarea class="report-box" id="report-text" readonly></textarea><div class="actions"><button type="button" class="btn primary" data-act="copy-now">Sao chép</button>'
   +'<button type="button" class="btn link" data-act="report-close">Đóng</button><span class="msg" id="report-msg" role="status"></span></div></section></section>'
 
-  +buildStats()+(admin?buildAdmin():'')+'</div>';
+  +buildStats()+(admin?buildAdmin():'')
+  +'<footer class="foot"><b>Báo cáo tuần</b>'
+  +'<span class="fnote">Ghi nhanh việc mỗi ngày, cuối tuần có ngay bảng tổng hợp để gửi báo cáo.</span>'
+  +'<nav class="flinks" aria-label="Liên kết chân trang"><button type="button" data-act="tab" data-t="report">Báo cáo</button>'
+  +'<button type="button" data-act="tab" data-t="stats">Thống kê</button>'
+  +(admin?'<button type="button" data-act="tab" data-t="admin">Quản lý</button>':'')
+  +'<button type="button" data-act="to-top">Lên đầu trang ↑</button></nav>'
+  +'<span class="fstat" id="foot-stat"></span></footer></div>';
 }
 function buildAdmin(){
   return '<section id="tab-admin" class="app" hidden>'
@@ -777,6 +789,7 @@ function renderReport(){
   $('sum-bar').innerHTML=n?STATUS.map(s=>c[s.id]?'<i class="b-'+s.id+'" style="width:'+(c[s.id]*100/n)+'%"></i>':'').join(''):'';
   $('sum-legend').innerHTML=STATUS.map(s=>'<li><span class="dot b-'+s.id+'"></span>'+s.label+' <span class="mono">'+c[s.id]+'</span></li>').join('');
   $('quick').hidden=S.who!==S.user.uid;
+  const fs=$('foot-stat');if(fs)fs.textContent='Tuần '+weekNo(ws)+' · '+(n?n+' việc · '+c.done+' hoàn thành · '+pct+'%':'chưa có việc nào');
   const el=$('list');
   if(!S.loadedTasks&&!n){el.innerHTML='<div class="emptybox">Đang tải dữ liệu…</div>'}
   else if(!n){el.innerHTML='<div class="emptybox">Tuần này chưa có việc nào'+(S.who===S.user.uid?'. Hãy thêm việc đầu tiên ở khung phía trên.':'.')+'</div>'}
@@ -1149,11 +1162,11 @@ function summarySheet(x){
     d.blocks.forEach(b=>{
       rows.push([{v:b.name,s:6},{v:'',s:6}]);merges.push('A'+rows.length+':B'+rows.length);heights[rows.length-1]=20;
       rows.push([{v:b.lines.join('\n'),s:2},{v:b.notes.join('\n'),s:2}]);
-      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),58),est(b.notes.join('\n'),92))*15+6);
+      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),60),est(b.notes.join('\n'),74))*15+6);
     });
   });
   if(!rows.length)rows.push([{v:sd.title,s:5},{v:'Ghi chú',s:5}],[{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}]);
-  return {name:'Tổng hợp kết quả',rows:rows,widths:[58,92],heights:heights,merges:merges};
+  return {name:'Tổng hợp kết quả',rows:rows,widths:[60,74],heights:heights,merges:merges};
 }
 function renderSummary(kind){
   const pn=$('sum-'+kind);if(!pn||pn.hidden)return;
@@ -1442,7 +1455,7 @@ function buildPrintHtml(x){
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/1.45 "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
     +'h1{font-size:19px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;break-after:avoid}.meta{color:#555;margin:0 0 8px}.sum{margin:0 0 6px;font-size:12px}'
     +'table{width:100%;border-collapse:collapse;margin:0 0 4px}th,td{border:1px solid #999;padding:3px 5px;text-align:left;vertical-align:top;word-break:break-word}'
-    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:40%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}thead{display:table-header-group}'
+    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:45%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}thead{display:table-header-group}'
     +'</style></head><body>'+h+'</body></html>';
 }
 function printHtml(html){
@@ -1676,6 +1689,7 @@ root.addEventListener('click',async e=>{
     if(act==='go-signup'){showSignup();return}
     if(act==='go-login'){showLogin();return}
     if(act==='logout'){await doLogout();return}
+    if(act==='to-top'){window.scrollTo({top:0,behavior:'smooth'});return}
     if(act==='tab'){
       const prevTab=S.tab;
       S.tab=b.dataset.t;
@@ -1685,7 +1699,7 @@ root.addEventListener('click',async e=>{
         const sw=$('sum-week');if(sw)sw.hidden=true;const rp=$('report-panel');if(rp)rp.hidden=true;
         renderWho();renderReport();
       }
-      document.querySelectorAll('.tabs [data-act="tab"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.tab)));
+      document.querySelectorAll('.tabs [data-act="tab"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.tab)));if(b.closest('.foot'))window.scrollTo({top:0,behavior:'smooth'});
       $('tab-report').hidden=S.tab!=='report';$('tab-stats').hidden=S.tab!=='stats';const ta=$('tab-admin');if(ta)ta.hidden=S.tab!=='admin';
       if(S.tab==='stats'){if(!monthUnsubs.length)subMonth();renderStats()}
       if(S.tab==='admin')renderSettings();
