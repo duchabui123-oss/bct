@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.38 -->
+<!-- Phiên bản 1.40 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -461,11 +461,11 @@ async function boot(){
   unsubs.push(listen(doc(db,'settings','app'),snap=>{S.settings=snap.exists()?snap.data():{};renderSettings();applyWeekSetting()}));
   unsubs.push(listen(doc(db,'settings','units'),snap=>{
     const it=snap.exists()?snap.data().items:[];S.units=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
-    renderQuickSelects();renderTplAdmin();renderUnits();if($('stats-body'))renderStats();
+    renderQuickSelects();renderTplAdmin();renderUnits();renderReport();if($('stats-body'))renderStats();
   }));
   unsubs.push(listen(doc(db,'settings','templates'),snap=>{
     const it=snap.exists()?snap.data().items:[];S.tpls=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
-    renderQuickSelects();renderTplAdmin();
+    renderQuickSelects();renderTplAdmin();renderReport();
   }));
   if(!groupsOf(S.profile).length)subWeek();
   renderQuickSelects();renderWho();renderReport();renderNotes();
@@ -1533,6 +1533,12 @@ async function deleteCatalogItem(kind,id){
   }
   await b.commit();
 }
+/* Ghi đơn vị mới vào mọi việc đang mang tên cũ (cả hoa/thường khác nhau); trả về số việc đã cập nhật. */
+async function retagUnit(oldNames,newName){let n=0;const seen=new Set();
+  for(const o of oldNames){if(!o||o===newName)continue;const sn=await getDocs(query(collection(db,'tasks'),where('unit','==',o)));
+    const ds=sn.docs.filter(d=>!seen.has(d.id));ds.forEach(d=>seen.add(d.id));
+    for(let i=0;i<ds.length;i+=400){const b=writeBatch(db);ds.slice(i,i+400).forEach(d=>b.update(doc(db,'tasks',d.id),{unit:newName}));await b.commit();n+=Math.min(400,ds.length-i)}}
+  return n}
 async function saveUnits(items){await setDoc(doc(db,'settings','units'),{items:items})}
 function renderUnits(){
   const el=$('unit-list');if(!el)return;
@@ -1867,11 +1873,11 @@ root.addEventListener('change',async e=>{
     }
     if(t.matches&&t.matches('select[data-orphan]')){
       if(!t.value)return;const old=t.dataset.orphan;
-      try{await saveUnits(S.units.map(x=>x.id!==t.value?x:Object.assign({},x,{alias:(x.alias||[]).filter(n=>n.toLowerCase()!==old.toLowerCase()).concat(old)})));flash('Đã gán đơn vị cũ "'+old+'" về đơn vị hiện tại.')}catch(err){flash(fsMsg(err));renderUnits()}return;
+      try{const tg=S.units.find(x=>x.id===t.value);await saveUnits(S.units.map(x=>x.id!==t.value?x:Object.assign({},x,{alias:(x.alias||[]).filter(n=>n.toLowerCase()!==old.toLowerCase()).concat(old)})));let k=0;try{k=await retagUnit([old],tg.name)}catch(e2){}flash('Đã gán đơn vị cũ "'+old+'" về "'+tg.name+'"'+(k?' ('+k+' việc).':'.'),true)}catch(err){flash(fsMsg(err));renderUnits()}return;
     }
     if(t.matches&&t.matches('input[data-unitname]')){
       const n=t.value.trim().replace(/\s+/g,' ');if(!n||S.units.some(x=>x.id!==t.dataset.unitname&&x.name.toLowerCase()===n.toLowerCase())){renderUnits();return}
-      try{await saveUnits(S.units.map(x=>{if(x.id!==t.dataset.unitname)return x;const al=(x.alias||[]).concat(x.name).filter((v,i,a)=>v.toLowerCase()!==n.toLowerCase()&&a.findIndex(w=>w.toLowerCase()===v.toLowerCase())===i);return Object.assign({},x,{name:n,alias:al})}))}catch(err){flash(fsMsg(err));renderUnits()}return;
+      try{const cur=S.units.find(x=>x.id===t.dataset.unitname),oldName=cur?cur.name:'';await saveUnits(S.units.map(x=>{if(x.id!==t.dataset.unitname)return x;const al=(x.alias||[]).concat(x.name).filter((v,i,a)=>v.toLowerCase()!==n.toLowerCase()&&a.findIndex(w=>w.toLowerCase()===v.toLowerCase())===i);return Object.assign({},x,{name:n,alias:al})}));if(oldName&&oldName!==n){try{const k=await retagUnit([oldName],n);if(k)flash('Đã cập nhật '+k+' việc sang đơn vị "'+n+'".',true)}catch(e2){flash('Đã đổi tên, nhưng chưa cập nhật được hết việc cũ: '+fsMsg(e2))}}}catch(err){flash(fsMsg(err));renderUnits()}return;
     }
     if(t.matches&&t.matches('input[data-tplname],select[data-tplsys],select[data-tpltype],select[data-tplunit],input[data-tpllabel],input[data-tplnoq]')){
       const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype||t.dataset.tplunit||t.dataset.tpllabel||t.dataset.tplnoq,patch={};
