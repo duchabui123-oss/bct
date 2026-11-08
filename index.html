@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.43 -->
+<!-- Phiên bản 1.44 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1081,7 +1081,7 @@ function summaryBlocks(list,grp){
       const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
       if(!m.length)return; /* chỉ liệt kê đầu việc đã có người nhập */
       const lab=tp.label||'Số lượng';
-      out.push({type:domType(m),text:tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
+      out.push({type:domType(m),ts:m,text:tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
     });
     return out;
   };
@@ -1089,16 +1089,18 @@ function summaryBlocks(list,grp){
     const g=new Map();
     tasks.forEach(t=>{const k=titleKey(t.title);if(!k||skip.has(k))return;let o=g.get(k);if(!o){o={name:String(t.title).trim(),ts:[]};g.set(k,o)}o.ts.push(t)});
     const out=[];
-    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),text:o.name+'.'+(st?' Số lượng: '+st:'')})});
+    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),ts:o.ts,text:o.name+'.'+(st?' Số lượng: '+st:'')})});
     return out;
   };
   const byType=items=>{
     const rk=id=>{const i=S.types.findIndex(y=>y.id===id);return i<0?9999:i};
     const types=[...new Set(items.map(x=>x.type))].sort((a,b)=>rk(a)-rk(b));
-    const out=[];let n=1;
-    types.forEach(ty=>{out.push('» '+typeName(ty));items.filter(x=>x.type===ty).forEach(x=>{out.push(n+'. '+x.text);n++})});
-    return out;
+    /* Mỗi loại việc một đoạn: danh sách việc (gạch đầu dòng "- ") và ghi chú theo đúng thứ tự các việc đó */
+    return types.map(ty=>{const its=items.filter(x=>x.type===ty),seen=new Set(),notes=[];
+      its.forEach(x=>x.ts.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);notes.push('- '+n)}}));
+      return {name:typeName(ty),lines:its.map(x=>'- '+x.text),notes:notes}});
   };
+  const mkBlock=(name,secs)=>({name:name,secs:secs,lines:[].concat(...secs.map(c=>['» '+c.name].concat(c.lines))),notes:[].concat(...secs.map(c=>c.notes))});
   const notesOf=tasks=>{const seen=new Set(),out=[];tasks.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);out.push('- '+n)}});return out};
   const known=new Set(S.systems.map(x=>x.id));
   /* Gom các hệ thống cùng nhóm báo cáo (ví dụ mọi hệ thống IPCC thành "IPCC") thành một khối */
@@ -1110,10 +1112,10 @@ function summaryBlocks(list,grp){
     const tasks=list.filter(t=>ids.has(t.system));
     if(!tasks.length)return;
     const tk=new Set(arr.map(x=>titleKey(x.name)));
-    blocks.push({name:gname,lines:byType(tplItems(arr,tasks).concat(extraItems(tasks,tk))),notes:notesOf(tasks)});
+    blocks.push(mkBlock(gname,byType(tplItems(arr,tasks).concat(extraItems(tasks,tk)))));
   });
   const lost=list.filter(t=>!known.has(t.system));
-  if(lost.length)blocks.push({name:'(Hệ thống đã xóa)',lines:byType(extraItems(lost,new Set())),notes:notesOf(lost)});
+  if(lost.length)blocks.push(mkBlock('(Hệ thống đã xóa)',byType(extraItems(lost,new Set()))));
   return blocks;
 }
 function summaryDocs(x){
@@ -1127,14 +1129,14 @@ function summaryText(sd){
   sd.docs.forEach(d=>{
     L.push(sd.title,d.person,'');
     if(!d.blocks.length)L.push('(Chưa có việc nào trong kỳ)','');
-    d.blocks.forEach(b=>{L.push('['+b.name+']');b.lines.forEach(l=>L.push(l));if(b.notes.length){L.push('Ghi chú:');b.notes.forEach(n=>L.push(n))}L.push('')});
+    d.blocks.forEach(b=>{L.push('['+b.name+']');b.secs.forEach(c=>{L.push('» '+c.name);c.lines.forEach(l=>L.push(l));if(c.notes.length){L.push('Ghi chú:');c.notes.forEach(n=>L.push(n))}});L.push('')});
   });
   return L.join('\n').replace(/\n+$/,'');
 }
 function summaryHtml(sd){
   if(!sd.docs.length)return '<p class="muted">Chưa có việc nào trong kỳ này.</p>';
   return sd.docs.map(d=>'<div class="tscroll"><table class="sumtbl"><thead><tr><th>'+esc(sd.title)+' – '+esc(d.person)+'</th><th>Ghi chú</th></tr></thead><tbody>'
-    +(d.blocks.length?d.blocks.map(b=>'<tr class="band"><td colspan="2">'+esc(b.name)+'</td></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2" class="muted">Chưa có việc nào trong kỳ này.</td></tr>')
+    +(d.blocks.length?d.blocks.map(b=>'<tr class="band"><td colspan="2">'+esc(b.name)+'</td></tr>'+b.secs.map(c=>'<tr><td><b>» '+esc(c.name)+'</b><br>'+c.lines.map(esc).join('<br>')+'</td><td>'+c.notes.map(esc).join('<br>')+'</td></tr>').join('')).join(''):'<tr><td colspan="2" class="muted">Chưa có việc nào trong kỳ này.</td></tr>')
     +'</tbody></table></div>').join('');
 }
 function summarySheet(x){
@@ -1146,8 +1148,9 @@ function summarySheet(x){
     if(!d.blocks.length){rows.push([{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}])}
     d.blocks.forEach(b=>{
       rows.push([{v:b.name,s:6},{v:'',s:6}]);merges.push('A'+rows.length+':B'+rows.length);heights[rows.length-1]=20;
-      rows.push([{v:b.lines.join('\n'),s:2},{v:b.notes.join('\n'),s:2}]);
-      heights[rows.length-1]=Math.max(20,Math.max(est(b.lines.join('\n'),100),est(b.notes.join('\n'),42))*15+6);
+      b.secs.forEach(c=>{const L=['» '+c.name].concat(c.lines).join('\n'),N=c.notes.join('\n');
+        rows.push([{v:L,s:2},{v:N,s:2}]);
+        heights[rows.length-1]=Math.max(20,Math.max(est(L,100),est(N,42))*15+6)});
     });
   });
   if(!rows.length)rows.push([{v:sd.title,s:5},{v:'Ghi chú',s:5}],[{v:'(Chưa có việc nào trong kỳ)',s:2},{v:'',s:2}]);
@@ -1421,7 +1424,7 @@ function buildPrintHtml(x){
     +'<p class="sum"><b>'+n+'</b> việc · <b>'+c.done+'</b> hoàn thành ('+pct+'%) · '+c.doing+' đang làm · '+c.wait+' chờ · '+c.block+' vướng'+(x.kind==='month'?' · '+new Set(x.list.map(t=>t.date)).size+' ngày có việc':'')+'</p>';
   summaryDocs(x).docs.forEach(d=>{
     h+='<h2>Bảng tổng hợp kết quả – '+esc(d.person)+'</h2><table class="stk"><thead><tr><th>Nội dung thực hiện</th><th>Ghi chú</th></tr></thead><tbody>'
-      +(d.blocks.length?d.blocks.map(b=>'<tr><th colspan="2" class="bd">'+esc(b.name)+'</th></tr><tr><td>'+b.lines.map(esc).join('<br>')+'</td><td>'+b.notes.map(esc).join('<br>')+'</td></tr>').join(''):'<tr><td colspan="2">Chưa có việc nào trong kỳ.</td></tr>')+'</tbody></table>'});
+      +(d.blocks.length?d.blocks.map(b=>'<tr><th colspan="2" class="bd">'+esc(b.name)+'</th></tr>'+b.secs.map(c=>'<tr><td><b>» '+esc(c.name)+'</b><br>'+c.lines.map(esc).join('<br>')+'</td><td>'+c.notes.map(esc).join('<br>')+'</td></tr>').join('')).join(''):'<tr><td colspan="2">Chưa có việc nào trong kỳ.</td></tr>')+'</tbody></table>'});
   if(x.kind==='month')statSets(x).forEach(s=>{if(s[2].length)h+='<h2>'+esc(s[0])+'</h2>'+tbl(statHead(s[1]),s[2].map(statRow))});
   const qv=qtyView(x.list,x.kind==='month',x.kind);
   if(qv.rows.length)h+='<h2>Số lượng theo đầu việc'+(qv.sys.length?' – '+esc(sysLabel(qv.sys)):'')+'</h2>'+tbl(['Đầu việc','Số lần ghi nhận','Tổng số lượng'],qv.rows.map(c=>{const q=qtyCells(c);return [q[0],q[1],qcell(q)]}));
