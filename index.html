@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.40 -->
+<!-- Phiên bản 1.43 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1073,21 +1073,30 @@ function summaryBlocks(list,grp){
   const hid=hiddenSys(list);
   const tpls=S.tpls.filter(x=>x.active!==false&&!hid.has(x.system)&&tplForGroup(x,grp));
   const blocks=[];
-  const tplLines=(arr,tasks,start)=>{
-    let i=start;const out=[];
+  const domType=ts=>{const c=new Map();ts.forEach(t=>c.set(t.type,(c.get(t.type)||0)+1));let b='',n=0;c.forEach((v,k)=>{if(v>n){n=v;b=k}});return b};
+  /* Mỗi mục: {type, text}; việc mẫu trước, việc khác sau; sau đó gom theo loại việc (thứ tự loại việc trong Quản lý) */
+  const tplItems=(arr,tasks)=>{
+    const out=[];
     arr.forEach(tp=>{
       const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
       if(!m.length)return; /* chỉ liệt kê đầu việc đã có người nhập */
       const lab=tp.label||'Số lượng';
-      out.push(i+'. '+tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):'')));i++;
+      out.push({type:domType(m),text:tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
     });
-    return {lines:out,next:i};
+    return out;
   };
-  const extraLines=(tasks,start,skip)=>{
+  const extraItems=(tasks,skip)=>{
     const g=new Map();
     tasks.forEach(t=>{const k=titleKey(t.title);if(!k||skip.has(k))return;let o=g.get(k);if(!o){o={name:String(t.title).trim(),ts:[]};g.set(k,o)}o.ts.push(t)});
-    let i=start;const out=[];
-    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push(i+'. '+o.name+'.'+(st?' Số lượng: '+st:''));i++});
+    const out=[];
+    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),text:o.name+'.'+(st?' Số lượng: '+st:'')})});
+    return out;
+  };
+  const byType=items=>{
+    const rk=id=>{const i=S.types.findIndex(y=>y.id===id);return i<0?9999:i};
+    const types=[...new Set(items.map(x=>x.type))].sort((a,b)=>rk(a)-rk(b));
+    const out=[];let n=1;
+    types.forEach(ty=>{out.push('» '+typeName(ty));items.filter(x=>x.type===ty).forEach(x=>{out.push(n+'. '+x.text);n++})});
     return out;
   };
   const notesOf=tasks=>{const seen=new Set(),out=[];tasks.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);out.push('- '+n)}});return out};
@@ -1100,11 +1109,11 @@ function summaryBlocks(list,grp){
     const seenK=new Set(),arr=tpls.filter(x=>!x.system||ids.has(x.system)).filter(x=>{const k=titleKey(x.name);if(seenK.has(k))return false;seenK.add(k);return true});
     const tasks=list.filter(t=>ids.has(t.system));
     if(!tasks.length)return;
-    const a=tplLines(arr,tasks,1),tk=new Set(arr.map(x=>titleKey(x.name)));
-    blocks.push({name:gname,lines:a.lines.concat(extraLines(tasks,a.next,tk)),notes:notesOf(tasks)});
+    const tk=new Set(arr.map(x=>titleKey(x.name)));
+    blocks.push({name:gname,lines:byType(tplItems(arr,tasks).concat(extraItems(tasks,tk))),notes:notesOf(tasks)});
   });
   const lost=list.filter(t=>!known.has(t.system));
-  if(lost.length)blocks.push({name:'(Hệ thống đã xóa)',lines:extraLines(lost,1,new Set()),notes:notesOf(lost)});
+  if(lost.length)blocks.push({name:'(Hệ thống đã xóa)',lines:byType(extraItems(lost,new Set())),notes:notesOf(lost)});
   return blocks;
 }
 function summaryDocs(x){
@@ -1188,7 +1197,7 @@ function sheetXml(sh){
         const rf=colL(ci)+(ri+1);
         if(v.v===''||v.v==null)x+='<c r="'+rf+'" s="'+v.s+'"/>';
         else if(typeof v.v==='number')x+='<c r="'+rf+'" s="'+v.s+'"><v>'+v.v+'</v></c>';
-        else x+='<c r="'+rf+'" s="'+v.s+'" t="inlineStr"><is><t xml:space="preserve">'+xe(String(v.v).replace(/^- /gm,'• '))+'</t></is></c>';
+        else x+='<c r="'+rf+'" s="'+v.s+'" t="inlineStr"><is><t xml:space="preserve">'+xe(String(v.v))+'</t></is></c>';
         return;
       }
       if(v===null||v===undefined||v==='')return;
@@ -1372,14 +1381,14 @@ function pivotSheet(list){
     let I=T.items.get(k);if(!I){I={name:String(t.title||'').trim()||'(không có đầu việc)',unit:un,n:0,q:0,hq:false};T.items.set(k,I)}
     [G,T,I].forEach(o=>{o.n++;if(hasQty(t)){o.q+=t.qty;o.hq=true}});
   });
-  const rows=[['Nhãn dòng',{v:'Số lần ghi nhận',s:13},{v:'Tổng số lượng',s:13},'Đơn vị tính']],levels=[0];
+  const rows=[['Loại việc',{v:'Số lần ghi nhận',s:13},{v:'Tổng số lượng',s:13},'Đơn vị tính']],levels=[0];
   const qv=o=>o.hq?Math.round(o.q*1000)/1000:'';
   let tn=0,tq=0,thq=false;
   [...tree.values()].sort((a,b)=>a.ord-b.ord||a.name.localeCompare(b.name,'vi')).forEach(G=>{
     rows.push([{v:G.name,s:5},{v:G.n,s:10},{v:qv(G),s:10},{v:'',s:5}]);levels.push(0);tn+=G.n;if(G.hq){tq+=G.q;thq=true}
     [...G.types.values()].sort((a,b)=>a.ord-b.ord||a.name.localeCompare(b.name,'vi')).forEach(T=>{
       rows.push([{v:T.name,s:8},{v:T.n,s:11},{v:qv(T),s:11},{v:'',s:8}]);levels.push(1);
-      [...T.items.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,'vi')||a.unit.localeCompare(b.unit,'vi')).forEach(I=>{rows.push([{v:I.name,s:9},{v:I.n,s:12},{v:qv(I),s:12},{v:I.unit,s:2}]);levels.push(2)});
+      [...T.items.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,'vi')||a.unit.localeCompare(b.unit,'vi')).forEach(I=>{rows.push([{v:'- '+I.name,s:9},{v:I.n,s:12},{v:qv(I),s:12},{v:I.unit,s:2}]);levels.push(2)});
     });
   });
   rows.push([{v:'Tổng cộng',s:5},{v:tn,s:10},{v:thq?Math.round(tq*1000)/1000:'',s:10},{v:'',s:5}]);levels.push(0);
@@ -1533,11 +1542,13 @@ async function deleteCatalogItem(kind,id){
   }
   await b.commit();
 }
-/* Ghi đơn vị mới vào mọi việc đang mang tên cũ (cả hoa/thường khác nhau); trả về số việc đã cập nhật. */
-async function retagUnit(oldNames,newName){let n=0;const seen=new Set();
-  for(const o of oldNames){if(!o||o===newName)continue;const sn=await getDocs(query(collection(db,'tasks'),where('unit','==',o)));
-    const ds=sn.docs.filter(d=>!seen.has(d.id));ds.forEach(d=>seen.add(d.id));
-    for(let i=0;i<ds.length;i+=400){const b=writeBatch(db);ds.slice(i,i+400).forEach(d=>b.update(doc(db,'tasks',d.id),{unit:newName}));await b.commit();n+=Math.min(400,ds.length-i)}}
+/* Ghi đơn vị mới vào các việc đang mở trên màn hình (tuần/tháng đã tải) mang tên cũ; các tuần khác tự quy theo bí danh khi hiển thị.
+   Không truy vấn toàn bộ để tránh bị luật Firebase từ chối. Trả về số việc đã cập nhật. */
+async function retagUnit(oldNames,newName){
+  const lo=new Set(oldNames.filter(Boolean).map(x=>x.toLowerCase()));const seen=new Map();
+  S.tasks.concat(S.mTasks||[]).forEach(t=>{const u=String(t.unit||'').trim();if(u&&u!==newName&&lo.has(u.toLowerCase()))seen.set(t.id,t)});
+  const ds=[...seen.values()];let n=0;
+  for(let i=0;i<ds.length;i+=400){const b=writeBatch(db);ds.slice(i,i+400).forEach(t=>b.update(doc(db,'tasks',t.id),{unit:newName}));await b.commit();n+=Math.min(400,ds.length-i)}
   return n}
 async function saveUnits(items){await setDoc(doc(db,'settings','units'),{items:items})}
 function renderUnits(){
@@ -1877,7 +1888,7 @@ root.addEventListener('change',async e=>{
     }
     if(t.matches&&t.matches('input[data-unitname]')){
       const n=t.value.trim().replace(/\s+/g,' ');if(!n||S.units.some(x=>x.id!==t.dataset.unitname&&x.name.toLowerCase()===n.toLowerCase())){renderUnits();return}
-      try{const cur=S.units.find(x=>x.id===t.dataset.unitname),oldName=cur?cur.name:'';await saveUnits(S.units.map(x=>{if(x.id!==t.dataset.unitname)return x;const al=(x.alias||[]).concat(x.name).filter((v,i,a)=>v.toLowerCase()!==n.toLowerCase()&&a.findIndex(w=>w.toLowerCase()===v.toLowerCase())===i);return Object.assign({},x,{name:n,alias:al})}));if(oldName&&oldName!==n){try{const k=await retagUnit([oldName],n);if(k)flash('Đã cập nhật '+k+' việc sang đơn vị "'+n+'".',true)}catch(e2){flash('Đã đổi tên, nhưng chưa cập nhật được hết việc cũ: '+fsMsg(e2))}}}catch(err){flash(fsMsg(err));renderUnits()}return;
+      try{const cur=S.units.find(x=>x.id===t.dataset.unitname),oldName=cur?cur.name:'';await saveUnits(S.units.map(x=>{if(x.id!==t.dataset.unitname)return x;const al=(x.alias||[]).concat(x.name).filter((v,i,a)=>v.toLowerCase()!==n.toLowerCase()&&a.findIndex(w=>w.toLowerCase()===v.toLowerCase())===i);return Object.assign({},x,{name:n,alias:al})}));if(oldName&&oldName!==n){try{const k=await retagUnit([oldName],n);if(k)flash('Đã cập nhật '+k+' việc sang đơn vị "'+n+'".',true)}catch(e2){}}}catch(err){flash(fsMsg(err));renderUnits()}return;
     }
     if(t.matches&&t.matches('input[data-tplname],select[data-tplsys],select[data-tpltype],select[data-tplunit],input[data-tpllabel],input[data-tplnoq]')){
       const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype||t.dataset.tplunit||t.dataset.tpllabel||t.dataset.tplnoq,patch={};
