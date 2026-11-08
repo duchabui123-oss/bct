@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.37 -->
+<!-- Phiên bản 1.38 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -209,6 +209,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .qdays{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:6px}
 .field select.tpl-new{font-weight:700}
 #q-tpl option[value=""]{font-weight:700}
+.orph{margin-top:1rem;padding:.8rem;border:1px dashed var(--bd,#c9d3d3);border-radius:10px}.orph .crow{display:flex;gap:.6rem;align-items:center;margin-top:.5rem}.orph-n{font-weight:700;min-width:8rem}
 .crow .usys,.trow .tgrp{grid-column:1/-1}
 .tgrp>summary{cursor:pointer;font-size:.84rem;color:var(--ink-2)}
 .qf-sys{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;flex:1 1 100%}
@@ -495,7 +496,7 @@ function subWeek(){
   S.loadedTasks=false;
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
-    S.tasks=list;S.loadedTasks=true;
+    S.tasks=list;S.loadedTasks=true;try{renderUnits()}catch(e){}
     const n=$('net');if(n&&(!snap||!snap.metadata.fromCache))n.hidden=true;
     renderReport();
   }));
@@ -622,7 +623,7 @@ function buildAdmin(){
 
   +'<div id="adm-units" class="app" hidden><section class="panel"><h2>Đơn vị tính</h2>'
   +'<form class="inline-add" id="f-addunit"><input id="add-unit" maxlength="40" placeholder="Tên đơn vị tính mới, ví dụ: phiếu, tài khoản, cuộc gọi" required><button type="submit" class="btn primary">Thêm đơn vị tính</button></form>'
-  +'<div class="tbl" id="unit-list"></div>'
+  +'<div class="tbl" id="unit-list"></div><div id="unit-orphans"></div>'
   +'<p class="muted">Đơn vị tính được chọn ở từng việc mẫu (mục Việc mẫu) và hiện ngay cạnh ô Số lượng khi thêm việc. Ẩn đơn vị để không còn chọn được nữa, báo cáo cũ vẫn giữ nguyên. Đổi tên đơn vị chỉ áp dụng cho các việc nhập sau đó; việc đã nhập giữ tên cũ.</p></section></div>'
   +'<div id="adm-tpls" class="app" hidden><section class="panel"><h2>Việc mẫu</h2>'
   +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
@@ -949,7 +950,7 @@ function subMonth(){
   const y=S.month.getFullYear(),mo=S.month.getMonth();
   const a=iso(new Date(y,mo,1)),b=iso(new Date(y,mo+1,0));
   monthUnsubs.push(listenTasks(a,b,list=>{
-    S.mTasks=list;S.loadedM=true;renderStats();
+    S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits()}catch(e){}
   }));
 }
 function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
@@ -1542,6 +1543,13 @@ function renderUnits(){
     +'<button type="button" class="btn sm" data-act="unit-toggle" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
     +'<button type="button" class="btn sm" data-act="unit-del" data-id="'+esc(x.id)+'">Xóa</button></div>').join('')
     ||'<p class="muted">Chưa có đơn vị tính nào. <button type="button" class="btn sm" data-act="unit-seed">Thêm các đơn vị thường dùng</button></p>';
+  /* Đơn vị đã nhập nhưng không còn trong danh sách (ví dụ đã đổi tên từ trước): cho gán về đơn vị hiện tại. */
+  const orf=new Map();
+  S.tasks.concat(S.mTasks||[]).forEach(t=>{const u=String(t.unit||'').trim();if(u&&canonUnit(u)===u&&!S.units.some(x=>x.name.toLowerCase()===u.toLowerCase())&&!orf.has(u.toLowerCase()))orf.set(u.toLowerCase(),u)});
+  S.tpls.forEach(t=>{const u=String(t.unit||'').trim();if(u&&canonUnit(u)===u&&!S.units.some(x=>x.name.toLowerCase()===u.toLowerCase())&&!orf.has(u.toLowerCase()))orf.set(u.toLowerCase(),u)});
+  const oe=$('unit-orphans');if(!oe)return;
+  oe.innerHTML=orf.size&&S.units.length?'<div class="orph"><b>Đơn vị cũ không còn trong danh sách</b><p class="muted">Các việc dưới đây đang ghi đơn vị cũ. Chọn đơn vị hiện tại tương ứng để báo cáo hiển thị đúng tên mới.</p>'
+    +[...orf.values()].map(u=>'<div class="crow"><span class="orph-n">'+esc(u)+'</span><span>→</span><select data-orphan="'+esc(u)+'"><option value="">Chọn đơn vị hiện tại</option>'+S.units.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></div>').join('')+'</div>':'';
 }
 async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
 function renderTplAdmin(){
@@ -1856,6 +1864,10 @@ root.addEventListener('change',async e=>{
         if(tp.type&&[...$('q-type').options].some(o=>o.value===tp.type)){$('q-type').value=tp.type;S.qType=tp.type}
       }else{qSysBlank(false);if(S.qSystem&&[...$('q-system').options].some(o=>o.value===S.qSystem))$('q-system').value=S.qSystem}
       setQuickUnit(tp?tp.unit||'':'');applyTplMode();if(!tp)$('q-title').focus();return;
+    }
+    if(t.matches&&t.matches('select[data-orphan]')){
+      if(!t.value)return;const old=t.dataset.orphan;
+      try{await saveUnits(S.units.map(x=>x.id!==t.value?x:Object.assign({},x,{alias:(x.alias||[]).filter(n=>n.toLowerCase()!==old.toLowerCase()).concat(old)})));flash('Đã gán đơn vị cũ "'+old+'" về đơn vị hiện tại.')}catch(err){flash(fsMsg(err));renderUnits()}return;
     }
     if(t.matches&&t.matches('input[data-unitname]')){
       const n=t.value.trim().replace(/\s+/g,' ');if(!n||S.units.some(x=>x.id!==t.dataset.unitname&&x.name.toLowerCase()===n.toLowerCase())){renderUnits();return}
