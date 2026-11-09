@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.59 -->
+<!-- Phiên bản 1.60 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1486,7 +1486,7 @@ function buildPrintHtml(x){
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/1.45 "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
     +'h1{font-size:19px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;break-after:avoid}.meta{color:#555;margin:0 0 8px}.sum{margin:0 0 6px;font-size:12px}'
     +'table{width:100%;border-collapse:collapse;margin:0 0 4px}th,td{border:1px solid #999;padding:3px 5px;text-align:left;vertical-align:top;word-break:break-word}'
-    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:45%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}thead{display:table-header-group}'
+    +'th{background:#e6edf5;font-weight:600}.tk td:nth-child(-n+2){white-space:nowrap}.stk td:first-child{width:45%}.bd{background:#2f5d8a;color:#fff}tr{break-inside:avoid}.stk tr{break-inside:auto}thead{display:table-header-group}'
     +'</style></head><body>'+h+'</body></html>';
 }
 function printHtml(html){
