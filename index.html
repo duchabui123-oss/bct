@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.55 -->
+<!-- Phiên bản 1.56 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -513,7 +513,7 @@ function subWeek(){
   S.loadedTasks=false;
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
-    canonTitles(list);canonTypes(list);S.tasks=list;S.loadedTasks=true;try{renderUnits()}catch(e){}
+    canonTitles(list);canonTypes(list);S.tasks=list;S.loadedTasks=true;try{renderUnits();refreshTplUses()}catch(e){}
     const n=$('net');if(n&&(!snap||!snap.metadata.fromCache))n.hidden=true;
     renderReport();
   }));
@@ -976,7 +976,7 @@ function subMonth(){
   const y=S.month.getFullYear(),mo=S.month.getMonth();
   const a=iso(new Date(y,mo,1)),b=iso(new Date(y,mo+1,0));
   monthUnsubs.push(listenTasks(a,b,list=>{
-    canonTitles(list);canonTypes(list);S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits()}catch(e){}
+    canonTitles(list);canonTypes(list);S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits();refreshTplUses()}catch(e){}
   }));
 }
 function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
@@ -1615,6 +1615,10 @@ const tasksTitled=name=>{const k=normKey(name),m=new Map();S.tasks.concat(S.mTas
 async function retagTitle(ids,newName){
   try{for(let i=0;i<ids.length;i+=400){const b=writeBatch(db);ids.slice(i,i+400).forEach(id=>b.update(doc(db,'tasks',id),{title:newName}));await b.commit()}}catch(e){}
 }
+/* Số việc đã nhập (tuần/tháng đang tải) gắn với một việc mẫu: cùng tên theo bí danh, và cùng hệ thống nếu việc mẫu có chọn hệ thống. */
+function tplUses(tp){const k=titleKey(tp.name);let n=0;S.tasks.concat(S.mTasks||[]).forEach(t=>{if(titleKey(t.title)===k&&(!tp.system||t.system===tp.system))n++});return n}
+const usesText=n=>n?' · Đã dùng '+n+' lần':' · Chưa ai dùng';
+function refreshTplUses(){document.querySelectorAll('.tuse[data-tid]').forEach(el=>{const tp=S.tpls.find(x=>x.id===el.dataset.tid);if(tp)el.textContent=usesText(tplUses(tp))})}
 /* Đổi loại việc của việc mẫu: các việc đang mở trên màn hình mang tên việc mẫu đó (cùng hệ thống nếu mẫu có chọn hệ thống) đổi theo loại mới. */
 const tasksOfTpl=tp=>{const k=normKey(tp.name),m=new Map();S.tasks.concat(S.mTasks||[]).forEach(t=>{if(normKey(t.title)===k&&(!tp.system||t.system===tp.system))m.set(t.id,t)});return [...m.values()]};
 async function retagType(ts,newType){
@@ -1698,7 +1702,7 @@ function renderTplAdmin(){
     +'<button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="1"'+(i===vis.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="tpl-toggle" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
     +'<button type="button" class="btn sm" data-act="tpl-del" data-id="'+esc(x.id)+'">Xóa</button></span>'
-    +'<details class="tgrp" data-tgid="'+esc(x.id)+'"'+(S.tplOpen.has(x.id)?' open':'')+'><summary>Dành cho: '+esc(grpSummary(x))+'</summary><div class="qdays">'
+    +'<details class="tgrp" data-tgid="'+esc(x.id)+'"'+(S.tplOpen.has(x.id)?' open':'')+'><summary>Dành cho: '+esc(grpSummary(x))+'<span class="tuse" data-tid="'+esc(x.id)+'" title="Tính trên các tuần và tháng đang tải">'+usesText(tplUses(x))+'</span></summary><div class="qdays">'
     +S.groups.filter(g=>g.active!==false||(x.groups||[]).indexOf(g.id)>=0).map(g=>'<label class="qf-chip"><input type="checkbox" data-tplg="'+esc(x.id)+'" data-gid="'+esc(g.id)+'"'+((x.groups||[]).indexOf(g.id)>=0?' checked':'')+'> '+esc(g.name)+'</label>').join('')
     +'</div></details></div>'}).join('')
     ||'<p class="muted">Chưa có việc mẫu nào. Hãy thêm ở ô phía trên.</p>';
@@ -1899,6 +1903,10 @@ root.addEventListener('click',async e=>{
     }
     if(act==='tpl-toggle'){await saveTpls(S.tpls.map(x=>x.id===b.dataset.id?Object.assign({},x,{active:x.active===false}):x));return}
     if(act==='tpl-del'){
+      const dtp=S.tpls.find(x=>x.id===b.dataset.id),du=dtp?tplUses(dtp):0;
+      if(du>0){
+        if(confirm('Việc mẫu "'+dtp.name+'" đã được dùng ở '+du+' việc (trong dữ liệu đang xem).\n\nXóa sẽ mất đơn vị tính, nhãn số lượng, loại việc và các tên cũ của việc mẫu; việc đã nhập vẫn còn.\nNên chọn Ẩn để giữ lại.\n\nVẫn xóa?'))await saveTpls(S.tpls.filter(x=>x.id!==b.dataset.id));
+        return}
       if(b.dataset.armed){await saveTpls(S.tpls.filter(x=>x.id!==b.dataset.id))}
       else{b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');
         setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},3000)}
