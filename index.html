@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.53 -->
+<!-- Phiên bản 1.55 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -268,21 +268,27 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
   .urow.head{display:none}
   .me{margin-left:0}
 }
+#notices{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;flex-direction:column;gap:6px;padding:0 .75rem calc(.6rem + env(safe-area-inset-bottom));pointer-events:none}
+#notices:empty{display:none}
+.ntc{pointer-events:auto;margin:0 auto;max-width:640px;width:100%;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.55rem .75rem;border:1px solid var(--accent);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:.88rem}
+.ntc span{flex:1 1 220px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
+<script src="config.js"></script>
 <script type="module">
 /* ============================================================
-   CẤU HÌNH: dán thông tin Firebase của bạn vào đây (xem HUONG-DAN.md, bước 5)
+   CẤU HÌNH: thông tin Firebase nằm trong tệp config.js (dán một lần, xem HUONG-DAN.md, bước 5).
+   Các giá trị bên dưới chỉ dùng khi không có config.js.
    ============================================================ */
-const firebaseConfig = {
-  apiKey: "AIzaSyBQX8tQtaeu5_2h_dJzLU9GsPQZSzIryc8",
-  authDomain: "bao-cao-tuan-41dcd.firebaseapp.com",
-  projectId: "bao-cao-tuan-41dcd",
-  appId: "1:106370420272:web:08de51dd82ec93d00367f5"
+const firebaseConfig = window.BCT_CONFIG || {
+  apiKey: "DÁN_API_KEY_VÀO_ĐÂY",
+  authDomain: "DÁN_AUTH_DOMAIN",
+  projectId: "DÁN_PROJECT_ID",
+  appId: "DÁN_APP_ID"
 };
 /* Tên đăng nhập được đổi thành địa chỉ nội bộ dạng ten@baocao-tuan.com. Hệ thống không gửi thư tới địa chỉ này. */
 const EMAIL_DOMAIN = "baocao-tuan.com";
@@ -366,7 +372,7 @@ const USER_HINT='Tên đăng nhập gồm 3–30 ký tự: chữ không dấu, s
 /* ===== Màn hình đăng nhập ===== */
 function authShell(inner){root.innerHTML='<main class="auth"><div class="auth-card"><h1>Báo cáo tuần</h1>'+inner+'</div></main>'}
 function showSetup(){
-  authShell('<p class="sub">Trang chưa được kết nối với Firebase.</p><p class="muted">Mở tệp <b>HUONG-DAN.md</b>, làm theo bước 1 đến bước 5, rồi dán thông tin cấu hình vào đầu phần mã trong <b>index.html</b>.</p>');
+  authShell('<p class="sub">Trang chưa được kết nối với Firebase.</p><p class="muted">Mở tệp <b>HUONG-DAN.md</b>, làm theo bước 1 đến bước 5, rồi dán thông tin cấu hình vào tệp <b>config.js</b> (nằm cùng thư mục với index.html).</p>');
 }
 function showLogin(msg){
   authShell('<p class="sub">Đăng nhập để làm hoặc xem báo cáo.</p>'
@@ -468,14 +474,14 @@ async function boot(){
     S.types=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
     renderQuickSelects();renderReport();renderCatalog('types');renderTplAdmin();
   }));
-  unsubs.push(listen(doc(db,'settings','app'),snap=>{S.settings=snap.exists()?snap.data():{};renderSettings();applyWeekSetting()}));
+  unsubs.push(listen(doc(db,'settings','app'),snap=>{S.settings=snap.exists()?snap.data():{};S.settingsReady=true;renderSettings();applyWeekSetting();updateNotices()}));
   unsubs.push(listen(doc(db,'settings','units'),snap=>{
     const it=snap.exists()?snap.data().items:[];S.units=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
     renderQuickSelects();renderTplAdmin();renderUnits();renderReport();if($('stats-body'))renderStats();
   }));
   unsubs.push(listen(doc(db,'settings','templates'),snap=>{
     const it=snap.exists()?snap.data().items:[];S.tpls=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
-    canonTitles(S.tasks);canonTitles(S.mTasks);
+    canonTitles(S.tasks);canonTitles(S.mTasks);canonTypes(S.tasks);canonTypes(S.mTasks);
     renderQuickSelects();renderTplAdmin();renderReport();
   }));
   if(!groupsOf(S.profile).length)subWeek();
@@ -507,7 +513,7 @@ function subWeek(){
   S.loadedTasks=false;
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
-    canonTitles(list);S.tasks=list;S.loadedTasks=true;try{renderUnits()}catch(e){}
+    canonTitles(list);canonTypes(list);S.tasks=list;S.loadedTasks=true;try{renderUnits()}catch(e){}
     const n=$('net');if(n&&(!snap||!snap.metadata.fromCache))n.hidden=true;
     renderReport();
   }));
@@ -660,7 +666,7 @@ function buildAdmin(){
   +'<small class="muted">Áp dụng cho mọi người dùng: khung ngày của từng tuần, số tuần và nội dung sao chép báo cáo. Với tuần bắt đầu khác Thứ 2, số tuần được tính theo ngày kết thúc: tuần chứa ngày 01/01 là tuần 1.</small></div>'
   +'<span class="msg" id="set-msg" role="status"></span></section>'
   +'<section class="panel" style="margin-top:14px"><h2>Sao lưu dữ liệu</h2><p class="muted">Tải toàn bộ dữ liệu (người dùng, hệ thống, loại việc, việc mẫu, đầu việc, tổng kết tuần, cài đặt) về máy thành một tệp JSON. Nên sao lưu định kỳ, ví dụ mỗi tuần. Tài khoản đăng nhập (mật khẩu) do Firebase quản lý nên không nằm trong tệp.</p>'
-  +'<div class="actions"><button type="button" class="btn" data-act="bk-export">Tải bản sao lưu</button>'
+  +'<p class="muted" id="bk-last"></p><div class="actions"><button type="button" class="btn" data-act="bk-export">Tải bản sao lưu</button>'
   +'<label class="btn" style="cursor:pointer">Khôi phục từ tệp…<input type="file" id="bk-file" accept=".json,application/json" hidden></label></div>'
   +'<small class="muted">Khôi phục sẽ ghi đè các bản ghi cùng mã và thêm lại bản ghi bị xóa; không xóa dữ liệu hiện có khác.</small><span class="msg" id="bk-msg" role="status"></span></section></div></section>';
 }
@@ -970,7 +976,7 @@ function subMonth(){
   const y=S.month.getFullYear(),mo=S.month.getMonth();
   const a=iso(new Date(y,mo,1)),b=iso(new Date(y,mo+1,0));
   monthUnsubs.push(listenTasks(a,b,list=>{
-    canonTitles(list);S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits()}catch(e){}
+    canonTitles(list);canonTypes(list);S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits()}catch(e){}
   }));
 }
 function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
@@ -1269,6 +1275,7 @@ async function backupExport(){
     if(al)out.partial='Chỉ gồm việc của các hệ thống được gán cho tài khoản sao lưu.';
     const t=new Date(),pad=x=>String(x).padStart(2,'0');
     download(new Blob([JSON.stringify(out)],{type:'application/json'}),'sao-luu-bao-cao-tuan-'+t.getFullYear()+pad(t.getMonth()+1)+pad(t.getDate())+'.json');
+    if(!al){try{await setDoc(doc(db,'settings','app'),{lastBackup:Date.now()},{merge:true})}catch(e2){}}
     m.className='msg ok';m.textContent='Đã tải bản sao lưu ('+n+' bản ghi).'+(al?' Lưu ý: chỉ gồm việc của các hệ thống được gán cho tài khoản này; muốn sao lưu đầy đủ hãy dùng tài khoản quản trị không bị giới hạn hệ thống.':'');
   }catch(e){m.className='msg';m.textContent=fsMsg(e)}
 }
@@ -1608,6 +1615,40 @@ const tasksTitled=name=>{const k=normKey(name),m=new Map();S.tasks.concat(S.mTas
 async function retagTitle(ids,newName){
   try{for(let i=0;i<ids.length;i+=400){const b=writeBatch(db);ids.slice(i,i+400).forEach(id=>b.update(doc(db,'tasks',id),{title:newName}));await b.commit()}}catch(e){}
 }
+/* Đổi loại việc của việc mẫu: các việc đang mở trên màn hình mang tên việc mẫu đó (cùng hệ thống nếu mẫu có chọn hệ thống) đổi theo loại mới. */
+const tasksOfTpl=tp=>{const k=normKey(tp.name),m=new Map();S.tasks.concat(S.mTasks||[]).forEach(t=>{if(normKey(t.title)===k&&(!tp.system||t.system===tp.system))m.set(t.id,t)});return [...m.values()]};
+async function retagType(ts,newType){
+  const ds=ts.filter(t=>t.type!==newType);let n=0; /* ts: bản chụp {id,type} lấy trước khi lưu, vì danh sách trên màn hình có thể đã tự đổi loại khi việc mẫu được lưu */
+  for(let i=0;i<ds.length;i+=400){const b=writeBatch(db);ds.slice(i,i+400).forEach(t=>b.update(doc(db,'tasks',t.id),{type:newType}));await b.commit();n+=Math.min(400,ds.length-i)}
+  return n}
+/* ===== Thanh nhắc: có bản mới của trang, đã lâu chưa sao lưu ===== */
+const BUILD=(()=>{try{const it=document.createNodeIterator(document,NodeFilter.SHOW_COMMENT);let n;while((n=it.nextNode())){const m=/Phiên bản\s+([\d.]+)/.exec(n.nodeValue);if(m)return m[1]}}catch(e){}return ''})();
+const BK_DAYS=7;
+const bkDue=()=>{if(!S.user||!isAdminUser()||!S.settingsReady||S.bkHide||allowedSys())return false;const l=Number(S.settings.lastBackup)||0;return !l||Date.now()-l>BK_DAYS*86400000};
+function updateNotices(){
+  let el=$('notices');
+  if(!el){el=document.createElement('div');el.id='notices';el.setAttribute('role','status');document.body.appendChild(el);
+    el.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-nt]');if(!b)return;const k=b.dataset.nt;
+      if(k==='reload'){const u=location.href.split('#')[0];fetch(u,{cache:'reload'}).catch(()=>{}).then(()=>location.reload());return}
+      if(k==='bk-hide'){S.bkHide=true;updateNotices();return}
+      if(k==='bk-go'){const a=document.querySelector('button[data-t="admin"]');if(a)a.click();const s2=document.querySelector('[data-act="adm"][data-t="settings"]');if(s2)s2.click();const bk=$('bk-msg');if(bk)bk.scrollIntoView({block:'center'});S.bkHide=true;updateNotices()}})}
+  const l=Number(S.settings&&S.settings.lastBackup)||0,days=l?Math.floor((Date.now()-l)/86400000):0;
+  el.innerHTML=(S.newVer?'<div class="ntc"><span>Có bản mới của trang. Bấm Tải lại để dùng bản mới.</span><button type="button" class="btn sm primary" data-nt="reload">Tải lại</button></div>':'')
+    +(bkDue()?'<div class="ntc"><span>'+(l?'Đã '+days+' ngày chưa sao lưu dữ liệu.':'Chưa có bản sao lưu dữ liệu nào.')+' Nên sao lưu mỗi tuần.</span><button type="button" class="btn sm primary" data-nt="bk-go">Đến mục Sao lưu</button><button type="button" class="btn sm" data-nt="bk-hide" aria-label="Ẩn nhắc nhở">Để sau</button></div>':'');
+}
+let lastVerCheck=0;
+async function checkNewVersion(){
+  if(!BUILD||S.newVer||!/^https?:/.test(location.protocol)||Date.now()-lastVerCheck<60000)return;lastVerCheck=Date.now();
+  try{const r=await fetch(location.href.split('#')[0],{cache:'no-store'});if(!r.ok)return;const t=await r.text();
+    const m=/<!--\s*Phiên bản\s+([\d.]+)\s*-->/.exec(t);if(m&&t.indexOf('id="root"')>=0&&m[1]!==BUILD){S.newVer=m[1];updateNotices()}}catch(e){}
+}
+/* Loại việc của việc mẫu đã đổi: các việc nhập trước lúc đổi và còn mang loại cũ được hiển thị theo loại mới của việc mẫu. */
+function canonTypes(arr){
+  if(!arr||!arr.length)return;
+  S.tpls.forEach(tp=>{if(!Array.isArray(tp.typeHist)||!tp.typeHist.length)return;const k=titleKey(tp.name);
+    arr.forEach(t=>{if(titleKey(t.title)!==k||(tp.system&&t.system!==tp.system))return;
+      tp.typeHist.forEach(h=>{if((t.type||'')===(h.from||'')&&(t.ts||0)<=h.until)t.type=h.to})})})
+}
 async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
 function renderImport(){
   const box=$('tpl-import');if(!box)return;
@@ -1672,6 +1713,7 @@ function applyWeekSetting(){
 function renderSettings(){
   const ws=$('week-start');if(ws)ws.value=String(WK);
   const c=$('allow-signup');if(c)c.checked=!!S.settings.allowSignup;
+  const bl=$('bk-last');if(bl){const l=Number(S.settings.lastBackup)||0;bl.textContent=l?'Lần sao lưu đầy đủ gần nhất: '+new Date(l).toLocaleString('vi-VN')+'.':'Chưa ghi nhận lần sao lưu nào.'}
 }
 async function createUserAsAdmin(name,username,password,unit,role,groups,systems){
   const sec=getApps().find(a=>a.name==='secondary')||initializeApp(firebaseConfig,'secondary');
@@ -1964,10 +2006,12 @@ root.addEventListener('change',async e=>{
       if(t.dataset.tplunit!==undefined)patch.unit=t.value;else
       if(t.dataset.tpllabel!==undefined)patch.label=t.value.trim();else if(t.dataset.tplnoq!==undefined)patch.noQty=t.checked;else
       if(t.dataset.tplname){const n=t.value.trim();if(!n){renderTplAdmin();return}patch.name=n;const cur=S.tpls.find(x=>x.id===id);if(cur&&cur.name!==n){patch.alias=(Array.isArray(cur.alias)?cur.alias:[]).concat(cur.name).filter((v,i,a)=>normKey(v)!==normKey(n)&&a.findIndex(w=>normKey(w)===normKey(v))===i);patch.oldName=cur.name}}
-      else if(t.dataset.tplsys!==undefined)patch.system=t.value;else patch.type=t.value;
+      else if(t.dataset.tplsys!==undefined)patch.system=t.value;else{patch.type=t.value;const c0=S.tpls.find(x=>x.id===id);if(c0&&(c0.type||'')!==t.value&&t.value)patch.typeHist=(Array.isArray(c0.typeHist)?c0.typeHist:[]).concat({from:c0.type||'',to:t.value,until:Date.now()}).slice(-10)}
       const oldName=patch.oldName;delete patch.oldName;
       const ids=oldName?tasksTitled(oldName):[];
-      try{await saveTpls(S.tpls.map(x=>x.id===id?Object.assign({},x,patch):x));if(ids.length)retagTitle(ids,patch.name)}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
+      const tcur=S.tpls.find(x=>x.id===id),typeTs=(t.dataset.tpltype!==undefined&&patch.type&&tcur&&tcur.type!==patch.type)?tasksOfTpl(tcur).map(x=>({id:x.id,type:x.type})):[];
+      try{await saveTpls(S.tpls.map(x=>x.id===id?Object.assign({},x,patch):x));if(ids.length)retagTitle(ids,patch.name);
+        if(typeTs.length){try{const k=await retagType(typeTs,patch.type);if(k)flash('Đã chuyển '+k+' việc sang loại việc "'+typeName(patch.type)+'".',true)}catch(e2){}}}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
     }
     if(t.id==='week-start'){
       const m=$('set-msg'),v=parseInt(t.value,10);
@@ -2069,7 +2113,7 @@ async function start(){
     if(S.busyAuth)return;
     teardown();
     if(!user){
-      S.user=null;S.profile=null;S.publicSignup=false;
+      S.user=null;S.profile=null;S.publicSignup=false;S.settingsReady=false;S.bkHide=false;updateNotices();
       try{const s=await getDoc(doc(db,'settings','app'));S.publicSignup=s.exists()&&!!s.data().allowSignup}catch(e){}
       showLogin();return;
     }
@@ -2085,6 +2129,8 @@ async function start(){
   });
 }
 start();
+setTimeout(checkNewVersion,15000);setInterval(checkNewVersion,600000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkNewVersion()});
 </script>
 </body>
 </html>
