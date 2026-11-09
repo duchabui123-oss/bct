@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.57 -->
+<!-- Phiên bản 1.58 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1110,7 +1110,7 @@ function summaryBlocks(list,grp){
       const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
       if(!m.length)return; /* chỉ liệt kê đầu việc đã có người nhập */
       const lab=tp.label||'Số lượng';
-      out.push({type:domType(m),ts:m,text:tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
+      out.push({type:domType(m),ts:m,lab:lab,noQ:!!tp.noQty,text:tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
     });
     return out;
   };
@@ -1118,7 +1118,7 @@ function summaryBlocks(list,grp){
     const g=new Map();
     tasks.forEach(t=>{const k=titleKey(t.title);if(!k||skip.has(k))return;let o=g.get(k);if(!o){o={name:String(t.title).trim(),ts:[]};g.set(k,o)}o.ts.push(t)});
     const out=[];
-    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),ts:o.ts,text:o.name+'.'+(st?' Số lượng: '+st:'')})});
+    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),ts:o.ts,lab:'Số lượng',noQ:false,text:o.name+'.'+(st?' Số lượng: '+st:'')})});
     return out;
   };
   const byType=items=>{
@@ -1126,7 +1126,11 @@ function summaryBlocks(list,grp){
     const types=[...new Set(items.map(x=>x.type))].sort((a,b)=>rk(a)-rk(b));
     /* Mỗi loại việc một đoạn: danh sách việc (gạch đầu dòng "- ") và ghi chú theo đúng thứ tự các việc đó */
     return types.map(ty=>{const its=items.filter(x=>x.type===ty),seen=new Set(),notes=[];
-      its.forEach(x=>x.ts.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);notes.push('- '+n)}}));
+      /* Ghi chú không nhập số lượng thì tự thêm số lượng của chính việc đó vào cuối: "Số lượng: x Đơn vị" */
+      const noteTxt=(t,x)=>{let n=String(t.note||'').trim();if(!n)return '';
+        if(!x.noQ&&hasQty(t)&&!/số lượng/i.test(n)){const u=unitOf(t);n+=(/[.;:,!?]$/.test(n)?' ':'. ')+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u?' '+u:'')}
+        return n};
+      its.forEach(x=>x.ts.forEach(t=>{const n=noteTxt(t,x);if(n&&!seen.has(n)){seen.add(n);notes.push('- '+n)}}));
       return {name:typeName(ty),lines:its.map(x=>'- '+x.text),notes:notes}});
   };
   const mkBlock=(name,secs)=>({name:name,secs:secs,lines:[].concat(...secs.map(c=>['» '+c.name].concat(c.lines))),notes:[].concat(...secs.map(c=>['» '+c.name].concat(c.notes,['────────────────'])))});
