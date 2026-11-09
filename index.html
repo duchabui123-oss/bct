@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.56 -->
+<!-- Phiên bản 1.57 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -571,7 +571,7 @@ function buildShell(){
   +'<label class="field"><span>Trạng thái</span><select id="q-status">'+STATUS.map(s=>'<option value="'+s.id+'">'+s.label+'</option>').join('')+'</select></label>'
   +'<label class="field"><span>Số lượng</span><div class="qq"><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Không bắt buộc" aria-label="Số lượng (không bắt buộc)"><select id="q-unit" aria-label="Đơn vị tính"></select></div></label></div>'
   +'<div class="qg2"><label class="field" id="q-tplf" hidden><span>Chọn việc có sẵn</span><select id="q-tpl"></select></label>'
-  +'<label class="field" id="q-titlef"><span>Đầu việc</span><input id="q-title" maxlength="300" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
+  +'<label class="field" id="q-titlef"><span>Đầu việc</span><input id="q-title" maxlength="500" autocomplete="off" placeholder="Bắt đầu bằng động từ, ví dụ: Kiểm tra hàng đợi cuộc gọi vào"></label></div>'
   +'<div class="qopts">'
   +'<details class="more" id="q-multi"><summary>Nhiều ngày</summary><div class="qdays" id="q-days"></div><small class="muted">Tích các ngày cần nhập. Mỗi ngày được tạo thành một việc riêng; nếu không tích ngày nào thì dùng ngày đã chọn ở trên.</small></details>'
   +'<details class="more" id="q-more"><summary>Kết quả, mã phiếu, ghi chú</summary><div class="grid">'
@@ -634,15 +634,15 @@ function buildAdmin(){
   +'<div class="actions"><button type="button" class="btn" data-act="mv-run">Chuyển toàn bộ việc và tổng kết tuần</button><span class="msg" id="mv-msg" role="status"></span></div></section></div>'
 
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
-  +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="80" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
+  +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="300" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
   +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên. <b>Xóa</b> hệ thống sẽ gỡ nó khỏi người dùng, nhóm và ẩn các việc mẫu của hệ thống đó; báo cáo cũ hiện là "(Hệ thống đã xóa)".<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
 
   +'<div id="adm-groups" class="app" hidden><section class="panel"><h2>Nhóm (chức danh)</h2>'
-  +'<form class="inline-add" data-add="groups"><input id="add-groups" maxlength="80" placeholder="Tên nhóm mới, ví dụ: Chuyên viên vận hành" required><button type="submit" class="btn primary">Thêm nhóm</button></form>'
+  +'<form class="inline-add" data-add="groups"><input id="add-groups" maxlength="300" placeholder="Tên nhóm mới, ví dụ: Chuyên viên vận hành" required><button type="submit" class="btn primary">Thêm nhóm</button></form>'
   +'<div class="tbl" id="cat-groups"></div><p class="muted">Mỗi người dùng thuộc một hoặc nhiều nhóm, tối đa 5 (chọn ở mục Người dùng). Việc mẫu gắn với nhóm nào thì chỉ người trong nhóm đó thấy; việc mẫu không gắn nhóm là dùng chung. Tích <b>Hệ thống mặc định</b> để người trong nhóm tự thấy đúng các hệ thống đó; người nào đã được tích hệ thống riêng thì ưu tiên theo tích riêng. Không tích gì thì thấy tất cả hệ thống. <b>Xóa</b> nhóm sẽ gỡ nhóm khỏi người dùng và ẩn các việc mẫu chỉ dành cho nhóm đó.</p></section></div>'
 
   +'<div id="adm-types" class="app" hidden><section class="panel"><h2>Loại việc</h2>'
-  +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="80" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
+  +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="300" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
   +'<div class="tbl" id="cat-types"></div><p class="muted">Ẩn loại việc để người dùng không còn thấy khi thêm việc, báo cáo cũ vẫn giữ nguyên. Xóa loại việc là xóa hẳn khỏi danh sách; các việc đã nhập với loại đó sẽ hiện là "Khác".</p></section></div>'
 
   +'<div id="adm-units" class="app" hidden><section class="panel"><h2>Đơn vị tính</h2>'
@@ -651,7 +651,7 @@ function buildAdmin(){
   +'<p class="muted">Đơn vị tính được chọn ở từng việc mẫu (mục Việc mẫu) và hiện ngay cạnh ô Số lượng khi thêm việc. Ẩn đơn vị để không còn chọn được nữa, báo cáo cũ vẫn giữ nguyên. Đổi tên đơn vị chỉ áp dụng cho các việc nhập sau đó; việc đã nhập giữ tên cũ.</p></section></div>'
   +'<div id="adm-tpls" class="app" hidden><section class="panel"><h2>Việc mẫu</h2>'
   +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
-  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="300" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><input id="t-label" maxlength="80" placeholder="Nhãn số lượng (mặc định: Số lượng)" aria-label="Nhãn số lượng"><select id="t-unit" aria-label="Đơn vị tính"></select><label class="tpl-noq"><input type="checkbox" id="t-noq">Không ghi số lượng</label><details id="t-groups" class="tgrp"><summary>Dành cho nhóm (không tích = tất cả nhóm)</summary><div class="qdays" id="t-gchips"></div></details><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
+  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="500" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><input id="t-label" maxlength="200" placeholder="Nhãn số lượng (mặc định: Số lượng)" aria-label="Nhãn số lượng"><select id="t-unit" aria-label="Đơn vị tính"></select><label class="tpl-noq"><input type="checkbox" id="t-noq">Không ghi số lượng</label><details id="t-groups" class="tgrp"><summary>Dành cho nhóm (không tích = tất cả nhóm)</summary><div class="qdays" id="t-gchips"></div></details><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
   +'<div class="actions"><button type="button" class="btn" data-act="tpl-import">Lấy từ các việc đã nhập</button>'
   +'<button type="button" class="btn" data-act="tpl-sort">Sắp xếp theo hệ thống</button>'
   +'<label class="who">Xem theo <select id="tpl-filter" aria-label="Lọc theo hệ thống"></select></label><label class="who">Nhóm <select id="tpl-gfilter" aria-label="Lọc theo nhóm"></select></label><span class="msg" id="tpl-msg" role="status"></span></div>'
@@ -1545,7 +1545,7 @@ function renderCatalog(kind){
   const el=$('cat-'+kind);if(!el)return;
   const list=S[kind];
   el.innerHTML=list.map((x,i)=>'<div class="crow'+(kind==='systems'?' sys':'')+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
-    +'<input data-catname="'+kind+'" data-id="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="80" aria-label="Tên">'
+    +'<input data-catname="'+kind+'" data-id="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên">'
     +(kind==='systems'?'<input data-sysgroup="'+esc(x.id)+'" value="'+esc(x.group||'')+'" maxlength="80" placeholder="Nhóm báo cáo: '+esc(autoGroup(x.name))+'" aria-label="Nhóm báo cáo">':'')
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="1"'+(i===list.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
@@ -1694,10 +1694,10 @@ function renderTplAdmin(){
     const g=x.system||'',head=(!S.tplFilter&&g!==prev)?'<div class="tgroup">'+(g?esc(sysName(g)):'Dùng chung (không gắn hệ thống)')+'</div>':'';
     if(g!==prev)no=0;no++;prev=g;
     return head+'<div class="trow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
-    +'<div class="tnm"><span class="no" aria-hidden="true">'+no+'.</span><input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên đầu việc"></div>'
+    +'<div class="tnm"><span class="no" aria-hidden="true">'+no+'.</span><input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="500" aria-label="Tên đầu việc"></div>'
     +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống">'+opt(S.systems,'— Tất cả hệ thống —',x.system)+'</select>'
     +'<select data-tpltype="'+esc(x.id)+'" aria-label="Loại việc">'+opt(S.types,'— Không gắn loại việc —',x.type)+'</select>'
-    +'<div class="tul"><input data-tpllabel="'+esc(x.id)+'" value="'+esc(x.label||'')+'" maxlength="80" placeholder="Nhãn số lượng" aria-label="Nhãn số lượng"><select data-tplunit="'+esc(x.id)+'" aria-label="Đơn vị tính">'+unitOpts(x.unit||'')+'</select></div>'
+    +'<div class="tul"><input data-tpllabel="'+esc(x.id)+'" value="'+esc(x.label||'')+'" maxlength="200" placeholder="Nhãn số lượng" aria-label="Nhãn số lượng"><select data-tplunit="'+esc(x.id)+'" aria-label="Đơn vị tính">'+unitOpts(x.unit||'')+'</select></div>'
     +'<span class="tbtns"><label class="tpl-noq"><input type="checkbox" data-tplnoq="'+esc(x.id)+'"'+(x.noQty?' checked':'')+'>Không SL</label><button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="1"'+(i===vis.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="tpl-toggle" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
