@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.58 -->
+<!-- Phiên bản 1.59 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1110,7 +1110,7 @@ function summaryBlocks(list,grp){
       const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
       if(!m.length)return; /* chỉ liệt kê đầu việc đã có người nhập */
       const lab=tp.label||'Số lượng';
-      out.push({type:domType(m),ts:m,lab:lab,noQ:!!tp.noQty,text:tp.name+'.'+(tp.noQty?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
+      out.push({type:domType(m),ts:m,lab:lab,noQ:!!tp.noQty&&!qs.length,text:tp.name+'.'+((tp.noQty&&!qs.length)?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
     });
     return out;
   };
