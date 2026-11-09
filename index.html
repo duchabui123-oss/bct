@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.48 -->
+<!-- Phiên bản 1.49 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1114,7 +1114,7 @@ function summaryBlocks(list,grp){
       its.forEach(x=>x.ts.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);notes.push('- '+n)}}));
       return {name:typeName(ty),lines:its.map(x=>'- '+x.text),notes:notes}});
   };
-  const mkBlock=(name,secs)=>({name:name,secs:secs,lines:[].concat(...secs.map(c=>['» '+c.name].concat(c.lines))),notes:[].concat(...secs.map(c=>c.notes))});
+  const mkBlock=(name,secs)=>({name:name,secs:secs,lines:[].concat(...secs.map(c=>['» '+c.name].concat(c.lines))),notes:[].concat(...secs.map(c=>['» '+c.name].concat(c.notes,['────────────────'])))});
   const notesOf=tasks=>{const seen=new Set(),out=[];tasks.forEach(t=>{const n=String(t.note||'').trim();if(n&&!seen.has(n)){seen.add(n);out.push('- '+n)}});return out};
   const known=new Set(S.systems.map(x=>x.id));
   /* Gom các hệ thống cùng nhóm báo cáo (ví dụ mọi hệ thống IPCC thành "IPCC") thành một khối */
