@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.50 -->
+<!-- Phiên bản 1.53 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -131,6 +131,11 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .sys,.day{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .sys>summary,.day>header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:.8rem 1rem;cursor:pointer;list-style:none;background:var(--surface-2)}
 .day>header{cursor:default}
+.impbox{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.impbox .imp-list{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin:8px 0}
+.impbox label.imp-item{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.impbox label.imp-item:last-child{border-bottom:0}.impbox .imp-sys{color:var(--muted,#5b6b7a);font-size:.85rem}
+.stbox .stbody{padding:10px 16px 16px}.stbox>summary h2{margin:0}
 .sys>summary::-webkit-details-marker{display:none}
 .sys>summary::before{content:"";width:.5rem;height:.5rem;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(-45deg);transition:transform .15s}
 .sys[open]>summary::before{transform:rotate(45deg)}
@@ -565,7 +570,7 @@ function buildShell(){
   +'<details class="more" id="q-multi"><summary>Nhiều ngày</summary><div class="qdays" id="q-days"></div><small class="muted">Tích các ngày cần nhập. Mỗi ngày được tạo thành một việc riêng; nếu không tích ngày nào thì dùng ngày đã chọn ở trên.</small></details>'
   +'<details class="more" id="q-more"><summary>Kết quả, mã phiếu, ghi chú</summary><div class="grid">'
   +'<label class="field"><span>Kết quả / số liệu</span><input id="q-result" maxlength="400" autocomplete="off" placeholder="Ví dụ: 12/12 phiếu đã đóng"></label>'
-  +'<label class="field"><span>Mã phiếu / yêu cầu</span><input id="q-ticket" maxlength="120" autocomplete="off" placeholder="Ví dụ: INC-2026-0001"></label>'
+  +'<label class="field"><span>Mã phiếu/Eof/Email</span><input id="q-ticket" maxlength="120" autocomplete="off" placeholder="Ví dụ: INC-2026-0001"></label>'
   +'<label class="field wide"><span>Ghi chú</span><textarea id="q-note" rows="2" maxlength="800" placeholder="Vướng mắc, người phối hợp, đường dẫn"></textarea></label></div></details>'
   +'<div class="actions"><span class="msg" id="q-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" id="q-goto" data-act="goto-week" hidden>Xem tuần đó</button><button type="button" class="btn link" id="q-cancel" data-act="cancel-edit" hidden>Hủy sửa</button><button type="submit" class="btn primary" id="q-save">Thêm việc</button></div></div></form>'
 
@@ -644,6 +649,7 @@ function buildAdmin(){
   +'<div class="actions"><button type="button" class="btn" data-act="tpl-import">Lấy từ các việc đã nhập</button>'
   +'<button type="button" class="btn" data-act="tpl-sort">Sắp xếp theo hệ thống</button>'
   +'<label class="who">Xem theo <select id="tpl-filter" aria-label="Lọc theo hệ thống"></select></label><label class="who">Nhóm <select id="tpl-gfilter" aria-label="Lọc theo nhóm"></select></label><span class="msg" id="tpl-msg" role="status"></span></div>'
+  +'<div id="tpl-import" class="impbox" hidden></div>'
   +'<div class="tbl" id="tpl-list"></div>'
   +'<p class="muted">Hệ thống và loại việc là tùy chọn. Nếu gắn, khi người dùng chọn việc mẫu thì hệ thống và loại việc được chọn sẵn. Việc bị ẩn không hiện cho người dùng, báo cáo cũ vẫn giữ nguyên.</p></section></div>'
 
@@ -1001,6 +1007,8 @@ function dayChart(list){
     return '<div class="dcol'+(c.wd>=5?' we':'')+'" title="'+dm(c.key)+': '+n+' việc"><div class="dbar">'+(n?'<div class="dstack" style="height:'+(n*100/max)+'%">'+seg+'</div>':'')+'</div><span class="dnum mono">'+c.d+'</span></div>';
   }).join('')+'</div></div><p class="muted">Ngày cao nhất: '+max+' việc. Di chuột (hoặc chạm) vào cột để xem số việc từng ngày.</p>';
 }
+/* Mỗi mục thống kê là một khối thu gọn/mở rộng giống nhóm hệ thống ở màn hình Báo cáo */
+const statBox=(key,title,inner)=>'<details class="sys stbox" data-sys="'+key+'"'+(S.collapsed.has(key)?'':' open')+'><summary><h2>'+title+'</h2></summary><div class="stbody">'+inner+'</div></details>';
 function renderStats(){
   if(!$('stats-body'))return;
   const m=S.month,now=new Date();
@@ -1012,11 +1020,11 @@ function renderStats(){
   let h='<section class="summary"><div class="sum-line"><span class="mono">'+n+'</span> việc · <span class="mono">'+c.done+'</span> hoàn thành (<span class="mono">'+pct+'%</span>) · <span class="mono">'+days+'</span> ngày có việc</div>'
     +'<div class="bar-s" role="img" aria-label="Tỷ lệ trạng thái trong tháng">'+STATUS.map(s=>c[s.id]?'<i class="b-'+s.id+'" style="width:'+(c[s.id]*100/n)+'%"></i>':'').join('')+'</div>'
     +'<ul class="legend">'+STATUS.map(s=>'<li><span class="dot b-'+s.id+'"></span>'+s.label+' <span class="mono">'+c[s.id]+'</span></li>').join('')+'</ul></section>';
-  h+='<section class="panel"><h2>Theo hệ thống</h2>'+statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'))+'</section>';
-  h+='<section class="panel"><h2>Theo loại việc</h2>'+statTable('Loại việc',groupRows(list,'type',S.types,'Khác'))+'</section>';
+  h+='<div class="list">'+statBox('st-sys','Theo hệ thống',statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)')));
+  h+=statBox('st-type','Theo loại việc',statTable('Loại việc',groupRows(list,'type',S.types,'Khác')));
   const qv=qtyView(list,true);
   const checked=c=>qv.isDefault?c.n>0:qv.sel.has(c.key);
-  h+='<section class="panel"><h2>Số lượng theo đầu việc</h2><div class="qf">'
+  h+=statBox('st-qty','Số lượng theo đầu việc','<div class="qf">'
     +'<details id="qf-sdet"'+(S.qfSOpen?' open':'')+'><summary>Chọn hệ thống ('+(S.qfSys.size?S.qfSys.size+' đã chọn':'tất cả hệ thống')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qfs-all">Chọn tất cả hệ thống</button></div>'
     +'<div class="qf-list">'+S.systems.filter(x=>!hiddenSys(list).has(x.id)).map(x=>'<label class="qf-item"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(!S.qfSys.size||S.qfSys.has(x.id)?' checked':'')+'><span>'+esc(x.name)+'</span></label>').join('')+'</div></details>'
@@ -1026,9 +1034,10 @@ function renderStats(){
     +(qv.rows.length?'<div class="tscroll"><div class="stbl"><div class="srow head qrow"><span>Đầu việc</span><span>Số lần</span><span>Tổng số lượng</span></div>'
       +qv.rows.map(c=>{const q=qtyCells(c);return '<div class="srow qrow"><span class="nm">'+esc(q[0])+'</span><span class="mono">'+q[1]+'</span><span class="mono"><b>'+esc(qcell(q))+'</b></span></div>'}).join('')
       +'</div></div>':'<p class="muted">'+(qv.isDefault?'Chưa có việc nào trong kỳ này. Hãy mở "Chọn đầu việc" để chọn các đầu việc muốn xem.':'Chưa chọn đầu việc nào.')+'</p>')
-    +'<p class="muted">Mặc định hiện mọi đầu việc đã thực hiện trong kỳ, việc không ghi số lượng thì cột tổng số lượng để trống. Đầu việc được chọn mà chưa có số liệu thì để trống. Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p></section>';
-  h+='<section class="panel"><h2>Theo ngày</h2>'+dayChart(list)+'</section>';
-  if(S.mWho==='all')h+='<section class="panel"><h2>Theo người</h2>'+statTable('Người báo cáo',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'))+'</section>';
+    +'<p class="muted">Mặc định hiện mọi đầu việc đã thực hiện trong kỳ, việc không ghi số lượng thì cột tổng số lượng để trống. Đầu việc được chọn mà chưa có số liệu thì để trống. Các lần ghi cùng một tên đầu việc được cộng lại với nhau.</p>');
+  h+=statBox('st-day','Theo ngày',dayChart(list));
+  if(S.mWho==='all')h+=statBox('st-uid','Theo người',statTable('Người báo cáo',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)')));
+  h+='</div>';
   $('stats-body').innerHTML=h;
   renderSummary('month');
 }
@@ -1377,7 +1386,7 @@ const wdName=s=>DAYS[(parse(s).getDay()+6)%7];
 const stLabel=id=>ST[id]?ST[id].label:'Chờ';
 const sysGroupOf=id=>{const sy=S.systems.find(x=>x.id===id);return sy?sysGroup(sy):'(Hệ thống đã xóa)'};
 function taskTableRows(list,all,withGroup){
-  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Số lượng','Đơn vị tính','Kết quả','Trạng thái','Mã phiếu','Ghi chú'].concat(all?['Người thực hiện']:[]).concat(withGroup?['Nhóm hệ thống']:[]);
+  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Số lượng','Đơn vị tính','Kết quả','Trạng thái','Mã phiếu/Eof/Email','Ghi chú'].concat(all?['Người thực hiện']:[]).concat(withGroup?['Nhóm hệ thống']:[]);
   const rows=list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0)))
     .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',hasQty(t)?t.qty:'',hasQty(t)?unitOf(t):'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]).concat(withGroup?[sysGroupOf(t.system)]:[]));
   return {head:head,rows:rows};
@@ -1428,7 +1437,7 @@ function buildXlsx(x){
   sheets.push(summarySheet(x));
   sheets.push({name:'Tổng quan',rows:ov,widths:[26,40],titleRows:[0]});
   const tt=taskTableRows(x.list,x.all,true);
-  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,13,40,13,14,30,22,22]});
+  sheets.push({name:'Công việc',rows:[tt.head].concat(tt.rows),headRows:[0],freeze:1,widths:[12,10,24,26,48,11,13,40,13,30,30,22,22]});
   sheets.push(pivotSheet(x.list));
   statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
   const qv=qtyView(x.list,x.kind==='month',x.kind);
@@ -1600,6 +1609,18 @@ async function retagTitle(ids,newName){
   try{for(let i=0;i<ids.length;i+=400){const b=writeBatch(db);ids.slice(i,i+400).forEach(id=>b.update(doc(db,'tasks',id),{title:newName}));await b.commit()}}catch(e){}
 }
 async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
+function renderImport(){
+  const box=$('tpl-import');if(!box)return;
+  const q=normQ(S.impQ),list=(S.impCand||[]).filter(c=>!q||normQ(c.name).indexOf(q)>=0);
+  box.innerHTML='<b>Chọn các việc muốn đưa vào danh sách việc mẫu</b>'
+    +'<p class="muted">Các việc người dùng đã nhập (tuần và tháng đang xem) mà chưa có trong việc mẫu. Tích chọn việc nào cần lấy.</p>'
+    +'<div class="actions"><input id="imp-q" type="search" placeholder="Gõ để tìm" value="'+esc(S.impQ||'')+'" aria-label="Tìm việc" autocomplete="off">'
+    +'<button type="button" class="btn sm" data-act="imp-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="imp-none">Bỏ chọn</button>'
+    +'<span class="muted">Đã chọn '+S.impSel.size+'/'+S.impCand.length+'</span></div>'
+    +'<div class="imp-list">'+(list.map(c=>'<label class="imp-item"><input type="checkbox" data-imp="'+esc(c.key)+'"'+(S.impSel.has(c.key)?' checked':'')+'><span>'+esc(c.name)+' <span class="imp-sys">· '+(c.system?esc(sysName(c.system)):'không gắn hệ thống')+' · '+c.n+' lần</span></span></label>').join('')||'<p class="muted" style="padding:8px 10px">Không có việc phù hợp.</p>')+'</div>'
+    +'<div class="actions"><button type="button" class="btn primary" data-act="imp-add">Thêm các việc đã chọn</button><button type="button" class="btn" data-act="imp-close">Đóng</button></div>';
+  const qi=$('imp-q');if(qi&&S.impFocus){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length)}
+}
 function renderTplAdmin(){
   const sf=$('t-system'),tf=$('t-type'),ls=$('tpl-list');if(!sf||!tf||!ls)return;
   /* Quản trị mở danh sách mà việc mẫu cùng hệ thống đang nằm rời nhau thì tự gom lại một lần (xếp ổn định, giữ thứ tự trong từng khối) */
@@ -1842,14 +1863,29 @@ root.addEventListener('click',async e=>{
       return;
     }
     if(act==='tpl-import'){
-      const m=$('tpl-msg'),have=new Set(S.tpls.map(x=>x.name.trim().toLowerCase())),add=[],seen=new Set();
-      S.tasks.concat(S.mTasks).slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).forEach(t=>{
-        const n=String(t.title||'').trim().replace(/\s+/g,' '),k=n.toLowerCase();
-        if(!n||have.has(k)||seen.has(k))return;seen.add(k);
-        add.push({id:newId()+add.length,name:n,system:t.system||'',type:t.type||'',active:true});
+      const box=$('tpl-import');
+      if(!box.hidden){box.hidden=true;return}
+      const have=new Set(S.tpls.map(x=>titleKey(x.name))),seen=new Map();
+      S.tasks.concat(S.mTasks||[]).slice().sort((a,c)=>(a.ts||0)-(c.ts||0)).forEach(t=>{
+        const n=String(t.title||'').trim().replace(/\s+/g,' '),k=titleKey(n);
+        if(!n||have.has(k))return;
+        const o=seen.get(k);if(o){o.n++;return}
+        seen.set(k,{key:k,name:n,system:t.system||'',type:t.type||'',n:1});
       });
-      if(!add.length){m.className='msg';m.textContent='Không có đầu việc mới để lấy (dựa trên các việc của tuần và tháng đang xem).';return}
-      await saveTpls(tplsWith(add));m.className='msg ok';m.textContent='Đã thêm '+add.length+' việc mẫu. Bạn có thể sửa tên, hệ thống, loại việc hoặc ẩn bớt.';return;
+      S.impCand=[...seen.values()].sort((a,c)=>c.n-a.n||a.name.localeCompare(c.name,'vi'));S.impSel=new Set();S.impQ='';
+      renderImport();box.hidden=false;
+      if(!S.impCand.length){const m=$('tpl-msg');m.className='msg';m.textContent='Không có đầu việc mới để lấy (dựa trên các việc của tuần và tháng đang xem).'}
+      return;
+    }
+    if(act==='imp-all'||act==='imp-none'){
+      const q=normQ(S.impQ);S.impCand.filter(c=>!q||normQ(c.name).indexOf(q)>=0).forEach(c=>{act==='imp-all'?S.impSel.add(c.key):S.impSel.delete(c.key)});renderImport();return}
+    if(act==='imp-close'){$('tpl-import').hidden=true;return}
+    if(act==='imp-add'){
+      const m=$('tpl-msg'),pick=S.impCand.filter(c=>S.impSel.has(c.key));
+      if(!pick.length){m.className='msg';m.textContent='Hãy tích chọn ít nhất một việc.';return}
+      const add=pick.map((c,i)=>({id:newId()+i,name:c.name,system:c.system,type:c.type,active:true}));
+      await saveTpls(tplsWith(add));$('tpl-import').hidden=true;
+      m.className='msg ok';m.textContent='Đã thêm '+add.length+' việc mẫu. Bạn có thể sửa tên, hệ thống, loại việc hoặc ẩn bớt.';return;
     }
     if(act==='cat-move'){await moveCatalog(b.dataset.k,b.dataset.id,Number(b.dataset.d));return}
   }catch(err){flash(fsMsg(err))}
@@ -1858,6 +1894,7 @@ root.addEventListener('toggle',e=>{if(e.target&&e.target.id==='qf-det')S.qfOpen=
 root.addEventListener('change',async e=>{
   const t=e.target;
   try{
+    if(t.dataset&&t.dataset.imp!==undefined){t.checked?S.impSel.add(t.dataset.imp):S.impSel.delete(t.dataset.imp);renderImport();return}
     if(t.id==='m-who'){S.mWho=t.value;renderWho();renderStats();return}
     if(t.id==='who'){S.who=t.value;S.editing=null;resetQuick();renderWho();renderReport();renderNotes();return}
     if(t.id==='w-group'){S.wGroup=t.value;renderReport();return}
@@ -1954,6 +1991,7 @@ root.addEventListener('change',async e=>{
   }catch(err){flash(fsMsg(err))}
 });
 root.addEventListener('input',e=>{
+  if(e.target&&e.target.id==='imp-q'){S.impQ=e.target.value;S.impFocus=true;renderImport();S.impFocus=false;return}
   if(['n-highlights','n-issues','n-plan'].includes(e.target.id))queueNote();
 });
 root.addEventListener('toggle',e=>{
