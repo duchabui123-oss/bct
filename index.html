@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.61 -->
+<!-- Phiên bản 1.62 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1498,7 +1498,7 @@ function printHtml(html){
 }
 /* ===== Xuất PDF thành tệp tải về (không qua hộp thoại in) =====
    Dựng từng trang A4 ngang bằng trình duyệt (SVG foreignObject → ảnh JPEG) rồi ghép thành tệp PDF. Chữ trong PDF là ảnh nên không chọn/sao chép được. */
-const PDF_W=1123,PDF_H=794,PDF_M=45,PDF_SCALE=1.5; /* A4 ngang ở 96 dpi; lề 12 mm */
+const PDF_W=1123,PDF_H=794,PDF_M=45,PDF_SCALE=2.5; /* A4 ngang ở 96 dpi; lề 12 mm */
 async function buildPdfBlob(html){
   const CW=PDF_W-2*PDF_M,CH=PDF_H-2*PDF_M;
   const f=document.createElement('iframe');f.setAttribute('aria-hidden','true');
@@ -1534,13 +1534,20 @@ async function buildPdfBlob(html){
       const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('Không dựng được trang PDF.'));im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
       const cv=document.createElement('canvas');cv.width=PDF_W*PDF_SCALE;cv.height=PDF_H*PDF_SCALE;
       const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);cx.drawImage(img,0,0,cv.width,cv.height);
-      const b64=cv.toDataURL('image/jpeg',0.8).split(',')[1];const bin=atob(b64),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);
-      pages.push(u);
+      let pg=null;
+      /* Ưu tiên nén không mất chất lượng (chữ sắc nét); trình duyệt cũ không có CompressionStream thì dùng JPEG chất lượng cao */
+      if(typeof CompressionStream==='function'){
+        try{const w=cv.width,hh=cv.height,id=cx.getImageData(0,0,w,hh).data,rgb=new Uint8Array(w*hh*3);
+          for(let k=0,m=0;k<id.length;k+=4){rgb[m++]=id[k];rgb[m++]=id[k+1];rgb[m++]=id[k+2]}
+          const z=new Uint8Array(await new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+          pg={u:z,f:'FlateDecode'}}catch(e){pg=null}}
+      if(!pg){const b64=cv.toDataURL('image/jpeg',0.92).split(',')[1];const bin=atob(b64),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);pg={u:u,f:'DCTDecode'}}
+      pages.push(pg);
     }
     return pdfFromJpegs(pages,PDF_W*PDF_SCALE,PDF_H*PDF_SCALE);
   }finally{f.remove()}
 }
-function pdfFromJpegs(pages,iw,ih){
+function pdfFromJpegs(pages,iw,ih){ /* mỗi trang: {u: dữ liệu ảnh, f: FlateDecode | DCTDecode} */
   const enc=new TextEncoder(),parts=[],off=[];let len=0;
   const put=x=>{const u=typeof x==='string'?enc.encode(x):x;parts.push(u);len+=u.length};
   const obj=(n,body)=>{off[n]=len;put(n+' 0 obj\n');put(body);put('\nendobj\n')};
@@ -1548,11 +1555,11 @@ function pdfFromJpegs(pages,iw,ih){
   put('%PDF-1.4\n');
   obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
   obj(2,'<< /Type /Pages /Kids ['+pages.map((_,i)=>(3+i*3)+' 0 R').join(' ')+'] /Count '+N+' >>');
-  pages.forEach((u,i)=>{
-    const pg=3+i*3,ct=pg+1,im=pg+2,cs='q '+PW+' 0 0 '+PH+' 0 0 cm /Im0 Do Q';
+  pages.forEach((pgd,i)=>{
+    const u=pgd.u,pg=3+i*3,ct=pg+1,im=pg+2,cs='q '+PW+' 0 0 '+PH+' 0 0 cm /Im0 Do Q';
     obj(pg,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Resources << /XObject << /Im0 '+im+' 0 R >> >> /Contents '+ct+' 0 R >>');
     obj(ct,'<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream');
-    off[im]=len;put(im+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+iw+' /Height '+ih+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+u.length+' >>\nstream\n');put(u);put('\nendstream\nendobj\n');
+    off[im]=len;put(im+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+iw+' /Height '+ih+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /'+pgd.f+' /Length '+u.length+' >>\nstream\n');put(u);put('\nendstream\nendobj\n');
   });
   const total=3+N*3,xr=len;
   put('xref\n0 '+total+'\n0000000000 65535 f \n');
