@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.60 -->
+<!-- Phiên bản 1.61 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1496,12 +1496,79 @@ function printHtml(html){
   const d=f.contentWindow.document;d.open();d.write(html);d.close();
   setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){flash('Trình duyệt không mở được hộp thoại in.')}setTimeout(()=>f.remove(),60000)},400);
 }
+/* ===== Xuất PDF thành tệp tải về (không qua hộp thoại in) =====
+   Dựng từng trang A4 ngang bằng trình duyệt (SVG foreignObject → ảnh JPEG) rồi ghép thành tệp PDF. Chữ trong PDF là ảnh nên không chọn/sao chép được. */
+const PDF_W=1123,PDF_H=794,PDF_M=45,PDF_SCALE=1.5; /* A4 ngang ở 96 dpi; lề 12 mm */
+async function buildPdfBlob(html){
+  const CW=PDF_W-2*PDF_M,CH=PDF_H-2*PDF_M;
+  const f=document.createElement('iframe');f.setAttribute('aria-hidden','true');
+  f.style.cssText='position:fixed;left:-20000px;top:0;width:'+CW+'px;height:800px;border:0;visibility:hidden';
+  document.body.appendChild(f);
+  try{
+    const d=f.contentWindow.document;d.open();d.write(html);d.close();
+    d.body.style.cssText='margin:0;width:'+CW+'px';
+    await new Promise(r=>setTimeout(r,150));
+    const total=Math.ceil(d.documentElement.scrollHeight);
+    /* các dòng chữ: để chỗ ngắt trang không cắt ngang một dòng */
+    const lines=[];const tw=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let nd;
+    while((nd=tw.nextNode())){if(!nd.nodeValue.trim())continue;const r=d.createRange();r.selectNodeContents(nd);Array.from(r.getClientRects()).forEach(q=>{if(q.height>0)lines.push([q.top,q.bottom])})}
+    const cuts=[];let y=0;
+    while(y<total-1){
+      let c=y+CH;
+      if(c>=total){cuts.push([y,total]);break}
+      for(let k=0;k<50;k++){const hit=lines.filter(l=>l[0]<c-0.5&&l[1]>c+0.5);if(!hit.length)break;c=Math.min.apply(null,hit.map(l=>l[0]))}
+      if(c<=y+40)c=y+CH;
+      cuts.push([y,c]);y=c;
+    }
+    const css=(d.querySelector('style')?d.querySelector('style').textContent:'').replace(/@page\{[^}]*\}/g,'').replace(/(^|\})\s*body\{[^}]*\}/g,'$1');
+    const body=new XMLSerializer().serializeToString(d.body).replace(/^<body[^>]*>/,'').replace(/<\/body>$/,'');
+    const pages=[];
+    for(let i=0;i<cuts.length;i++){
+      const y0=cuts[i][0],h=cuts[i][1]-cuts[i][0];
+      const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+PDF_W+'" height="'+PDF_H+'"><foreignObject x="0" y="0" width="'+PDF_W+'" height="'+PDF_H+'">'
+        +'<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+PDF_W+'px;height:'+PDF_H+'px;background:#fff;position:relative;overflow:hidden;font:11px/1.45 \'Segoe UI\',Roboto,Arial,sans-serif;color:#111">'
+        +'<style><![CDATA['+css+']]></style>'
+        +'<div style="position:absolute;left:'+PDF_M+'px;top:'+PDF_M+'px;width:'+CW+'px;height:'+Math.ceil(h)+'px;overflow:hidden"><div style="margin-top:-'+y0+'px;width:'+CW+'px">'+body+'</div></div>'
+        +'<div style="position:absolute;left:'+PDF_M+'px;bottom:14px;width:'+CW+'px;font-size:9px;color:#666;text-align:right">Trang '+(i+1)+'/'+cuts.length+'</div>'
+        +'</div></foreignObject></svg>';
+      const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('Không dựng được trang PDF.'));im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
+      const cv=document.createElement('canvas');cv.width=PDF_W*PDF_SCALE;cv.height=PDF_H*PDF_SCALE;
+      const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);cx.drawImage(img,0,0,cv.width,cv.height);
+      const b64=cv.toDataURL('image/jpeg',0.8).split(',')[1];const bin=atob(b64),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);
+      pages.push(u);
+    }
+    return pdfFromJpegs(pages,PDF_W*PDF_SCALE,PDF_H*PDF_SCALE);
+  }finally{f.remove()}
+}
+function pdfFromJpegs(pages,iw,ih){
+  const enc=new TextEncoder(),parts=[],off=[];let len=0;
+  const put=x=>{const u=typeof x==='string'?enc.encode(x):x;parts.push(u);len+=u.length};
+  const obj=(n,body)=>{off[n]=len;put(n+' 0 obj\n');put(body);put('\nendobj\n')};
+  const N=pages.length,PW=842,PH=595;
+  put('%PDF-1.4\n');
+  obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2,'<< /Type /Pages /Kids ['+pages.map((_,i)=>(3+i*3)+' 0 R').join(' ')+'] /Count '+N+' >>');
+  pages.forEach((u,i)=>{
+    const pg=3+i*3,ct=pg+1,im=pg+2,cs='q '+PW+' 0 0 '+PH+' 0 0 cm /Im0 Do Q';
+    obj(pg,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Resources << /XObject << /Im0 '+im+' 0 R >> >> /Contents '+ct+' 0 R >>');
+    obj(ct,'<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream');
+    off[im]=len;put(im+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+iw+' /Height '+ih+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+u.length+' >>\nstream\n');put(u);put('\nendstream\nendobj\n');
+  });
+  const total=3+N*3,xr=len;
+  put('xref\n0 '+total+'\n0000000000 65535 f \n');
+  for(let n=1;n<total;n++)put(String(off[n]).padStart(10,'0')+' 00000 n \n');
+  put('trailer\n<< /Size '+total+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF');
+  return new Blob(parts,{type:'application/pdf'});
+}
 function exportReport(kind,fmt){
   const x=exportCtx(kind);
   if(!x.list.length){flash('Chưa có việc nào trong kỳ này để xuất.');return}
   try{
     if(fmt==='xlsx'){download(buildXlsx(x),x.file+'.xlsx');flash('Đã tạo file Excel.',true)}
-    else{printHtml(buildPrintHtml(x));flash('Trong hộp thoại in, chọn "Lưu dưới dạng PDF" (Save as PDF) ở mục Máy in.',true)}
+    else{
+      const html=buildPrintHtml(x);flash('Đang tạo file PDF…',true);
+      buildPdfBlob(html).then(bl=>{download(bl,x.file+'.pdf');flash('Đã tạo file PDF.',true)})
+        .catch(()=>{printHtml(html);flash('Không tạo được file PDF trực tiếp. Trong hộp thoại in, chọn "Lưu dưới dạng PDF" ở mục Máy in.',true)})}
   }catch(e){flash('Không xuất được: '+(e&&e.message?e.message:e))}
 }
 
