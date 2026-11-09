@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.47 -->
+<!-- Phiên bản 1.48 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -470,6 +470,7 @@ async function boot(){
   }));
   unsubs.push(listen(doc(db,'settings','templates'),snap=>{
     const it=snap.exists()?snap.data().items:[];S.tpls=Array.isArray(it)?it.filter(x=>x&&x.id&&x.name):[];
+    canonTitles(S.tasks);canonTitles(S.mTasks);
     renderQuickSelects();renderTplAdmin();renderReport();
   }));
   if(!groupsOf(S.profile).length)subWeek();
@@ -501,7 +502,7 @@ function subWeek(){
   S.loadedTasks=false;
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
-    S.tasks=list;S.loadedTasks=true;try{renderUnits()}catch(e){}
+    canonTitles(list);S.tasks=list;S.loadedTasks=true;try{renderUnits()}catch(e){}
     const n=$('net');if(n&&(!snap||!snap.metadata.fromCache))n.hidden=true;
     renderReport();
   }));
@@ -963,7 +964,7 @@ function subMonth(){
   const y=S.month.getFullYear(),mo=S.month.getMonth();
   const a=iso(new Date(y,mo,1)),b=iso(new Date(y,mo+1,0));
   monthUnsubs.push(listenTasks(a,b,list=>{
-    S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits()}catch(e){}
+    canonTitles(list);S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits()}catch(e){}
   }));
 }
 function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
@@ -1342,7 +1343,13 @@ const unitOpts0=cur=>'<option value="">Đơn vị tính</option>'+S.units.filter
 const qcell=q=>q[2]===''?'':(typeof q[2]==='number'?fmtQ(q[2])+(q[3]?' '+q[3]:''):q[2]);
 const qtyDisp=c=>c.hasSum?(c.multi?c.multiText:fmtQ(c.sum)+(c.unit?' '+c.unit:'')):'';
 const fmtQ=n=>String(Math.round(n*1000)/1000).replace('.',',');
-const titleKey=t=>String(t||'').trim().replace(/\s+/g,' ').toLowerCase();
+const normKey=t=>String(t||'').trim().replace(/\s+/g,' ').toLowerCase();
+/* Việc mẫu đã đổi tên: tên cũ lưu trong "alias" và được quy về tên hiện tại để việc cũ vẫn gắn đúng việc mẫu. */
+let aliasSrc=null,aliasMap=new Map();
+function aliases(){if(aliasSrc!==S.tpls){aliasSrc=S.tpls;aliasMap=new Map();const own=new Set(S.tpls.map(x=>normKey(x.name)));
+  S.tpls.forEach(x=>(Array.isArray(x.alias)?x.alias:[]).forEach(a=>{const k=normKey(a);if(k&&!own.has(k)&&!aliasMap.has(k))aliasMap.set(k,x.name)}))}return aliasMap}
+const titleKey=t=>{const k=normKey(t);const a=aliases().get(k);return a?normKey(a):k};
+function canonTitles(arr){const m=aliases();if(!m.size||!arr)return;arr.forEach(t=>{const a=m.get(normKey(t.title));if(a)t.title=a})}
 /* Số lượng theo đầu việc: lọc theo hệ thống, chọn đầu việc. useFilter=false thì dùng chế độ mặc định (các việc có số lượng) */
 const sysLabel=a=>a.map(sysName).join(', ');
 function qtyView(list,useFilter,kind){
@@ -1582,6 +1589,11 @@ function renderUnits(){
   const oe=$('unit-orphans');if(!oe)return;
   oe.innerHTML=orf.size&&S.units.length?'<div class="orph"><b>Đơn vị cũ không còn trong danh sách</b><p class="muted">Các việc dưới đây đang ghi đơn vị cũ. Chọn đơn vị hiện tại tương ứng để báo cáo hiển thị đúng tên mới.</p>'
     +[...orf.values()].map(u=>'<div class="crow"><span class="orph-n">'+esc(u)+'</span><span>→</span><select data-orphan="'+esc(u)+'"><option value="">Chọn đơn vị hiện tại</option>'+S.units.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></div>').join('')+'</div>':'';
+}
+/* Ghi tên mới vào các việc đang mở trên màn hình mang tên việc mẫu cũ; các tuần khác tự theo tên mới nhờ bí danh. */
+const tasksTitled=name=>{const k=normKey(name),m=new Map();S.tasks.concat(S.mTasks||[]).forEach(t=>{if(normKey(t.title)===k)m.set(t.id,t)});return [...m.keys()]};
+async function retagTitle(ids,newName){
+  try{for(let i=0;i<ids.length;i+=400){const b=writeBatch(db);ids.slice(i,i+400).forEach(id=>b.update(doc(db,'tasks',id),{title:newName}));await b.commit()}}catch(e){}
 }
 async function saveTpls(items){await setDoc(doc(db,'settings','templates'),{items:items})}
 function renderTplAdmin(){
@@ -1910,9 +1922,11 @@ root.addEventListener('change',async e=>{
       const id=t.dataset.tplname||t.dataset.tplsys||t.dataset.tpltype||t.dataset.tplunit||t.dataset.tpllabel||t.dataset.tplnoq,patch={};
       if(t.dataset.tplunit!==undefined)patch.unit=t.value;else
       if(t.dataset.tpllabel!==undefined)patch.label=t.value.trim();else if(t.dataset.tplnoq!==undefined)patch.noQty=t.checked;else
-      if(t.dataset.tplname){const n=t.value.trim();if(!n){renderTplAdmin();return}patch.name=n}
+      if(t.dataset.tplname){const n=t.value.trim();if(!n){renderTplAdmin();return}patch.name=n;const cur=S.tpls.find(x=>x.id===id);if(cur&&cur.name!==n){patch.alias=(Array.isArray(cur.alias)?cur.alias:[]).concat(cur.name).filter((v,i,a)=>normKey(v)!==normKey(n)&&a.findIndex(w=>normKey(w)===normKey(v))===i);patch.oldName=cur.name}}
       else if(t.dataset.tplsys!==undefined)patch.system=t.value;else patch.type=t.value;
-      try{await saveTpls(S.tpls.map(x=>x.id===id?Object.assign({},x,patch):x))}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
+      const oldName=patch.oldName;delete patch.oldName;
+      const ids=oldName?tasksTitled(oldName):[];
+      try{await saveTpls(S.tpls.map(x=>x.id===id?Object.assign({},x,patch):x));if(ids.length)retagTitle(ids,patch.name)}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
     }
     if(t.id==='week-start'){
       const m=$('set-msg'),v=parseInt(t.value,10);
