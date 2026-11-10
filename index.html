@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.64 -->
+<!-- Phiên bản 1.66 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -272,6 +272,18 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 #notices:empty{display:none}
 .ntc{pointer-events:auto;margin:0 auto;max-width:640px;width:100%;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.55rem .75rem;border:1px solid var(--accent);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:.88rem}
 .ntc span{flex:1 1 220px}
+.gsearch{position:relative;flex:1 1 220px;max-width:380px;margin-left:auto}
+.gsearch input{border-radius:999px;padding-left:.9rem}
+.sr-panel{position:absolute;z-index:50;top:calc(100% + 6px);left:0;width:min(620px,92vw);max-height:65vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:6px}
+.sr-head{padding:6px 8px;font-size:.8rem;color:var(--ink-2)}
+.sr-item{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;font:inherit}
+.sr-item:hover,.sr-item:focus-visible{background:var(--accent-soft);outline:none}
+.sr-t{font-weight:600;overflow-wrap:anywhere}.sr-m{font-size:.78rem;color:var(--ink-2)}
+.sr-x{font-size:.8rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-all{margin:6px 8px}
+.row.sr-hit{outline:2px solid var(--accent);outline-offset:2px}
+@media (min-width:701px){.gsearch+.me{margin-left:0}}
+@media (max-width:700px){.gsearch{flex:1 1 100%;max-width:none;order:5;margin-left:0}.sr-panel{width:100%}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -445,7 +457,7 @@ function listen(ref,cb,onErr){
 async function boot(){
   teardown();
   S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
-  S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+  S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
   buildShell();
   const isAdmin=S.profile.role==='admin';
   unsubs.push(listen(collection(db,'users'),snap=>{
@@ -540,6 +552,7 @@ function buildShell(){
   +'<nav class="tabs" aria-label="Chuyển mục"><button type="button" data-act="tab" data-t="report" aria-pressed="true">Báo cáo</button>'
   +'<button type="button" data-act="tab" data-t="stats" aria-pressed="false">Thống kê</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin" aria-pressed="false">Quản lý</button>':'')+'</nav>'
+  +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><div id="sr-panel" class="sr-panel" hidden></div></form>'
   +'<div class="me"><button type="button" class="btn link" data-act="me" id="me-name">'+esc(S.profile.name||S.profile.username)+'</button>'
   +'<button type="button" class="btn sm" data-act="logout">Đăng xuất</button></div></header>'
   +'<div id="net" class="banner warn" hidden></div><div id="msg" class="msg" role="status" aria-live="polite"></div>'
@@ -1129,8 +1142,13 @@ function summaryBlocks(list,grp){
       /* Ghi chú không nhập số lượng thì tự thêm số lượng của chính việc đó vào cuối: "Số lượng: x Đơn vị" */
       const noteTxt=(t,x)=>{let n=String(t.note||'').trim();if(!n)return '';
         if(!x.noQ&&hasQty(t)&&!/số lượng/i.test(n)){const u=unitOf(t);n+=(/[.;:,!?]$/.test(n)?' ':'. ')+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u?' '+u:'')}
+        /* Mỗi ghi chú luôn bắt đầu bằng ngày thực hiện (dd/mm) để phân biệt việc lặp lại */
+        if(n)n=dm(t.date)+': '+n;
         return n};
-      its.forEach(x=>x.ts.forEach(t=>{const n=noteTxt(t,x);if(n&&!seen.has(n)){seen.add(n);notes.push('- '+n)}}));
+      /* Ghi chú trong một loại việc xếp theo thứ tự nhập: việc nhập trước lên trước (thiếu thời điểm nhập thì theo ngày) */
+      const ents=[];its.forEach((x,xi)=>x.ts.forEach(t=>{const n=noteTxt(t,x);if(n)ents.push({d:t.date,xi:xi,ts:t.ts||0,n:n})}));
+      ents.sort((a,b)=>(a.ts-b.ts)||(a.d<b.d?-1:a.d>b.d?1:a.xi-b.xi));
+      ents.forEach(e=>{if(!seen.has(e.n)){seen.add(e.n);notes.push('- '+e.n)}});
       return {name:typeName(ty),lines:its.map(x=>'- '+x.text),notes:notes}});
   };
   const mkBlock=(name,secs)=>({name:name,secs:secs,lines:[].concat(...secs.map(c=>['» '+c.name].concat(c.lines))),notes:[].concat(...secs.map(c=>['» '+c.name].concat(c.notes,['────────────────'])))});
@@ -1705,6 +1723,60 @@ async function retagType(ts,newType){
   const ds=ts.filter(t=>t.type!==newType);let n=0; /* ts: bản chụp {id,type} lấy trước khi lưu, vì danh sách trên màn hình có thể đã tự đổi loại khi việc mẫu được lưu */
   for(let i=0;i<ds.length;i+=400){const b=writeBatch(db);ds.slice(i,i+400).forEach(t=>b.update(doc(db,'tasks',t.id),{type:newType}));await b.commit();n+=Math.min(400,ds.length-i)}
   return n}
+/* ===== Ô tìm kiếm trên đầu trang =====
+   Tìm trong các việc đang tải (tuần và tháng đang xem); nút "Tìm trong tất cả các tuần" đọc toàn bộ việc của chính người đang đăng nhập (một lần, lưu tạm 10 phút). */
+const SR_MAX=40;let srTimer=null;
+function srPool(){
+  const m=new Map();S.tasks.concat(S.mTasks||[]).forEach(t=>m.set(t.id,t));
+  if(S.sAll&&S.allMine){if(Date.now()-S.allMine.ts>600000){S.allMine=null;S.sAll=false}else S.allMine.list.forEach(t=>{if(!m.has(t.id))m.set(t.id,t)})}
+  return [...m.values()]}
+const srHay=t=>normQ([t.title,t.note,t.result,t.ticket,sysName(t.system),typeName(t.type),dm(t.date),full(parse(t.date)),unitOf(t),userName(t.uid)].join(' | '));
+function srRun(){
+  const toks=normQ(S.sq).split(/\s+/).filter(Boolean);if(!toks.length)return [];
+  return srPool().filter(t=>{const h=srHay(t);return toks.every(k=>h.indexOf(k)>=0)}).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:((b.ts||0)-(a.ts||0)))}
+function renderSearch(){
+  const box=$('sr-panel');if(!box)return;
+  if(!S.sOpen||!normQ(S.sq)){box.hidden=true;box.innerHTML='';return}
+  const res=srRun(),shown=res.slice(0,SR_MAX),all=!!(S.sAll&&S.allMine);
+  box.innerHTML='<div class="sr-head">'+(res.length?res.length+' kết quả'+(res.length>SR_MAX?' (hiện '+SR_MAX+' việc mới nhất)':''):'Không có kết quả')+' · '+(all?'trong tất cả việc của bạn':'trong các việc đang tải (tuần và tháng đang xem)')+'</div>'
+    +shown.map(t=>{const ex=[t.note,t.result,t.ticket?'Mã: '+t.ticket:''].filter(Boolean).join(' · ');
+      return '<button type="button" class="sr-item" data-act="sr-go" data-id="'+esc(t.id)+'" data-date="'+esc(t.date)+'"><span class="sr-t">'+esc(t.title)+'</span>'
+        +'<span class="sr-m">'+DS[(parse(t.date).getDay()+6)%7]+' '+full(parse(t.date))+' · '+esc(sysName(t.system))+' · '+esc(typeName(t.type))+(t.uid!==S.user.uid?' · '+esc(userName(t.uid)):'')+'</span>'
+        +(ex?'<span class="sr-x">'+esc(ex.slice(0,140))+'</span>':'')+'</button>'}).join('')
+    +(all?'':'<button type="button" class="btn sm sr-all" data-act="sr-all"'+(S.sBusy?' disabled':'')+'>'+(S.sBusy?'Đang tải…':'Tìm trong tất cả các tuần (việc của tôi)')+'</button>');
+  box.hidden=false}
+async function srLoadAll(){
+  S.sBusy=true;renderSearch();
+  try{const me=S.user.uid,al=allowedSys();
+    const qs=al?[...al].map(id=>query(collection(db,'tasks'),where('uid','==',me),where('system','==',id))):[query(collection(db,'tasks'),where('uid','==',me))];
+    const list=[];for(const q of qs)(await getDocs(q)).docs.forEach(d=>list.push(Object.assign({id:d.id},d.data())));
+    canonTitles(list);canonTypes(list);S.allMine={ts:Date.now(),list:list};S.sAll=true}
+  catch(e){flash(fsMsg(e))}
+  S.sBusy=false;renderSearch()}
+function srGo(id,date){
+  S.sOpen=false;renderSearch();
+  const t=srPool().find(x=>x.id===id);
+  if(S.tab!=='report'){const tb=document.querySelector('button[data-act="tab"][data-t="report"]');if(tb)tb.click()}
+  if(t&&t.uid===S.user.uid&&S.who!=='all'&&S.who!==t.uid){S.who=t.uid;const w=$('who');if(w)w.value=t.uid}
+  const ws=mondayOf(parse(date));
+  if(iso(S.weekStart)!==iso(ws))setWeek(ws);else renderReport();
+  let n=0;const tm=setInterval(()=>{
+    const el=document.querySelector('.row[data-id="'+id+'"]');
+    if(el){clearInterval(tm);let d=el.closest('details');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details')}
+      el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('sr-hit');setTimeout(()=>el.classList.remove('sr-hit'),2500)}
+    else if(++n>16)clearInterval(tm)},250)}
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='sr-q'){S.sq=t.value;S.sOpen=true;clearTimeout(srTimer);srTimer=setTimeout(renderSearch,120)}});
+document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='sr-q'&&normQ(e.target.value)){S.sq=e.target.value;S.sOpen=true;renderSearch()}});
+document.addEventListener('submit',e=>{if(e.target&&e.target.id==='gsearch')e.preventDefault()});
+document.addEventListener('click',e=>{if(!S.sOpen)return;const inside=(e.composedPath?e.composedPath():[]).some(n=>n&&n.id==='gsearch');if(!inside){S.sOpen=false;renderSearch()}});
+document.addEventListener('keydown',e=>{
+  const t=e.target;if(!t||!t.closest||!t.closest('#gsearch'))return;
+  const items=[...document.querySelectorAll('#sr-panel .sr-item')],i=items.indexOf(t);
+  if(e.key==='Escape'){S.sOpen=false;renderSearch();const q=$('sr-q');if(q)q.focus();return}
+  if(e.key==='Enter'&&t.id==='sr-q'){e.preventDefault();S.sq=t.value;S.sOpen=true;renderSearch();return}
+  if(e.key==='ArrowDown'){e.preventDefault();const n=t.id==='sr-q'?items[0]:items[i+1];if(n)n.focus()}
+  if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i===0?$('sr-q'):items[i-1]).focus()}
+});
 /* ===== Thanh nhắc: có bản mới của trang, đã lâu chưa sao lưu ===== */
 const BUILD=(()=>{try{const it=document.createNodeIterator(document,NodeFilter.SHOW_COMMENT);let n;while((n=it.nextNode())){const m=/Phiên bản\s+([\d.]+)/.exec(n.nodeValue);if(m)return m[1]}}catch(e){}return ''})();
 const BK_DAYS=7;
@@ -1853,6 +1925,8 @@ root.addEventListener('click',async e=>{
     if(act==='go-login'){showLogin();return}
     if(act==='logout'){await doLogout();return}
     if(act==='to-top'){window.scrollTo({top:0,behavior:'smooth'});return}
+    if(act==='sr-go'){srGo(b.dataset.id,b.dataset.date);return}
+    if(act==='sr-all'){srLoadAll();return}
     if(act==='tab'){
       const prevTab=S.tab;
       S.tab=b.dataset.t;
