@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.78 -->
+<!-- Phiên bản 1.79 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1957,12 +1957,21 @@ const rstSrc=un=>S.users.filter(x=>x.username===un).sort((x,y)=>(Number(x.gen)||
 const genPw=()=>{const a='abcdefghjkmnpqrstuvwxyz23456789';let r='';const b=new Uint32Array(8);(window.crypto||{getRandomValues:x=>x.forEach((_,i)=>x[i]=Math.floor(Math.random()*4e9))}).getRandomValues(b);b.forEach(v=>{r+=a[v%a.length]});return r};
 async function resetPasswordAsAdmin(u,pass,say){
   if(!u||!u.username)throw {code:'app/no-user'};
-  if(allowedSys())throw {code:'app/limited-admin'};
+  /* luật Firestore chỉ cho đọc/sửa việc thuộc hệ thống mà quản trị được xem: quản trị phải xem được TẤT CẢ hệ thống thì mới chuyển hết việc */
+  {const al=allowedSys();if(al&&S.systems.filter(x=>x.active!==false).some(x=>!al.has(x.id)))throw {code:'app/limited-admin'}}
   /* nếu lần trước làm dở thì còn 2 hồ sơ cùng tên đăng nhập: dùng lại tài khoản thế hệ cao nhất, gom việc từ các hồ sơ còn lại */
   const dups=S.users.filter(x=>x.username===u.username);
   const top=dups.reduce((m,x)=>Math.max(m,Number(x.gen)||0),0);
   const gen=dups.length>1?top:(Number(u.gen)||0)+1;
   if(gen>MAXGEN)throw {code:'app/max-gen'};
+  /* đọc dữ liệu trước khi tạo tài khoản: nếu không đọc được thì dừng sớm, chưa đổi gì */
+  const rdUids=dups.length>1?dups.map(x=>x.uid):[u.uid];
+  let ts=[],ns=[];
+  say('Đang đọc việc và tổng kết tuần của người dùng…');
+  for(const id of rdUids){
+    ts=ts.concat((await getDocs(query(collection(db,'tasks'),where('uid','==',id)))).docs);
+    ns=ns.concat((await getDocs(query(collection(db,'weeknotes'),where('uid','==',id)))).docs);
+  }
   const email=authEmail(u.username,gen);
   const sec=getApps().find(a=>a.name==='secondary')||initializeApp(firebaseConfig,'secondary');
   const sAuth=getAuth(sec);
@@ -1981,11 +1990,7 @@ async function resetPasswordAsAdmin(u,pass,say){
   prof.gen=gen;prof.resetAt=Date.now();prof.prevUid=srcs[0].uid;
   await setDoc(doc(db,'users',nuid),prof);
   say('Đang chuyển việc sang tài khoản mới…');
-  let ts=[],ns=[];
-  for(const sx of srcs){
-    ts=ts.concat((await getDocs(query(collection(db,'tasks'),where('uid','==',sx.uid)))).docs);
-    ns=ns.concat((await getDocs(query(collection(db,'weeknotes'),where('uid','==',sx.uid)))).docs);
-  }
+  ts=ts.filter(d=>d.data().uid!==nuid);ns=ns.filter(d=>d.data().uid!==nuid);
   for(let i=0;i<ts.length;i+=400){const bt=writeBatch(db);ts.slice(i,i+400).forEach(d=>bt.update(doc(db,'tasks',d.id),{uid:nuid}));await bt.commit()}
   const join=(x,y)=>[x,y].map(v=>String(v||'').trim()).filter(Boolean).join('\n');
   for(const d of ns){
@@ -1998,7 +2003,7 @@ async function resetPasswordAsAdmin(u,pass,say){
 }
 function rstMsgOf(e){
   const c=e&&e.code||'';
-  if(c==='app/limited-admin')return 'Tài khoản quản trị này bị giới hạn hệ thống nên không chuyển được hết dữ liệu. Hãy dùng quản trị không giới hạn hệ thống.';
+  if(c==='app/limited-admin')return 'Tài khoản quản trị này chưa được xem tất cả hệ thống nên không chuyển được hết việc. Hãy vào Người dùng, mở "Hệ thống phụ trách" của chính bạn và tích đủ mọi hệ thống (hoặc bỏ chọn hết), rồi thử lại.';
   if(c==='app/max-gen')return 'Tài khoản này đã được cấp lại mật khẩu quá '+MAXGEN+' lần. Hãy xóa tài khoản rồi tạo mới và chuyển dữ liệu.';
   if(c==='app/retry-same')return 'Lần cấp lại trước làm dở. Hãy nhập đúng mật khẩu tạm đã dùng lần trước để làm tiếp.';
   if(c==='app/no-user')return 'Không tìm thấy tài khoản.';
