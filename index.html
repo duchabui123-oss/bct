@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.80 -->
+<!-- Phiên bản 1.81 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -276,7 +276,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .ntc{pointer-events:auto;margin:0 auto;max-width:640px;width:100%;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.55rem .75rem;border:1px solid var(--accent);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:.88rem}
 .ntc span{flex:1 1 220px}
 .gsearch{position:relative;flex:1 1 220px;max-width:380px;margin-left:auto}
-.gsearch input{border-radius:999px;padding-left:.9rem}
+.gsearch #sr-q{border-radius:999px;padding-left:.9rem}
 .sr-panel{position:absolute;z-index:50;top:calc(100% + 6px);left:0;width:min(620px,92vw);max-height:65vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:6px}
 .sr-head{padding:6px 8px;font-size:.8rem;color:var(--ink-2)}
 .sr-item{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;font:inherit}
@@ -284,6 +284,11 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .sr-t{font-weight:600;overflow-wrap:anywhere}.sr-m{font-size:.78rem;color:var(--ink-2)}
 .sr-x{font-size:.8rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-all{margin:6px 8px}
+.gsearch{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.gsearch #sr-q{flex:1 1 140px;min-width:0}.sr-tbtn{flex:0 0 auto;white-space:nowrap;border-radius:999px}.sr-tbtn.on{background:var(--accent-soft);border-color:var(--accent)}
+.sr-flt{padding:6px 8px 8px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.88rem}
+.sr-flt .sr-fh{flex-basis:100%;display:flex;gap:8px;align-items:center;color:var(--ink-2);font-size:.8rem}
+.sr-flt label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.sr-flt input[type=checkbox]{width:auto;flex:none;padding:0;margin:0;accent-color:var(--accent)}
 .row.sr-hit{outline:2px solid var(--accent);outline-offset:2px}
 @media (min-width:701px){.gsearch+.me{margin-left:0}}
 @media (max-width:700px){.gsearch{flex:1 1 100%;max-width:none;order:5;margin-left:0}.sr-panel{width:100%}}
@@ -479,7 +484,7 @@ function listen(ref,cb,onErr){
 async function boot(){
   teardown();
   S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
-  S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
+  S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sTypes=new Set();S.sFilt=false;S.sFocus='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
   buildShell();
   const isAdmin=S.profile.role==='admin';
   unsubs.push(listen(collection(db,'users'),snap=>{
@@ -574,7 +579,7 @@ function buildShell(){
   +'<nav class="tabs" aria-label="Chuyển mục"><button type="button" data-act="tab" data-t="report" aria-pressed="true">Báo cáo</button>'
   +'<button type="button" data-act="tab" data-t="stats" aria-pressed="false">Thống kê</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin" aria-pressed="false">Quản lý</button>':'')+'</nav>'
-  +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><div id="sr-panel" class="sr-panel" hidden></div></form>'
+  +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><button type="button" class="btn sm sr-tbtn" id="sr-tbtn" data-act="sr-types" aria-controls="sr-panel" aria-expanded="false">Loại việc</button><div id="sr-panel" class="sr-panel" hidden></div></form>'
   +'<div class="me"><button type="button" class="btn link" data-act="me" id="me-name">'+esc(S.profile.name||S.profile.username)+'</button>'
   +'<button type="button" class="btn sm" data-act="logout">Đăng xuất</button></div></header>'
   +'<div id="net" class="banner warn" hidden></div><div id="msg" class="msg" role="status" aria-live="polite"></div>'
@@ -1800,20 +1805,27 @@ function srPool(){
   if(S.sAll&&S.allMine){if(Date.now()-S.allMine.ts>600000){S.allMine=null;S.sAll=false}else S.allMine.list.forEach(t=>{if(!m.has(t.id))m.set(t.id,t)})}
   return [...m.values()]}
 const srHay=t=>normQ([t.title,t.note,t.result,t.ticket,sysName(t.system),typeName(t.type),dm(t.date),full(parse(t.date)),unitOf(t),userName(t.uid)].join(' | '));
+const srTypeIds=()=>{const ids=new Set(S.types.filter(x=>x.active!==false).map(x=>x.id));S.sTypes.forEach(i=>ids.add(i));return S.types.filter(x=>ids.has(x.id))};
 function srRun(){
-  const toks=normQ(S.sq).split(/\s+/).filter(Boolean);if(!toks.length)return [];
-  return srPool().filter(t=>{const h=srHay(t);return toks.every(k=>h.indexOf(k)>=0)}).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:((b.ts||0)-(a.ts||0)))}
+  const toks=normQ(S.sq).split(/\s+/).filter(Boolean),ty=S.sTypes;if(!toks.length&&!ty.size)return [];
+  return srPool().filter(t=>{if(ty.size&&!ty.has(t.type))return false;if(!toks.length)return true;const h=srHay(t);return toks.every(k=>h.indexOf(k)>=0)}).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:((b.ts||0)-(a.ts||0)))}
+function srShown(){return !!(S.sOpen&&(normQ(S.sq)||S.sTypes.size||S.sFilt))}
 function renderSearch(){
-  const box=$('sr-panel');if(!box)return;
-  if(!S.sOpen||!normQ(S.sq)){box.hidden=true;box.innerHTML='';return}
-  const res=srRun(),shown=res.slice(0,SR_MAX),all=!!(S.sAll&&S.allMine);
-  box.innerHTML='<div class="sr-head">'+(res.length?res.length+' kết quả'+(res.length>SR_MAX?' (hiện '+SR_MAX+' việc mới nhất)':''):'Không có kết quả')+' · '+(all?'trong tất cả việc của bạn':'trong các việc đang tải (tuần và tháng đang xem)')+'</div>'
+  const box=$('sr-panel'),tb=$('sr-tbtn');if(!box)return;
+  if(tb){const n=S.sTypes.size;tb.textContent=n?'Loại việc ('+n+')':'Loại việc';tb.classList.toggle('on',n>0);tb.setAttribute('aria-expanded',srShown()&&S.sFilt?'true':'false')}
+  if(!srShown()){box.hidden=true;box.innerHTML='';return}
+  const hasQ=!!(normQ(S.sq)||S.sTypes.size),res=hasQ?srRun():[],shown=res.slice(0,SR_MAX),all=!!(S.sAll&&S.allMine);
+  const tl=srTypeIds(),tn=S.sTypes.size?tl.filter(x=>S.sTypes.has(x.id)).map(x=>x.name).join(', '):'tất cả loại việc';
+  const flt=S.sFilt?'<div class="sr-flt"><div class="sr-fh"><b>Loại việc</b><button type="button" class="btn sm" data-act="sr-types-all"'+(S.sTypes.size?'':' disabled')+'>Tất cả</button><span>Không chọn loại nào = tìm trong tất cả loại việc</span></div>'
+    +tl.map(x=>'<label><input type="checkbox" data-srtype="'+esc(x.id)+'"'+(S.sTypes.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')+'</div>':'';
+  box.innerHTML=flt+'<div class="sr-head">'+(!hasQ?'Gõ từ khóa hoặc chọn loại việc để tìm':(res.length?res.length+' kết quả'+(res.length>SR_MAX?' (hiện '+SR_MAX+' việc mới nhất)':''):'Không có kết quả')+' · '+(S.sTypes.size?'loại việc: '+esc(tn)+' · ':'')+(all?'trong tất cả việc của bạn':'trong các việc đang tải (tuần và tháng đang xem)'))+'</div>'
     +shown.map(t=>{const ex=[t.note,t.result,t.ticket?'Mã: '+t.ticket:''].filter(Boolean).join(' · ');
       return '<button type="button" class="sr-item" data-act="sr-go" data-id="'+esc(t.id)+'" data-date="'+esc(t.date)+'"><span class="sr-t">'+esc(t.title)+'</span>'
         +'<span class="sr-m">'+DS[(parse(t.date).getDay()+6)%7]+' '+full(parse(t.date))+' · '+esc(sysName(t.system))+' · '+esc(typeName(t.type))+(t.uid!==S.user.uid?' · '+esc(userName(t.uid)):'')+'</span>'
         +(ex?'<span class="sr-x">'+esc(ex.slice(0,140))+'</span>':'')+'</button>'}).join('')
     +(all?'':'<button type="button" class="btn sm sr-all" data-act="sr-all"'+(S.sBusy?' disabled':'')+'>'+(S.sBusy?'Đang tải…':'Tìm trong tất cả các tuần (việc của tôi)')+'</button>');
-  box.hidden=false}
+  box.hidden=false;
+  if(S.sFocus){const f=box.querySelector('[data-srtype="'+S.sFocus.replace(/"/g,'')+'"]');S.sFocus='';if(f)f.focus()}}
 async function srLoadAll(){
   S.sBusy=true;renderSearch();
   try{const me=S.user.uid,al=allowedSys();
@@ -1835,13 +1847,14 @@ function srGo(id,date){
       el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('sr-hit');setTimeout(()=>el.classList.remove('sr-hit'),2500)}
     else if(++n>16)clearInterval(tm)},250)}
 document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='rst-pw'){S.rstPw=t.value;S.rstArm=false;return}if(t&&t.id==='sr-q'){S.sq=t.value;S.sOpen=true;clearTimeout(srTimer);srTimer=setTimeout(renderSearch,120)}});
-document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='sr-q'&&normQ(e.target.value)){S.sq=e.target.value;S.sOpen=true;renderSearch()}});
+document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='sr-q'&&(normQ(e.target.value)||S.sTypes.size)){S.sq=e.target.value;S.sOpen=true;renderSearch()}});
 document.addEventListener('submit',e=>{if(e.target&&e.target.id==='gsearch')e.preventDefault()});
-document.addEventListener('click',e=>{if(!S.sOpen)return;const inside=(e.composedPath?e.composedPath():[]).some(n=>n&&n.id==='gsearch');if(!inside){S.sOpen=false;renderSearch()}});
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.srtype){if(t.checked)S.sTypes.add(t.dataset.srtype);else S.sTypes.delete(t.dataset.srtype);S.sOpen=true;S.sFocus=t.dataset.srtype;renderSearch()}});
+document.addEventListener('click',e=>{if(!S.sOpen)return;const inside=(e.composedPath?e.composedPath():[]).some(n=>n&&n.id==='gsearch');if(!inside){S.sOpen=false;S.sFilt=false;renderSearch()}});
 document.addEventListener('keydown',e=>{
   const t=e.target;if(!t||!t.closest||!t.closest('#gsearch'))return;
   const items=[...document.querySelectorAll('#sr-panel .sr-item')],i=items.indexOf(t);
-  if(e.key==='Escape'){S.sOpen=false;renderSearch();const q=$('sr-q');if(q)q.focus();return}
+  if(e.key==='Escape'){S.sOpen=false;S.sFilt=false;renderSearch();const q=$('sr-q');if(q)q.focus();return}
   if(e.key==='Enter'&&t.id==='sr-q'){e.preventDefault();S.sq=t.value;S.sOpen=true;renderSearch();return}
   if(e.key==='ArrowDown'){e.preventDefault();const n=t.id==='sr-q'?items[0]:items[i+1];if(n)n.focus()}
   if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i===0?$('sr-q'):items[i-1]).focus()}
@@ -2058,6 +2071,8 @@ root.addEventListener('click',async e=>{
     if(act==='to-top'){window.scrollTo({top:0,behavior:'smooth'});return}
     if(act==='sr-go'){srGo(b.dataset.id,b.dataset.date);return}
     if(act==='sr-all'){srLoadAll();return}
+    if(act==='sr-types'){S.sFilt=srShown()&&S.sFilt?false:true;S.sOpen=true;renderSearch();return}
+    if(act==='sr-types-all'){S.sTypes.clear();S.sOpen=true;renderSearch();return}
     if(act==='tab'){
       const prevTab=S.tab;
       S.tab=b.dataset.t;
