@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.79 -->
+<!-- Phiên bản 1.80 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1958,7 +1958,8 @@ const genPw=()=>{const a='abcdefghjkmnpqrstuvwxyz23456789';let r='';const b=new 
 async function resetPasswordAsAdmin(u,pass,say){
   if(!u||!u.username)throw {code:'app/no-user'};
   /* luật Firestore chỉ cho đọc/sửa việc thuộc hệ thống mà quản trị được xem: quản trị phải xem được TẤT CẢ hệ thống thì mới chuyển hết việc */
-  {const al=allowedSys();if(al&&S.systems.filter(x=>x.active!==false).some(x=>!al.has(x.id)))throw {code:'app/limited-admin'}}
+  const al=allowedSys();
+  {const miss=al?S.systems.filter(x=>!al.has(x.id)).map(x=>x.name):[];if(miss.length)throw {code:'app/limited-admin',miss:miss}}
   /* nếu lần trước làm dở thì còn 2 hồ sơ cùng tên đăng nhập: dùng lại tài khoản thế hệ cao nhất, gom việc từ các hồ sơ còn lại */
   const dups=S.users.filter(x=>x.username===u.username);
   const top=dups.reduce((m,x)=>Math.max(m,Number(x.gen)||0),0);
@@ -1969,7 +1970,9 @@ async function resetPasswordAsAdmin(u,pass,say){
   let ts=[],ns=[];
   say('Đang đọc việc và tổng kết tuần của người dùng…');
   for(const id of rdUids){
-    ts=ts.concat((await getDocs(query(collection(db,'tasks'),where('uid','==',id)))).docs);
+    /* quản trị có khai báo hệ thống thì Firestore chỉ cho truy vấn theo từng hệ thống */
+    const qs=al?[...al].map(sid=>query(collection(db,'tasks'),where('uid','==',id),where('system','==',sid))):[query(collection(db,'tasks'),where('uid','==',id))];
+    for(const q of qs)ts=ts.concat((await getDocs(q)).docs);
     ns=ns.concat((await getDocs(query(collection(db,'weeknotes'),where('uid','==',id)))).docs);
   }
   const email=authEmail(u.username,gen);
@@ -2003,7 +2006,7 @@ async function resetPasswordAsAdmin(u,pass,say){
 }
 function rstMsgOf(e){
   const c=e&&e.code||'';
-  if(c==='app/limited-admin')return 'Tài khoản quản trị này chưa được xem tất cả hệ thống nên không chuyển được hết việc. Hãy vào Người dùng, mở "Hệ thống phụ trách" của chính bạn và tích đủ mọi hệ thống (hoặc bỏ chọn hết), rồi thử lại.';
+  if(c==='app/limited-admin')return 'Tài khoản quản trị này chưa được xem hệ thống: '+((e.miss||[]).join(', '))+'. Hãy mở "Hệ thống phụ trách" của chính bạn, tích thêm các hệ thống này rồi thử lại. Chưa có dữ liệu nào bị thay đổi.';
   if(c==='app/max-gen')return 'Tài khoản này đã được cấp lại mật khẩu quá '+MAXGEN+' lần. Hãy xóa tài khoản rồi tạo mới và chuyển dữ liệu.';
   if(c==='app/retry-same')return 'Lần cấp lại trước làm dở. Hãy nhập đúng mật khẩu tạm đã dùng lần trước để làm tiếp.';
   if(c==='app/no-user')return 'Không tìm thấy tài khoản.';
