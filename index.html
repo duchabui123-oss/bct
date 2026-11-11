@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.81 -->
+<!-- Phiên bản 1.82 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -285,8 +285,16 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .sr-x{font-size:.8rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-all{margin:6px 8px}
 .gsearch{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.gsearch #sr-q{flex:1 1 140px;min-width:0}.sr-tbtn{flex:0 0 auto;white-space:nowrap;border-radius:999px}.sr-tbtn.on{background:var(--accent-soft);border-color:var(--accent)}
-.sr-flt{padding:6px 8px 8px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.88rem}
-.sr-flt .sr-fh{flex-basis:100%;display:flex;gap:8px;align-items:center;color:var(--ink-2);font-size:.8rem}
+.sr-flt{margin:6px;border:2px solid var(--accent);border-radius:12px;background:var(--surface);overflow:hidden}
+.sr-ft{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:7px 10px;background:var(--accent-soft);border-bottom:1px solid var(--line)}
+.sr-ft b{font-size:.92rem}.sr-ft span{flex:1 1 200px;font-size:.78rem;color:var(--ink-2)}
+.sr-grp{margin:8px;padding:6px 10px 8px;border:1px solid var(--line);border-radius:10px;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.88rem;min-width:0}
+.sr-grp legend{padding:0 6px;font-weight:600;font-size:.84rem}
+.sr-gh{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;color:var(--ink-2);font-size:.78rem}
+.sr-rt{padding:8px 10px 0;font-weight:600;font-size:.84rem}
+.sr-tq{flex:1 1 200px;min-width:0;max-width:340px}
+.sr-tl{flex-basis:100%;min-width:0;max-height:130px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:3px 12px;padding:4px 0}
+.sr-tl label{align-items:flex-start}.sr-tl small{color:var(--ink-2)}
 .sr-flt label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
 .sr-flt input[type=checkbox]{width:auto;flex:none;padding:0;margin:0;accent-color:var(--accent)}
 .row.sr-hit{outline:2px solid var(--accent);outline-offset:2px}
@@ -484,7 +492,7 @@ function listen(ref,cb,onErr){
 async function boot(){
   teardown();
   S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
-  S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sTypes=new Set();S.sFilt=false;S.sFocus='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
+  S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sTypes=new Set();S.sTpls=new Set();S.sTq='';S.sFilt=false;S.sFocus='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
   buildShell();
   const isAdmin=S.profile.role==='admin';
   unsubs.push(listen(collection(db,'users'),snap=>{
@@ -579,7 +587,7 @@ function buildShell(){
   +'<nav class="tabs" aria-label="Chuyển mục"><button type="button" data-act="tab" data-t="report" aria-pressed="true">Báo cáo</button>'
   +'<button type="button" data-act="tab" data-t="stats" aria-pressed="false">Thống kê</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin" aria-pressed="false">Quản lý</button>':'')+'</nav>'
-  +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><button type="button" class="btn sm sr-tbtn" id="sr-tbtn" data-act="sr-types" aria-controls="sr-panel" aria-expanded="false">Loại việc</button><div id="sr-panel" class="sr-panel" hidden></div></form>'
+  +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><button type="button" class="btn sm sr-tbtn" id="sr-tbtn" data-act="sr-types" aria-controls="sr-panel" aria-expanded="false" title="Lọc theo loại việc, việc mẫu">Lọc nâng cao</button><div id="sr-panel" class="sr-panel" hidden></div></form>'
   +'<div class="me"><button type="button" class="btn link" data-act="me" id="me-name">'+esc(S.profile.name||S.profile.username)+'</button>'
   +'<button type="button" class="btn sm" data-act="logout">Đăng xuất</button></div></header>'
   +'<div id="net" class="banner warn" hidden></div><div id="msg" class="msg" role="status" aria-live="polite"></div>'
@@ -1806,26 +1814,44 @@ function srPool(){
   return [...m.values()]}
 const srHay=t=>normQ([t.title,t.note,t.result,t.ticket,sysName(t.system),typeName(t.type),dm(t.date),full(parse(t.date)),unitOf(t),userName(t.uid)].join(' | '));
 const srTypeIds=()=>{const ids=new Set(S.types.filter(x=>x.active!==false).map(x=>x.id));S.sTypes.forEach(i=>ids.add(i));return S.types.filter(x=>ids.has(x.id))};
+/* Việc mẫu hiện trong bộ lọc: đang dùng (hoặc đang được chọn), thu hẹp theo loại việc đã chọn và theo chữ gõ */
+function srTplList(){
+  const q=normQ(S.sTq),ty=S.sTypes;
+  const l=S.tpls.filter(x=>S.sTpls.has(x.id)||(x.active!==false&&(!ty.size||ty.has(x.type))&&(!q||normQ(x.name+' '+sysName(x.system)).indexOf(q)>=0)));
+  const so=id=>{const i=S.systems.findIndex(y=>y.id===id);return i<0?999:i};
+  return l.sort((a,b)=>(S.sTpls.has(b.id)-S.sTpls.has(a.id))||(so(a.system)-so(b.system))||String(a.name).localeCompare(String(b.name),'vi'))}
+function srTlHtml(){
+  const l=srTplList(),cap=80;
+  return l.slice(0,cap).map(x=>'<label><input type="checkbox" data-srtpl="'+esc(x.id)+'"'+(S.sTpls.has(x.id)?' checked':'')+'> <span>'+esc(x.name)+(x.system?' <small>· '+esc(sysName(x.system))+'</small>':'')+'</span></label>').join('')
+    +(l.length>cap?'<small class="muted">Còn '+(l.length-cap)+' việc mẫu nữa, hãy gõ để thu hẹp.</small>':'')
+    +(l.length?'':'<small class="muted">Không có việc mẫu phù hợp.</small>')}
+const srTplMatch=t=>{const sel=S.tpls.filter(x=>S.sTpls.has(x.id)),k=titleKey(t.title);return sel.some(x=>titleKey(x.name)===k&&(!x.system||t.system===x.system))};
 function srRun(){
-  const toks=normQ(S.sq).split(/\s+/).filter(Boolean),ty=S.sTypes;if(!toks.length&&!ty.size)return [];
-  return srPool().filter(t=>{if(ty.size&&!ty.has(t.type))return false;if(!toks.length)return true;const h=srHay(t);return toks.every(k=>h.indexOf(k)>=0)}).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:((b.ts||0)-(a.ts||0)))}
-function srShown(){return !!(S.sOpen&&(normQ(S.sq)||S.sTypes.size||S.sFilt))}
+  const toks=normQ(S.sq).split(/\s+/).filter(Boolean),ty=S.sTypes,tp=S.sTpls;if(!toks.length&&!ty.size&&!tp.size)return [];
+  return srPool().filter(t=>{if(ty.size&&!ty.has(t.type))return false;if(tp.size&&!srTplMatch(t))return false;if(!toks.length)return true;const h=srHay(t);return toks.every(k=>h.indexOf(k)>=0)}).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:((b.ts||0)-(a.ts||0)))}
+const srFiltN=()=>S.sTypes.size+S.sTpls.size;
+function srShown(){return !!(S.sOpen&&(normQ(S.sq)||srFiltN()||S.sFilt))}
 function renderSearch(){
   const box=$('sr-panel'),tb=$('sr-tbtn');if(!box)return;
-  if(tb){const n=S.sTypes.size;tb.textContent=n?'Loại việc ('+n+')':'Loại việc';tb.classList.toggle('on',n>0);tb.setAttribute('aria-expanded',srShown()&&S.sFilt?'true':'false')}
+  if(tb){const n=srFiltN();tb.textContent=(n?'Lọc nâng cao ('+n+')':'Lọc nâng cao')+(srShown()&&S.sFilt?' ▴':' ▾');tb.classList.toggle('on',n>0);tb.setAttribute('aria-expanded',srShown()&&S.sFilt?'true':'false')}
   if(!srShown()){box.hidden=true;box.innerHTML='';return}
-  const hasQ=!!(normQ(S.sq)||S.sTypes.size),res=hasQ?srRun():[],shown=res.slice(0,SR_MAX),all=!!(S.sAll&&S.allMine);
-  const tl=srTypeIds(),tn=S.sTypes.size?tl.filter(x=>S.sTypes.has(x.id)).map(x=>x.name).join(', '):'tất cả loại việc';
-  const flt=S.sFilt?'<div class="sr-flt"><div class="sr-fh"><b>Loại việc</b><button type="button" class="btn sm" data-act="sr-types-all"'+(S.sTypes.size?'':' disabled')+'>Tất cả</button><span>Không chọn loại nào = tìm trong tất cả loại việc</span></div>'
-    +tl.map(x=>'<label><input type="checkbox" data-srtype="'+esc(x.id)+'"'+(S.sTypes.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')+'</div>':'';
-  box.innerHTML=flt+'<div class="sr-head">'+(!hasQ?'Gõ từ khóa hoặc chọn loại việc để tìm':(res.length?res.length+' kết quả'+(res.length>SR_MAX?' (hiện '+SR_MAX+' việc mới nhất)':''):'Không có kết quả')+' · '+(S.sTypes.size?'loại việc: '+esc(tn)+' · ':'')+(all?'trong tất cả việc của bạn':'trong các việc đang tải (tuần và tháng đang xem)'))+'</div>'
+  const keepP=box.scrollTop,tl0=$('sr-tl'),keepL=tl0?tl0.scrollTop:0;
+  const hasQ=!!(normQ(S.sq)||srFiltN()),res=hasQ?srRun():[],shown=res.slice(0,SR_MAX),all=!!(S.sAll&&S.allMine);
+  const tl=srTypeIds(),tn=S.sTypes.size?tl.filter(x=>S.sTypes.has(x.id)).map(x=>x.name).join(', '):'';
+  const flt=S.sFilt?'<div class="sr-flt" role="group" aria-label="Điều kiện tìm kiếm"><div class="sr-ft"><b>Điều kiện tìm kiếm</b><span>Kết hợp với chữ gõ ở ô tìm kiếm. Không chọn gì nghĩa là tìm tất cả.</span><button type="button" class="btn sm" data-act="sr-clear-all"'+(srFiltN()||S.sTq?'':' disabled')+'>Xóa điều kiện</button></div>'
+    +'<fieldset class="sr-grp"><legend>Loại việc</legend><div class="sr-gh"><button type="button" class="btn sm" data-act="sr-types-all"'+(S.sTypes.size?'':' disabled')+'>Bỏ chọn</button><span>Chọn một hoặc nhiều loại</span></div>'
+    +tl.map(x=>'<label><input type="checkbox" data-srtype="'+esc(x.id)+'"'+(S.sTypes.has(x.id)?' checked':'')+'> '+esc(x.name)+'</label>').join('')+'</fieldset>'
+    +'<fieldset class="sr-grp"><legend>Việc mẫu</legend><div class="sr-gh"><input type="search" id="sr-tq" class="sr-tq" placeholder="Gõ để tìm việc mẫu…" value="'+esc(S.sTq)+'" autocomplete="off" aria-label="Tìm việc mẫu"><button type="button" class="btn sm" data-act="sr-tpls-clear"'+(S.sTpls.size?'':' disabled')+'>Bỏ chọn</button><span>Chọn một hoặc nhiều việc mẫu (thu hẹp theo loại việc đã chọn)</span></div>'
+    +'<div class="sr-tl" id="sr-tl">'+srTlHtml()+'</div></fieldset></div><div class="sr-rt">Kết quả tìm kiếm</div>':'';
+  const tpn=S.sTpls.size?S.tpls.filter(x=>S.sTpls.has(x.id)).map(x=>x.name).join(', '):'';
+  box.innerHTML=flt+'<div class="sr-head">'+(!hasQ?'Gõ từ khóa hoặc chọn bộ lọc để tìm':(res.length?res.length+' kết quả'+(res.length>SR_MAX?' (hiện '+SR_MAX+' việc mới nhất)':''):'Không có kết quả')+' · '+(tn?'loại việc: '+esc(tn)+' · ':'')+(tpn?'việc mẫu: '+esc(tpn.length>120?tpn.slice(0,120)+'…':tpn)+' · ':'')+(all?'trong tất cả việc của bạn':'trong các việc đang tải (tuần và tháng đang xem)'))+'</div>'
     +shown.map(t=>{const ex=[t.note,t.result,t.ticket?'Mã: '+t.ticket:''].filter(Boolean).join(' · ');
       return '<button type="button" class="sr-item" data-act="sr-go" data-id="'+esc(t.id)+'" data-date="'+esc(t.date)+'"><span class="sr-t">'+esc(t.title)+'</span>'
         +'<span class="sr-m">'+DS[(parse(t.date).getDay()+6)%7]+' '+full(parse(t.date))+' · '+esc(sysName(t.system))+' · '+esc(typeName(t.type))+(t.uid!==S.user.uid?' · '+esc(userName(t.uid)):'')+'</span>'
         +(ex?'<span class="sr-x">'+esc(ex.slice(0,140))+'</span>':'')+'</button>'}).join('')
     +(all?'':'<button type="button" class="btn sm sr-all" data-act="sr-all"'+(S.sBusy?' disabled':'')+'>'+(S.sBusy?'Đang tải…':'Tìm trong tất cả các tuần (việc của tôi)')+'</button>');
-  box.hidden=false;
-  if(S.sFocus){const f=box.querySelector('[data-srtype="'+S.sFocus.replace(/"/g,'')+'"]');S.sFocus='';if(f)f.focus()}}
+  box.hidden=false;box.scrollTop=keepP;const tl1=$('sr-tl');if(tl1)tl1.scrollTop=keepL;
+  if(S.sFocus){const f=box.querySelector('[data-'+S.sFocus.k+'="'+String(S.sFocus.v).replace(/"/g,'')+'"]');S.sFocus=null;if(f)f.focus()}}
 async function srLoadAll(){
   S.sBusy=true;renderSearch();
   try{const me=S.user.uid,al=allowedSys();
@@ -1846,15 +1872,17 @@ function srGo(id,date){
     if(el){clearInterval(tm);let d=el.closest('details');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details')}
       el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('sr-hit');setTimeout(()=>el.classList.remove('sr-hit'),2500)}
     else if(++n>16)clearInterval(tm)},250)}
-document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='rst-pw'){S.rstPw=t.value;S.rstArm=false;return}if(t&&t.id==='sr-q'){S.sq=t.value;S.sOpen=true;clearTimeout(srTimer);srTimer=setTimeout(renderSearch,120)}});
-document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='sr-q'&&(normQ(e.target.value)||S.sTypes.size)){S.sq=e.target.value;S.sOpen=true;renderSearch()}});
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='rst-pw'){S.rstPw=t.value;S.rstArm=false;return}if(t&&t.id==='sr-tq'){S.sTq=t.value;const l=$('sr-tl');if(l)l.innerHTML=srTlHtml();return}if(t&&t.id==='sr-q'){S.sq=t.value;S.sOpen=true;clearTimeout(srTimer);srTimer=setTimeout(renderSearch,120)}});
+document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='sr-q'){S.sq=e.target.value;S.sOpen=true;if(!S.sFiltTouched)S.sFilt=true;renderSearch()}});
 document.addEventListener('submit',e=>{if(e.target&&e.target.id==='gsearch')e.preventDefault()});
-document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.srtype){if(t.checked)S.sTypes.add(t.dataset.srtype);else S.sTypes.delete(t.dataset.srtype);S.sOpen=true;S.sFocus=t.dataset.srtype;renderSearch()}});
-document.addEventListener('click',e=>{if(!S.sOpen)return;const inside=(e.composedPath?e.composedPath():[]).some(n=>n&&n.id==='gsearch');if(!inside){S.sOpen=false;S.sFilt=false;renderSearch()}});
+document.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset)return;
+  if(t.dataset.srtype){if(t.checked)S.sTypes.add(t.dataset.srtype);else S.sTypes.delete(t.dataset.srtype);S.sOpen=true;S.sFocus={k:'srtype',v:t.dataset.srtype};renderSearch()}
+  else if(t.dataset.srtpl){if(t.checked)S.sTpls.add(t.dataset.srtpl);else S.sTpls.delete(t.dataset.srtpl);S.sOpen=true;S.sFocus={k:'srtpl',v:t.dataset.srtpl};renderSearch()}});
+document.addEventListener('click',e=>{if(!S.sOpen)return;const inside=(e.composedPath?e.composedPath():[]).some(n=>n&&n.id==='gsearch');if(!inside){S.sOpen=false;S.sFilt=false;S.sFiltTouched=false;renderSearch()}});
 document.addEventListener('keydown',e=>{
   const t=e.target;if(!t||!t.closest||!t.closest('#gsearch'))return;
   const items=[...document.querySelectorAll('#sr-panel .sr-item')],i=items.indexOf(t);
-  if(e.key==='Escape'){S.sOpen=false;S.sFilt=false;renderSearch();const q=$('sr-q');if(q)q.focus();return}
+  if(e.key==='Escape'){S.sOpen=false;S.sFilt=false;S.sFiltTouched=false;renderSearch();const q=$('sr-q');if(q)q.focus();return}
   if(e.key==='Enter'&&t.id==='sr-q'){e.preventDefault();S.sq=t.value;S.sOpen=true;renderSearch();return}
   if(e.key==='ArrowDown'){e.preventDefault();const n=t.id==='sr-q'?items[0]:items[i+1];if(n)n.focus()}
   if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i===0?$('sr-q'):items[i-1]).focus()}
@@ -2071,8 +2099,10 @@ root.addEventListener('click',async e=>{
     if(act==='to-top'){window.scrollTo({top:0,behavior:'smooth'});return}
     if(act==='sr-go'){srGo(b.dataset.id,b.dataset.date);return}
     if(act==='sr-all'){srLoadAll();return}
-    if(act==='sr-types'){S.sFilt=srShown()&&S.sFilt?false:true;S.sOpen=true;renderSearch();return}
+    if(act==='sr-types'){S.sFiltTouched=true;S.sFilt=srShown()&&S.sFilt?false:true;S.sOpen=true;renderSearch();return}
     if(act==='sr-types-all'){S.sTypes.clear();S.sOpen=true;renderSearch();return}
+    if(act==='sr-clear-all'){S.sTypes.clear();S.sTpls.clear();S.sTq='';S.sOpen=true;renderSearch();return}
+    if(act==='sr-tpls-clear'){S.sTpls.clear();S.sOpen=true;renderSearch();return}
     if(act==='tab'){
       const prevTab=S.tab;
       S.tab=b.dataset.t;
