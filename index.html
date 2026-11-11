@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.77 -->
+<!-- Phiên bản 1.78 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -205,6 +205,9 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .ver{font:600 .62rem/1 var(--font-body,inherit);color:var(--ink-2);opacity:.7;margin-left:4px;vertical-align:middle}
 .usys{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:.84rem;color:var(--ink-2)}
 .usys .qf-chip{font-size:.84rem}
+.rst{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:.55rem .7rem;border:1px dashed var(--line);border-radius:10px;font-size:.88rem}
+.rst input{width:11rem;font:inherit;font-family:ui-monospace,Consolas,monospace}
+.rst .msg{flex-basis:100%}
 .msel{position:relative;display:inline-block;vertical-align:middle;min-width:13rem;max-width:100%}
 .msel>summary{list-style:none;cursor:pointer;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.38rem 1.8rem .38rem .65rem;font-size:.88rem;color:var(--ink);position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msel>summary::-webkit-details-marker{display:none}
@@ -348,7 +351,7 @@ let auth=null,db=null;
 /* ===== Trạng thái ===== */
 const S={units:[],msOpen:new Set(),msQ:{},user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),groups:[],tplGroup:'',wGroup:'',mGroup:'',tplOpen:new Set(),groupsReady:false,effKey:'',qfSOpen:false,qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
-  editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,
+  editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,rstOpen:'',rstPw:'',rstMsg:'',rstOk:false,rstBusy:false,rstArm:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
 let unsubs=[],weekUnsubs=[],monthUnsubs=[],msgTimer=null;
 const notePending={},noteTimers={};
@@ -411,12 +414,31 @@ function showBlocked(text){
 }
 function setAuthMsg(t){const m=$('a-msg');if(m)m.textContent=t||''}
 
+/* Tài khoản đăng nhập: thế hệ 0 là tên đăng nhập gốc; mỗi lần quản trị cấp lại mật khẩu thì thêm một thế hệ (ten+r1, ten+r2, …). */
+const MAXGEN=5;
+const authEmail=(u,g)=>u+(g?'+r'+g:'')+'@'+EMAIL_DOMAIN;
 async function doLogin(){
   const u=normUser($('l-user').value),p=$('l-pass').value;
   if(!u||!p){setAuthMsg('Hãy nhập tên đăng nhập và mật khẩu.');return}
   setAuthMsg('Đang đăng nhập…');
-  try{await signInWithEmailAndPassword(auth,u+'@'+EMAIL_DOMAIN,p)}
-  catch(e){setAuthMsg(authMsg(e))}
+  let hint=0;try{hint=Number(localStorage.getItem('bct_gen_'+u))||0}catch(e){}
+  if(hint<0||hint>MAXGEN)hint=0;
+  const order=[hint].concat([0,1,2,3,4,5].filter(g=>g!==hint));
+  let last=null,stale=false;
+  S.busyAuth=true;
+  try{
+    for(const g of order){
+      let cred;
+      try{cred=await signInWithEmailAndPassword(auth,authEmail(u,g),p)}
+      catch(e){last=e;if(!/invalid-credential|wrong-password|user-not-found|invalid-login/.test(e&&e.code||''))break;continue}
+      /* tài khoản cũ đã được quản trị cấp lại thì hồ sơ đã bị xóa: bỏ qua, thử thế hệ tiếp theo */
+      let gone=false;try{gone=!(await getDoc(doc(db,'users',cred.user.uid))).exists()}catch(e){}
+      if(gone&&g<MAXGEN){stale=true;try{await signOut(auth)}catch(e){}continue}
+      try{localStorage.setItem('bct_gen_'+u,String(g))}catch(e){}
+      S.busyAuth=false;await enterApp(cred.user);return;
+    }
+  }finally{S.busyAuth=false}
+  setAuthMsg(stale?'Mật khẩu này thuộc tài khoản cũ đã được quản trị viên cấp lại. Hãy dùng mật khẩu mới do quản trị viên cung cấp.':authMsg(last));
 }
 async function doSignup(){
   const name=$('s-name').value.trim(),unit=$('s-unit').value.trim(),user=normUser($('s-user').value),p1=$('s-pass').value,p2=$('s-pass2').value;
@@ -1680,8 +1702,9 @@ function renderAdminUsers(){
      return '<div class="urow'+(u.active===false?' off':'')+'" data-uid="'+esc(u.uid)+'"><span class="nm">'+esc(u.name||'')+(self?' (bạn)':'')+(u.active===false?' · đã khóa':'')+'</span>'
       +'<span class="mono">'+esc(u.username||'')+'</span><span>'+esc(u.unit||'')+'</span>'
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
-      +'<span class="tbtns"><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
+      +'<span class="tbtns"><button type="button" class="btn sm" data-act="user-reset" data-user="'+esc(u.username||'')+'"'+(self?' disabled':'')+'>Cấp lại mật khẩu</button><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
       +'<button type="button" class="btn sm" data-act="user-del" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>Xóa</button></span>'
+      +(S.rstOpen&&S.rstOpen===u.username&&rstSrc(u.username).uid===u.uid?'<div class="rst"><b>Mật khẩu tạm</b> <input id="rst-pw" type="text" autocomplete="off" maxlength="40" value="'+esc(S.rstPw)+'"'+(S.rstOk||S.rstBusy?' readonly':'')+' aria-label="Mật khẩu tạm"> '+(S.rstOk?'<button type="button" class="btn sm" data-act="user-reset-close">Đóng</button>':'<button type="button" class="btn sm primary" data-act="user-reset-go" data-user="'+esc(u.username||'')+'"'+(S.rstBusy?' disabled':'')+'>'+(S.rstArm?'Bấm lại để xác nhận':'Cấp lại')+'</button><button type="button" class="btn sm" data-act="user-reset-close"'+(S.rstBusy?' disabled':'')+'>Hủy</button>')+'<span class="msg'+(S.rstOk?' ok':'')+'" role="status">'+esc(S.rstMsg)+'</span></div>':'')
       +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm',true)+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
    }).join('');
 }
@@ -1811,7 +1834,7 @@ function srGo(id,date){
     if(el){clearInterval(tm);let d=el.closest('details');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details')}
       el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('sr-hit');setTimeout(()=>el.classList.remove('sr-hit'),2500)}
     else if(++n>16)clearInterval(tm)},250)}
-document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='sr-q'){S.sq=t.value;S.sOpen=true;clearTimeout(srTimer);srTimer=setTimeout(renderSearch,120)}});
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='rst-pw'){S.rstPw=t.value;S.rstArm=false;return}if(t&&t.id==='sr-q'){S.sq=t.value;S.sOpen=true;clearTimeout(srTimer);srTimer=setTimeout(renderSearch,120)}});
 document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='sr-q'&&normQ(e.target.value)){S.sq=e.target.value;S.sOpen=true;renderSearch()}});
 document.addEventListener('submit',e=>{if(e.target&&e.target.id==='gsearch')e.preventDefault()});
 document.addEventListener('click',e=>{if(!S.sOpen)return;const inside=(e.composedPath?e.composedPath():[]).some(n=>n&&n.id==='gsearch');if(!inside){S.sOpen=false;renderSearch()}});
@@ -1927,6 +1950,60 @@ async function createUserAsAdmin(name,username,password,unit,role,groups,systems
   if(groups&&groups.length){prof.groups=groups;prof.group=groups[0]}
   if(systems&&systems.length)prof.systems=systems;
   await setDoc(doc(db,'users',uid),prof);
+}
+/* Quản trị cấp lại mật khẩu: gói Firebase miễn phí không cho đổi mật khẩu người khác, nên tạo tài khoản đăng nhập mới (thế hệ kế tiếp) cùng tên đăng nhập,
+   chuyển toàn bộ việc và tổng kết tuần sang đó rồi xóa hồ sơ cũ. Người dùng đăng nhập bằng mật khẩu tạm rồi tự đổi. */
+const rstSrc=un=>S.users.filter(x=>x.username===un).sort((x,y)=>(Number(x.gen)||0)-(Number(y.gen)||0))[0]||{};
+const genPw=()=>{const a='abcdefghjkmnpqrstuvwxyz23456789';let r='';const b=new Uint32Array(8);(window.crypto||{getRandomValues:x=>x.forEach((_,i)=>x[i]=Math.floor(Math.random()*4e9))}).getRandomValues(b);b.forEach(v=>{r+=a[v%a.length]});return r};
+async function resetPasswordAsAdmin(u,pass,say){
+  if(!u||!u.username)throw {code:'app/no-user'};
+  if(allowedSys())throw {code:'app/limited-admin'};
+  /* nếu lần trước làm dở thì còn 2 hồ sơ cùng tên đăng nhập: dùng lại tài khoản thế hệ cao nhất, gom việc từ các hồ sơ còn lại */
+  const dups=S.users.filter(x=>x.username===u.username);
+  const top=dups.reduce((m,x)=>Math.max(m,Number(x.gen)||0),0);
+  const gen=dups.length>1?top:(Number(u.gen)||0)+1;
+  if(gen>MAXGEN)throw {code:'app/max-gen'};
+  const email=authEmail(u.username,gen);
+  const sec=getApps().find(a=>a.name==='secondary')||initializeApp(firebaseConfig,'secondary');
+  const sAuth=getAuth(sec);
+  let nuid;
+  say('Đang tạo tài khoản đăng nhập mới…');
+  try{nuid=(await createUserWithEmailAndPassword(sAuth,email,pass)).user.uid}
+  catch(e){
+    if(e&&e.code==='auth/email-already-in-use'){ /* lần trước làm dở: dùng lại nếu nhập đúng mật khẩu đã dùng */
+      try{nuid=(await signInWithEmailAndPassword(sAuth,email,pass)).user.uid}catch(e2){throw {code:'app/retry-same'}}
+    }else throw e;
+  }
+  try{await signOut(sAuth)}catch(e){}
+  const srcs=dups.filter(x=>x.uid!==nuid);if(!srcs.length)srcs.push(u);
+  const base=dups.find(x=>x.uid===nuid)||u;
+  const prof=Object.assign({},base);delete prof.uid;
+  prof.gen=gen;prof.resetAt=Date.now();prof.prevUid=srcs[0].uid;
+  await setDoc(doc(db,'users',nuid),prof);
+  say('Đang chuyển việc sang tài khoản mới…');
+  let ts=[],ns=[];
+  for(const sx of srcs){
+    ts=ts.concat((await getDocs(query(collection(db,'tasks'),where('uid','==',sx.uid)))).docs);
+    ns=ns.concat((await getDocs(query(collection(db,'weeknotes'),where('uid','==',sx.uid)))).docs);
+  }
+  for(let i=0;i<ts.length;i+=400){const bt=writeBatch(db);ts.slice(i,i+400).forEach(d=>bt.update(doc(db,'tasks',d.id),{uid:nuid}));await bt.commit()}
+  const join=(x,y)=>[x,y].map(v=>String(v||'').trim()).filter(Boolean).join('\n');
+  for(const d of ns){
+    const o=d.data(),tid=nuid+'_'+o.week,ex=await getDoc(doc(db,'weeknotes',tid)),cur=ex.exists()?ex.data():{};
+    await setDoc(doc(db,'weeknotes',tid),{uid:nuid,week:o.week,highlights:join(cur.highlights,o.highlights),issues:join(cur.issues,o.issues),plan:join(cur.plan,o.plan),updated:Date.now()});
+    await deleteDoc(doc(db,'weeknotes',d.id));
+  }
+  for(const sx of srcs)await deleteDoc(doc(db,'users',sx.uid));
+  return {tasks:ts.length,notes:ns.length};
+}
+function rstMsgOf(e){
+  const c=e&&e.code||'';
+  if(c==='app/limited-admin')return 'Tài khoản quản trị này bị giới hạn hệ thống nên không chuyển được hết dữ liệu. Hãy dùng quản trị không giới hạn hệ thống.';
+  if(c==='app/max-gen')return 'Tài khoản này đã được cấp lại mật khẩu quá '+MAXGEN+' lần. Hãy xóa tài khoản rồi tạo mới và chuyển dữ liệu.';
+  if(c==='app/retry-same')return 'Lần cấp lại trước làm dở. Hãy nhập đúng mật khẩu tạm đã dùng lần trước để làm tiếp.';
+  if(c==='app/no-user')return 'Không tìm thấy tài khoản.';
+  if(c==='permission-denied')return fsMsg(e);
+  return authMsg(e);
 }
 async function moveCatalog(kind,id,dir){
   const l=S[kind].slice(),i=l.findIndex(x=>x.id===id),j=i+dir;
@@ -2062,6 +2139,26 @@ root.addEventListener('click',async e=>{
         flash('Đã xóa người dùng '+(u.name||u.username)+info+'.',true);
       }catch(err){flash(fsMsg(err));b.disabled=false;b.textContent='Xóa';delete b.dataset.armed;b.classList.remove('danger')}
       return;
+    }
+    if(act==='user-reset'){
+      const un=b.dataset.user;if(S.rstBusy)return;
+      S.rstOpen=S.rstOpen===un?'':un;S.rstPw=genPw();S.rstMsg='Đặt mật khẩu tạm (từ 6 ký tự) rồi bấm Cấp lại. Việc và tổng kết tuần của người dùng sẽ được chuyển sang tài khoản mới.';S.rstOk=false;S.rstArm=false;
+      renderAdminUsers();return;
+    }
+    if(act==='user-reset-close'){if(S.rstBusy)return;S.rstOpen='';S.rstOk=false;S.rstArm=false;renderAdminUsers();return}
+    if(act==='user-reset-go'){
+      if(S.rstBusy)return;
+      const u=rstSrc(b.dataset.user);if(!u.uid||S.users.some(x=>x.username===u.username&&x.uid===S.user.uid))return;
+      const inp=$('rst-pw');if(inp)S.rstPw=inp.value.trim();
+      if(S.rstPw.length<6){S.rstMsg='Mật khẩu tạm cần tối thiểu 6 ký tự.';S.rstArm=false;renderAdminUsers();return}
+      if(!S.rstArm){S.rstArm=true;S.rstMsg='Mật khẩu cũ của '+(u.name||u.username)+' sẽ không còn dùng được. Bấm lại để xác nhận.';renderAdminUsers();return}
+      S.rstArm=false;S.rstBusy=true;
+      const say=t=>{S.rstMsg=t;const m=document.querySelector('.rst .msg');if(m)m.textContent=t};
+      try{
+        const r=await resetPasswordAsAdmin(u,S.rstPw,say);
+        S.rstOk=true;S.rstMsg='Đã cấp lại. Tên đăng nhập: '+u.username+' · Mật khẩu tạm: '+S.rstPw+'. Đã chuyển '+r.tasks+' việc và '+r.notes+' tổng kết tuần. Hãy gửi cho người dùng và nhắc đổi mật khẩu sau khi đăng nhập.';
+      }catch(err){S.rstOk=false;S.rstMsg=rstMsgOf(err)}
+      S.rstBusy=false;renderAdminUsers();return;
     }
     if(act==='user-toggle'){
       const u=S.users.find(x=>x.uid===b.dataset.uid);if(!u||u.uid===S.user.uid)return;
@@ -2325,16 +2422,19 @@ async function start(){
       try{const s=await getDoc(doc(db,'settings','app'));S.publicSignup=s.exists()&&!!s.data().allowSignup}catch(e){}
       showLogin();return;
     }
-    S.user=user;
-    try{
-      const snap=await getDoc(doc(db,'users',user.uid));
-      if(!snap.exists()){showBlocked('Tài khoản chưa được kích hoạt. Hãy liên hệ quản trị viên.');return}
-      const p=snap.data();
-      if(p.active===false){showBlocked('Tài khoản đã bị khóa. Hãy liên hệ quản trị viên.');return}
-      S.profile=Object.assign({uid:user.uid},p);
-      await boot();
-    }catch(e){showBlocked('Không đọc được thông tin tài khoản. Hãy kiểm tra mạng rồi tải lại trang.')}
+    await enterApp(user);
   });
+}
+async function enterApp(user){
+  S.user=user;
+  try{
+    const snap=await getDoc(doc(db,'users',user.uid));
+    if(!snap.exists()){showBlocked('Tài khoản chưa được kích hoạt hoặc đã được quản trị viên cấp lại mật khẩu. Hãy đăng nhập bằng mật khẩu mới hoặc liên hệ quản trị viên.');return}
+    const p=snap.data();
+    if(p.active===false){showBlocked('Tài khoản đã bị khóa. Hãy liên hệ quản trị viên.');return}
+    S.profile=Object.assign({uid:user.uid},p);
+    await boot();
+  }catch(e){showBlocked('Không đọc được thông tin tài khoản. Hãy kiểm tra mạng rồi tải lại trang.')}
 }
 start();
 setTimeout(checkNewVersion,15000);setInterval(checkNewVersion,600000);
