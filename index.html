@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.82 -->
+<!-- Phiên bản 1.86 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1110,7 +1110,7 @@ function statsText(){
   sect('THEO HỆ THỐNG',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'));
   sect('THEO LOẠI VIỆC',groupRows(list,'type',S.types,'Khác'));
   const qv=qtyView(list,true);
-  if(qv.rows.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC'+(qv.sys.length?' – '+sysLabel(qv.sys):''));qv.rows.forEach(c=>L.push('- '+c.name+': '+(c.hasSum?qtyDisp(c):'(trống)')+(c.n?' ('+c.n+' lần ghi nhận)':'')));L.push('')}
+  if(qv.rows.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC'+(qv.sys.length?' – '+sysLabel(qv.sys):''));qv.rows.forEach(c=>L.push('- '+c.name+': '+(c.hasSum?qtyDisp(c)+(c.n?' ('+c.n+' lần ghi nhận)':''):(c.n?c.n+' lần ghi nhận':'(chưa có)'))));L.push('')}
   if(S.mWho==='all')sect('THEO NGƯỜI',groupRows(list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)'));
   return L.join('\n').replace(/\n+$/,'');
 }
@@ -1146,6 +1146,9 @@ function hiddenSys(){
   const a=allowedSys();
   return a?new Set(S.systems.filter(x=>!a.has(x.id)).map(x=>x.id)):new Set();
 }
+const CNT_LAB='Số lần ghi nhận';
+/* Có việc làm nhiều lần nhưng chỉ vài lần nhập số lượng: ghi rõ để biết tổng chỉ cộng các lần có số */
+const partTxt=(withQ,all)=>withQ<all?' (có số lượng ở '+qtyText(withQ)+'/'+qtyText(all)+' lần ghi nhận)':'';
 function summaryBlocks(list,grp){
   const hid=hiddenSys(list);
   const tpls=S.tpls.filter(x=>x.active!==false&&!hid.has(x.system)&&tplForGroup(x,grp));
@@ -1158,7 +1161,7 @@ function summaryBlocks(list,grp){
       const m=tasks.filter(t=>titleKey(t.title)===titleKey(tp.name)),qs=m.filter(hasQty);
       if(!m.length)return; /* chỉ liệt kê đầu việc đã có người nhập */
       const lab=tp.label||'Số lượng';
-      out.push({type:domType(m),ts:m,lab:lab,noQ:!!tp.noQty&&!qs.length,text:tp.name+'.'+((tp.noQty&&!qs.length)?'':' '+lab+':'+(qs.length?' '+sumText(qs,qtyText,tp.unit):''))});
+      out.push({type:domType(m),ts:m,nm:tp.name,lab:lab,noQ:!!tp.noQty&&!qs.length,text:tp.name+'.'+(qs.length?' '+lab+': '+sumText(qs,qtyText,tp.unit)+partTxt(qs.length,m.length):' '+CNT_LAB+': '+qtyText(m.length))}); /* không có số lượng thì ghi số lần ghi nhận để biết đầu việc đã làm mấy lần */
     });
     return out;
   };
@@ -1166,7 +1169,7 @@ function summaryBlocks(list,grp){
     const g=new Map();
     tasks.forEach(t=>{const k=titleKey(t.title);if(!k||skip.has(k))return;let o=g.get(k);if(!o){o={name:String(t.title).trim(),ts:[]};g.set(k,o)}o.ts.push(t)});
     const out=[];
-    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),ts:o.ts,lab:'Số lượng',noQ:false,text:o.name+'.'+(st?' Số lượng: '+st:'')})});
+    g.forEach(o=>{const st=sumText(o.ts,qtyText,tplUnit(o.name));out.push({type:domType(o.ts),ts:o.ts,nm:o.name,lab:'Số lượng',noQ:false,text:o.name+'.'+(st?' Số lượng: '+st+partTxt(o.ts.filter(hasQty).length,o.ts.length):' '+CNT_LAB+': '+qtyText(o.ts.length))})});
     return out;
   };
   const byType=items=>{
@@ -1177,9 +1180,9 @@ function summaryBlocks(list,grp){
       /* Ghi chú không nhập số lượng thì tự thêm số lượng của chính việc đó vào cuối: "Số lượng: x Đơn vị" */
       const noteTxt=(t,x)=>{let n=String(t.note||'').trim();
         /* Phiếu có số lượng mà không ghi chú: vẫn liệt kê, lấy tên đầu việc (kèm mã phiếu nếu có) làm nội dung để nhận ra việc nào: "dd/mm: Tên đầu việc. Số lượng: x Đơn vị" */
-        if(!n){if(x.noQ||!hasQty(t))return '';const u0=unitOf(t),nm=String(t.title||'').trim().replace(/[.\s]+$/,''),tk=String(t.ticket||'').trim();
+        if(!n){if(x.noQ||!hasQty(t))return '';const u0=unitOf(t),nm=String(x.nm||t.title||'').trim().replace(/[.\s]+$/,''),tk=String(t.ticket||'').trim();
           return dm(t.date)+': '+(nm?nm+(tk?' ('+tk+')':'')+'. ':(tk?tk+'. ':''))+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u0?' '+u0:'')}
-        if(!x.noQ&&hasQty(t)&&!/số lượng/i.test(n)){const u=unitOf(t);n+=(/[.;:,!?]$/.test(n)?' ':'. ')+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u?' '+u:'')}
+        if(!x.noQ&&hasQty(t)&&!/số lượng\s*:\s*\d/i.test(n)&&!(x.lab&&n.toLowerCase().replace(/\s+/g,' ').indexOf(x.lab.toLowerCase()+':')>=0)){const u=unitOf(t);n+=(/[.;:,!?]$/.test(n)?' ':'. ')+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u?' '+u:'')}
         /* Mỗi ghi chú luôn bắt đầu bằng ngày thực hiện (dd/mm) để phân biệt việc lặp lại */
         if(n)n=dm(t.date)+': '+n;
         return n};
