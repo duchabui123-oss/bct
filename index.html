@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.86 -->
+<!-- Phiên bản 1.88 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,6 +44,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .muted{color:var(--ink-2);font-size:.88rem;margin:6px 0}
+.listhint{margin:10px 2px 8px;padding:7px 12px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;color:var(--ink);font-size:.88rem}
+.listhint::before{content:'\25B8\00a0';color:var(--accent);font-weight:700}
 [hidden]{display:none!important}
 
 .app{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
@@ -364,7 +366,7 @@ let auth=null,db=null;
 /* ===== Trạng thái ===== */
 const S={units:[],msOpen:new Set(),msQ:{},user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),groups:[],tplGroup:'',wGroup:'',mGroup:'',tplOpen:new Set(),groupsReady:false,effKey:'',qfSOpen:false,qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
   loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
-  editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',collapsed:new Set(),busyAuth:false,publicSignup:false,rstOpen:'',rstPw:'',rstMsg:'',rstOk:false,rstBusy:false,rstArm:false,
+  editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',expanded:new Set(),busyAuth:false,publicSignup:false,rstOpen:'',rstPw:'',rstMsg:'',rstOk:false,rstBusy:false,rstArm:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
 let unsubs=[],weekUnsubs=[],monthUnsubs=[],msgTimer=null;
 const notePending={},noteTimers={};
@@ -786,6 +788,15 @@ function renderQuickSelects(){
   sel.value=S.qTpl;applyTplMode();
 }
 function setQuickUnit(u){const us=$('q-unit');if(!us)return;u=canonUnit(u);us.innerHTML=unitOpts(u||'');us.value=u||''}
+/* Sau mỗi thao tác trên trang Báo cáo: các nhóm luôn thu gọn và mục "Chọn việc có sẵn" về "Việc khác (nhập tên mới)" */
+function tplReset(){
+  if(S.editing)return;
+  S.qTpl='';S.qSysPicked=false;
+  const sel=$('q-tpl');if(!sel)return;sel.value='';
+  qSysBlank(false);if(S.qSystem&&[...$('q-system').options].some(o=>o.value===S.qSystem))$('q-system').value=S.qSystem;
+  setQuickUnit('');applyTplMode();
+}
+function calmReport(){S.expanded.clear();tplReset()}
 const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
 function applyTplMode(){
   const f=$('q-titlef');if(!f)return;const tp=curTpl();f.hidden=!!tp;
@@ -820,10 +831,11 @@ function bySystem(list){
   if(rest.length)groups.push({id:'_x',name:'(Hệ thống đã xóa)',list:rest});
   let h=groups.map(g=>{
     const c=counts(g.list),pct=Math.round(c.done*100/g.list.length);
-    return '<details class="sys" data-sys="'+esc(g.id)+'"'+(S.collapsed.has(g.id)?'':' open')+'><summary><h2>'+esc(g.name)+'</h2>'
+    return '<details class="sys" data-sys="'+esc(g.id)+'"'+(S.expanded.has(g.id)?' open':'')+'><summary><h2>'+esc(g.name)+'</h2>'
      +'<span class="head-end">'+(c.block?'<span class="flag">'+c.block+' vướng</span>':'')+'<span class="mini" aria-hidden="true"><i style="width:'+pct+'%"></i></span>'
      +'<span class="count mono">'+c.done+'/'+g.list.length+'</span></span></summary><div>'+g.list.map(t=>row(t,'system')).join('')+'</div></details>';
   }).join('');
+  if(groups.length)h='<p class="listhint">Bấm vào tên từng hệ thống bên dưới để xem chi tiết công việc.</p>'+h;
   const hs=hiddenSys(list),empty=S.systems.filter(s=>s.active!==false&&!seen.has(s.id)&&!hs.has(s.id)).map(s=>s.name);
   if(groups.length&&empty.length)h+='<p class="muted">Chưa có việc: '+empty.map(esc).join(', ')+'.</p>';
   return h;
@@ -954,19 +966,20 @@ async function submitQuick(){
     result:$('q-result').value.trim(),ticket:$('q-ticket').value.trim(),note:$('q-note').value.trim(),ts:S.editing&&S.editing.ts?S.editing.ts:Date.now()};
   if(qty!==null){body.qty=qty;const un=$('q-unit').value;if(un)body.unit=un}
   $('q-save').disabled=true;msg.className='msg';msg.textContent='Đang lưu…';
+  S.expanded.clear();
   try{
     await setDoc(doc(db,'tasks',id),body);
     for(let i=1;i<dates.length;i++)await setDoc(doc(db,'tasks',newId()),Object.assign({},body,{date:dates[i],ts:Date.now()+i}));
     S.qDate=body.date;S.qSystem=body.system;S.qType=body.type;S.qStatus=body.status;
     const wasEdit=!!S.editing;
-    resetQuick(true);renderQuickSelects();
+    resetQuick(true);S.qTpl='';renderQuickSelects();calmReport();renderReport();
     msg.className='msg ok';msg.textContent=wasEdit?'Đã lưu thay đổi.':(dates.length>1?'Đã thêm '+dates.length+' việc (mỗi ngày một việc). Nhập việc tiếp theo.':'Đã thêm. Nhập việc tiếp theo.');
     const g=$('q-goto'),wa=iso(S.weekStart),wb=iso(addDays(S.weekStart,6));
     if(body.date<wa||body.date>wb){
       msg.textContent=(wasEdit?'Đã chuyển việc sang ngày ':'Đã thêm việc vào ngày ')+dmy(body.date)+' (tuần '+weekNo(mondayOf(parse(body.date)))+'), nên không hiện ở tuần đang xem.';
       g.dataset.d=body.date;g.hidden=false;
     }else g.hidden=true;
-    (S.qTpl?$('q-qty'):$('q-title')).focus();
+    $('q-title').focus();
   }catch(e){msg.className='msg';msg.textContent=fsMsg(e)}
   $('q-save').disabled=false;
 }
@@ -1027,7 +1040,7 @@ function subMonth(){
     canonTitles(list);canonTypes(list);S.mTasks=list;S.loadedM=true;renderStats();try{renderUnits();refreshTplUses()}catch(e){}
   }));
 }
-function setMonth(d){S.month=d;S.mTasks=[];subMonth();renderStats()}
+function setMonth(d){S.expanded.clear();S.month=d;S.mTasks=[];subMonth();renderStats()}
 function monthTasks(){
   let l=S.mTasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
   if(S.mWho!=='all')l=l.filter(t=>t.uid===S.mWho);else if(S.mGroup)l=l.filter(t=>userGroup(t.uid).indexOf(S.mGroup)>=0);
@@ -1062,7 +1075,7 @@ function dayChart(list){
   }).join('')+'</div></div><p class="muted">Ngày cao nhất: '+max+' việc. Di chuột (hoặc chạm) vào cột để xem số việc từng ngày.</p>';
 }
 /* Mỗi mục thống kê là một khối thu gọn/mở rộng giống nhóm hệ thống ở màn hình Báo cáo */
-const statBox=(key,title,inner)=>'<details class="sys stbox" data-sys="'+key+'"'+(S.collapsed.has(key)?'':' open')+'><summary><h2>'+title+'</h2></summary><div class="stbody">'+inner+'</div></details>';
+const statBox=(key,title,inner)=>'<details class="sys stbox" data-sys="'+key+'"'+(S.expanded.has(key)?' open':'')+'><summary><h2>'+title+'</h2></summary><div class="stbody">'+inner+'</div></details>';
 function renderStats(){
   if(!$('stats-body'))return;
   const m=S.month,now=new Date();
@@ -1074,7 +1087,7 @@ function renderStats(){
   let h='<section class="summary"><div class="sum-line"><span class="mono">'+n+'</span> việc · <span class="mono">'+c.done+'</span> hoàn thành (<span class="mono">'+pct+'%</span>) · <span class="mono">'+days+'</span> ngày có việc</div>'
     +'<div class="bar-s" role="img" aria-label="Tỷ lệ trạng thái trong tháng">'+STATUS.map(s=>c[s.id]?'<i class="b-'+s.id+'" style="width:'+(c[s.id]*100/n)+'%"></i>':'').join('')+'</div>'
     +'<ul class="legend">'+STATUS.map(s=>'<li><span class="dot b-'+s.id+'"></span>'+s.label+' <span class="mono">'+c[s.id]+'</span></li>').join('')+'</ul></section>';
-  h+='<div class="list">'+statBox('st-sys','Theo hệ thống',statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)')));
+  h+='<p class="listhint">Bấm vào tên từng mục bên dưới để xem chi tiết thống kê.</p><div class="list">'+statBox('st-sys','Theo hệ thống',statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)')));
   h+=statBox('st-type','Theo loại việc',statTable('Loại việc',groupRows(list,'type',S.types,'Khác')));
   const qv=qtyView(list,true);
   const checked=c=>qv.isDefault?c.n>0:qv.sel.has(c.key);
@@ -2067,8 +2080,9 @@ async function moveCatalog(kind,id,dir){
 
 /* ===== Sự kiện ===== */
 function setWeek(d){
-  S.weekStart=d;S.editing=null;S.tasks=[];S.notes=[];
+  S.expanded.clear();S.weekStart=d;S.editing=null;S.tasks=[];S.notes=[];
   if($('quick'))resetQuick();
+  tplReset();
   const rp=$('report-panel');if(rp)rp.hidden=true;
   const ss=$('save-state');if(ss)ss.textContent='';
   subWeek();renderQuickSelects();renderReport();renderNotes();
@@ -2109,6 +2123,7 @@ root.addEventListener('click',async e=>{
     if(act==='tab'){
       const prevTab=S.tab;
       S.tab=b.dataset.t;
+      if(prevTab!==S.tab||S.tab==='report'||S.tab==='stats'){S.expanded.clear();if(S.tab==='report')tplReset()} /* luôn thu gọn khi vào lại trang */
       /* Bấm menu Báo cáo hoặc đổi sang tab khác rồi quay lại: về trang của chính mình (có form thêm việc), đóng các bảng đang mở */
       if(S.tab==='report'||prevTab!==S.tab){
         S.who=S.user.uid;S.mWho=S.user.uid;S.wGroup='';S.mGroup='';
@@ -2136,13 +2151,13 @@ root.addEventListener('click',async e=>{
     if(act==='wk-today'){setWeek(mondayOf(new Date()));return}
     if(act==='view'){
       S.view=b.dataset.v;
-      document.querySelectorAll('[data-act="view"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===S.view)));renderReport();return;
+      document.querySelectorAll('[data-act="view"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===S.view)));calmReport();renderReport();return;
     }
-    if(act==='sum-open'){const k=b.dataset.k,pn=$('sum-'+k);pn.hidden=false;renderSummary(k);pn.scrollIntoView({block:'start'});return}
+    if(act==='sum-open'){const k=b.dataset.k,pn=$('sum-'+k);calmReport();if(k==='week')renderReport();pn.hidden=false;renderSummary(k);pn.scrollIntoView({block:'start'});return}
     if(act==='sum-close'){$('sum-'+b.dataset.k).hidden=true;return}
     if(act==='sum-copy'){await copySummary(b.dataset.k);return}
     if(act==='x-xlsx'||act==='x-pdf'){exportReport(b.dataset.k,act==='x-xlsx'?'xlsx':'pdf');return}
-    if(act==='copy'){const p=$('report-panel');$('report-text').value=reportText();p.hidden=false;$('report-msg').textContent='';p.scrollIntoView({block:'center'});copyReport();return}
+    if(act==='copy'){calmReport();renderReport();const p=$('report-panel');$('report-text').value=reportText();p.hidden=false;$('report-msg').textContent='';p.scrollIntoView({block:'center'});copyReport();return}
     if(act==='copy-now'){await copyReport();return}
     if(act==='report-close'){$('report-panel').hidden=true;return}
     if(act==='m-prev'){setMonth(new Date(S.month.getFullYear(),S.month.getMonth()-1,1));return}
@@ -2162,7 +2177,7 @@ root.addEventListener('click',async e=>{
       const rowEl=b.closest('.row'),t=S.tasks.find(x=>x.id===(rowEl&&rowEl.dataset.id));if(!t||!isMine(t))return;
       if(act==='edit'){startEdit(t);return}
       if(b.dataset.armed){
-        try{await deleteDoc(doc(db,'tasks',t.id))}catch(err){flash(fsMsg(err))}
+        S.expanded.clear();try{await deleteDoc(doc(db,'tasks',t.id))}catch(err){flash(fsMsg(err))}
       }else{
         b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');
         setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},3000);
@@ -2304,7 +2319,7 @@ root.addEventListener('change',async e=>{
     if(t.id==='m-group'){S.mGroup=t.value;renderStats();return}
     if(t.matches&&t.matches('select[data-status]')){
       const task=S.tasks.find(x=>x.id===t.dataset.status);if(!task||!isMine(task)){renderReport();return}
-      try{await updateDoc(doc(db,'tasks',task.id),{status:t.value})}catch(err){flash(fsMsg(err));renderReport()}return;
+      S.expanded.clear();try{await updateDoc(doc(db,'tasks',task.id),{status:t.value});tplReset()}catch(err){flash(fsMsg(err));renderReport()}return;
     }
     if(t.matches&&t.matches('input[data-gsys]')){
       const gid=t.dataset.gsys,g=S.groups.find(x=>x.id===gid);if(!g)return;
@@ -2403,7 +2418,7 @@ root.addEventListener('toggle',e=>{
   if(e.target&&e.target.dataset&&e.target.dataset.mk){const i=e.target.dataset.mk;e.target.open?S.msOpen.add(i):S.msOpen.delete(i);if(e.target.open){const q=e.target.querySelector('.msel-q');if(q)setTimeout(()=>q.focus(),0)}return}
   if(e.target&&e.target.dataset&&e.target.dataset.tgid){const i=e.target.dataset.tgid;e.target.open?S.tplOpen.add(i):S.tplOpen.delete(i);return}
   const d=e.target;if(!d.classList||!d.classList.contains('sys'))return;
-  if(d.open)S.collapsed.delete(d.dataset.sys);else S.collapsed.add(d.dataset.sys);
+  if(d.open)S.expanded.add(d.dataset.sys);else S.expanded.delete(d.dataset.sys);
 },true);
 root.addEventListener('submit',async e=>{
   e.preventDefault();
