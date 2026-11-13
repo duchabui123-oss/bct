@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.91 -->
+<!-- Phiên bản 1.92 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1219,8 +1219,8 @@ function summaryBlocks(list,grp){
         /* Phiếu có số lượng mà không ghi chú: vẫn liệt kê, lấy tên đầu việc (kèm mã phiếu nếu có) làm nội dung để nhận ra việc nào: "dd/mm: Tên đầu việc. Số lượng: x Đơn vị" */
         if(!n){if(x.noQ||!hasQty(t))return '';const u0=unitOf(t),nm=String(x.nm||t.title||'').trim().replace(/[.\s]+$/,''),tk=String(t.ticket||'').trim();
           return dm(t.date)+': '+(nm?nm+(tk?' ('+tk+')':'')+'. ':(tk?tk+'. ':''))+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u0?' '+u0:'')}
-        /* Mã phiếu/Eof/Email: ghép ngay sau nội dung ghi chú, trước phần số lượng (bỏ qua nếu ghi chú đã có sẵn mã đó) */
-        {const tk=String(t.ticket||'').trim();if(tk&&n.toLowerCase().indexOf(tk.toLowerCase())<0)n+=(/[.;:,!?]$/.test(n)?' ':'. ')+tk}
+        /* Mã phiếu/Eof/Email: ghép ngay sau nội dung ghi chú, trong ngoặc đơn, trước phần số lượng (bỏ qua nếu ghi chú đã có sẵn mã đó) */
+        {const tk=String(t.ticket||'').trim();if(tk&&n.toLowerCase().indexOf(tk.toLowerCase())<0)n=n.replace(/[.\s]+$/,'')+' ('+tk+')'}
         if(!x.noQ&&hasQty(t)&&!/số lượng\s*:\s*\d/i.test(n)&&!(x.lab&&n.toLowerCase().replace(/\s+/g,' ').indexOf(x.lab.toLowerCase()+':')>=0)){const u=unitOf(t);n+=(/[.;:,!?]$/.test(n)?' ':'. ')+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u?' '+u:'')}
         /* Mỗi ghi chú luôn bắt đầu bằng ngày thực hiện (dd/mm) để phân biệt việc lặp lại */
         if(n)n=dm(t.date)+': '+n;
