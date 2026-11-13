@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.88 -->
+<!-- Phiên bản 1.91 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -97,6 +97,9 @@ textarea{resize:vertical;min-height:4.5rem}
 .panel h2{font-family:var(--font-display);font-weight:600;font-size:1.15rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:12px}
 .grid .wide{grid-column:1/-1}
+.np{display:flex;flex-direction:column;gap:6px}.np-bar{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-size:.84rem}.np-bar .btn.link:disabled{opacity:.45;cursor:default;text-decoration:none}
+.np-panel{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:8px}.np-panel input{width:100%;margin-bottom:6px}.np-list{max-height:240px;overflow:auto}.np-g{font-weight:700;font-style:italic;font-size:.8rem;color:var(--ink-2);margin:8px 4px 2px}
+.np-i{display:flex;width:100%;justify-content:space-between;gap:10px;text-align:left;background:transparent;border:0;border-radius:8px;padding:6px 8px;font:inherit;color:var(--ink);cursor:pointer}.np-i:hover,.np-i:focus-visible{background:var(--accent-soft)}.np-c{color:var(--accent);font-weight:600;font-size:.78rem;white-space:nowrap}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 /* Form Thêm việc gọn: hàng 1 là 5 ô, hàng 2 là việc có sẵn + đầu việc, hàng 3 là các mục mở rộng cùng nút lưu */
 .qq{display:flex;gap:6px;min-width:0}.qq input{flex:1 1 52%;min-width:0}.qq select{flex:1 1 48%;min-width:0}
@@ -627,7 +630,9 @@ function buildShell(){
   +'<details class="more" id="q-more"><summary>Kết quả, mã phiếu, ghi chú</summary><div class="grid">'
   +'<label class="field"><span>Kết quả / số liệu</span><input id="q-result" maxlength="400" autocomplete="off" placeholder="Ví dụ: 12/12 phiếu đã đóng"></label>'
   +'<label class="field"><span>Mã phiếu/Eof/Email</span><input id="q-ticket" maxlength="120" autocomplete="off" placeholder="Ví dụ: INC-2026-0001"></label>'
-  +'<label class="field wide"><span>Ghi chú</span><textarea id="q-note" rows="2" maxlength="800" placeholder="Vướng mắc, người phối hợp, đường dẫn"></textarea></label></div></details>'
+  +'<label class="field wide"><span>Ghi chú</span><textarea id="q-note" rows="2" maxlength="800" placeholder="Vướng mắc, người phối hợp, đường dẫn"></textarea></label>'
+  +'<div class="field wide np" id="q-np" hidden><div class="np-bar"><span class="muted">Chép nhanh tên việc mẫu vào ghi chú:</span><button type="button" class="btn link" data-act="np-cur" id="q-np-cur" disabled>Chép tên việc đang chọn</button><button type="button" class="btn link" data-act="np-toggle" id="q-np-btn" aria-expanded="false">Gợi ý tên việc mẫu ▾</button></div>'
+  +'<div class="np-panel" id="q-np-panel" hidden><input id="q-nps" type="search" autocomplete="off" placeholder="Gõ để lọc tên việc mẫu" aria-label="Lọc tên việc mẫu"><div class="np-list" id="q-np-list"></div></div></div></div></details>'
   +'<div class="actions"><span class="msg" id="q-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" id="q-goto" data-act="goto-week" hidden>Xem tuần đó</button><button type="button" class="btn link" id="q-cancel" data-act="cancel-edit" hidden>Hủy sửa</button><button type="submit" class="btn primary" id="q-save">Thêm việc</button></div></div></form>'
 
   +'<div id="list" class="list"></div>'
@@ -783,6 +788,9 @@ function renderQuickSelects(){
   const rest=tl.filter(x=>!used.has(x.id)&&!x.system),odd=tl.filter(x=>!used.has(x.id)&&x.system);
   if(rest.length)og+='<optgroup label="Dùng chung">'+rest.map(o1).join('')+'</optgroup>';
   if(odd.length)og+='<optgroup label="Khác">'+odd.map(o1).join('')+'</optgroup>';
+  S.npList=[];S.systems.forEach(sy=>tl.filter(x=>x.system===sy.id).forEach(x=>S.npList.push({id:x.id,name:x.name,g:sy.name})));
+  tl.filter(x=>!used.has(x.id)&&!x.system).forEach(x=>S.npList.push({id:x.id,name:x.name,g:'Dùng chung'}));tl.filter(x=>!used.has(x.id)&&x.system).forEach(x=>S.npList.push({id:x.id,name:x.name,g:'Khác'}));
+  {const np=$('q-np');if(np)np.hidden=!S.npList.length}
   sel.innerHTML='<option value="">Việc khác (nhập tên mới)</option>'+og;
   if(!tl.some(x=>x.id===S.qTpl))S.qTpl='';
   sel.value=S.qTpl;applyTplMode();
@@ -798,8 +806,23 @@ function tplReset(){
 }
 function calmReport(){S.expanded.clear();tplReset()}
 const curTpl=()=>S.qTpl?S.tpls.find(x=>x.id===S.qTpl&&x.active!==false):null;
+/* Gợi ý tên việc mẫu để chép vào ô Ghi chú (đỡ phải gõ lại) */
+const npNorm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase();
+function npRender(){
+  const l=$('q-np-list');if(!l)return;const q=npNorm($('q-nps').value).trim(),a=(S.npList||[]).filter(x=>!q||npNorm(x.name).indexOf(q)>=0);
+  let g='',h='';a.forEach(x=>{if(x.g!==g){g=x.g;h+='<div class="np-g">'+esc(g)+'</div>'}h+='<button type="button" class="np-i" data-act="np-ins" data-id="'+esc(x.id)+'"><span>'+esc(x.name)+'</span><span class="np-c">Chép</span></button>'});
+  l.innerHTML=h||'<p class="muted" style="margin:6px 4px">Không có việc mẫu phù hợp.</p>';
+}
+function npInsert(name){
+  const ta=$('q-note');if(!ta||!name)return;
+  const v=ta.value,a=ta.selectionStart==null?v.length:ta.selectionStart,b=ta.selectionEnd==null?a:ta.selectionEnd,bef=v.slice(0,a),aft=v.slice(b),sp=bef&&!/\s$/.test(bef)?' ':'';
+  const nv=(bef+sp+name+aft).slice(0,ta.maxLength||800),pos=Math.min((bef+sp+name).length,nv.length);
+  ta.value=nv;ta.focus();ta.setSelectionRange(pos,pos);
+}
+function npClose(){const p=$('q-np-panel');if(p)p.hidden=true;const b=$('q-np-btn');if(b)b.setAttribute('aria-expanded','false')}
 function applyTplMode(){
   const f=$('q-titlef');if(!f)return;const tp=curTpl();f.hidden=!!tp;
+  {const nb=$('q-np-cur');if(nb){nb.disabled=!tp;nb.title=tp?tp.name:'Chọn việc có sẵn ở trên để dùng nút này'}}
   const qs=$('q-tpl');if(qs)qs.classList.toggle('tpl-new',!tp);
   const ql=$('q-qty').closest('label');ql.hidden=!!(tp&&tp.noQty);ql.firstElementChild.textContent=(tp&&tp.label?tp.label:'Số lượng');ql.firstElementChild.title='Không bắt buộc';
 }
@@ -925,6 +948,7 @@ function queueNote(){
 /* ===== Thêm / sửa / xóa việc ===== */
 function resetQuick(keep){
   S.editing=null;$('q-title').value='';$('q-result').value='';$('q-ticket').value='';$('q-note').value='';$('q-qty').value='';setQuickUnit(curTpl()?curTpl().unit||'':'');
+  npClose();
   $('q-multi').hidden=false;$('q-save').textContent='Thêm việc';$('q-cancel').hidden=true;$('quick').querySelector('h2').textContent='Thêm việc';
   if(!keep){$('q-msg').textContent='';$('q-goto').hidden=true}
 }
@@ -1195,6 +1219,8 @@ function summaryBlocks(list,grp){
         /* Phiếu có số lượng mà không ghi chú: vẫn liệt kê, lấy tên đầu việc (kèm mã phiếu nếu có) làm nội dung để nhận ra việc nào: "dd/mm: Tên đầu việc. Số lượng: x Đơn vị" */
         if(!n){if(x.noQ||!hasQty(t))return '';const u0=unitOf(t),nm=String(x.nm||t.title||'').trim().replace(/[.\s]+$/,''),tk=String(t.ticket||'').trim();
           return dm(t.date)+': '+(nm?nm+(tk?' ('+tk+')':'')+'. ':(tk?tk+'. ':''))+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u0?' '+u0:'')}
+        /* Mã phiếu/Eof/Email: ghép ngay sau nội dung ghi chú, trước phần số lượng (bỏ qua nếu ghi chú đã có sẵn mã đó) */
+        {const tk=String(t.ticket||'').trim();if(tk&&n.toLowerCase().indexOf(tk.toLowerCase())<0)n+=(/[.;:,!?]$/.test(n)?' ':'. ')+tk}
         if(!x.noQ&&hasQty(t)&&!/số lượng\s*:\s*\d/i.test(n)&&!(x.lab&&n.toLowerCase().replace(/\s+/g,' ').indexOf(x.lab.toLowerCase()+':')>=0)){const u=unitOf(t);n+=(/[.;:,!?]$/.test(n)?' ':'. ')+(x.lab||'Số lượng')+': '+qtyText(t.qty)+(u?' '+u:'')}
         /* Mỗi ghi chú luôn bắt đầu bằng ngày thực hiện (dd/mm) để phân biệt việc lặp lại */
         if(n)n=dm(t.date)+': '+n;
@@ -1584,9 +1610,8 @@ async function buildPdfBlob(html){
     const total=Math.ceil(Math.max(d.documentElement.scrollHeight,d.body.getBoundingClientRect().bottom))+8; /* dư vài px: chữ dựng ảnh có thể cao hơn lúc đo */
     /* các dòng chữ: để chỗ ngắt trang không cắt ngang một dòng */
     const lines=[];const tw=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT);let nd;
-    while((nd=tw.nextNode())){if(!nd.nodeValue.trim())continue;const r=d.createRange();r.selectNodeContents(nd);Array.from(r.getClientRects()).forEach(q=>{if(q.height>0)lines.push([q.top,q.bottom])})}
+    while((nd=tw.nextNode())){if(!nd.nodeValue.trim())continue;if(nd.parentElement&&nd.parentElement.closest('.stk td'))continue; /* dòng trong Bảng tổng hợp: xử lý riêng theo từng ô */const r=d.createRange();r.selectNodeContents(nd);Array.from(r.getClientRects()).forEach(q=>{if(q.height>0)lines.push([q.top,q.bottom])})}
     /* các dòng của bảng danh sách việc (và dòng tiêu đề bảng): không ngắt trang giữa một dòng, trừ khi dòng cao hơn nửa trang */
-    d.querySelectorAll('table.stk .ln').forEach(el=>{const q=el.getBoundingClientRect();if(q.height>0&&q.height<CH*0.5)lines.push([q.top+d.defaultView.scrollY,q.bottom+d.defaultView.scrollY])});
     d.querySelectorAll('table.tk tr, h2').forEach(el=>{const q=el.getBoundingClientRect();if(q.height>0&&q.height<CH*0.5)lines.push([q.top+d.defaultView.scrollY,q.bottom+d.defaultView.scrollY])});
     d.querySelectorAll('table.tk').forEach(t=>{const h2=t.previousElementSibling,r1=t.querySelectorAll('tr')[1];if(h2&&h2.tagName==='H2'&&r1){const a=h2.getBoundingClientRect(),b=r1.getBoundingClientRect(),sy=d.defaultView.scrollY;lines.push([a.top+sy,b.bottom+sy])}});
     const css=(d.querySelector('style')?d.querySelector('style').textContent:'').replace(/@page\{[^}]*\}/g,'').replace(/(^|\})\s*body\{[^}]*\}/g,'$1');
@@ -1602,7 +1627,7 @@ async function buildPdfBlob(html){
       let first=null;
       kids.forEach(k=>{
         if(out(k)){hide(k.el);return}
-        if(k.rows)k.rows.forEach(r=>{if(out(r)){hide(r.el);return}r.units.forEach(u=>{if(out(u))hide(u.el)})});
+        if(k.rows)k.rows.forEach(r=>{if(out(r)){hide(r.el);return}if(!r.units.length)return;let vis=0;r.units.forEach(u=>{if(u.t<y0-0.5||u.t>=c-0.5)hide(u.el);else vis++});if(!vis)hide(r.el)}); /* mỗi dòng việc thuộc về trang chứa đầu dòng đó: hai cột lệch nhau vẫn ngắt trang được */
         if(first===null)first=k.el;
       });
       let mt0='';if(first&&y0>0.5){mt0=first.style.marginTop;first.style.marginTop='0'}
@@ -1638,7 +1663,7 @@ async function buildPdfBlob(html){
         }
         const bot=await bottomInk(y,last?1e9:c);
         const lim=PDF_M+CH;
-        if(bot<=lim+0.5||capi<=160||tries>=6)break;
+        if(bot<=lim+0.5||capi<=160||tries>=10)break;
         capi-=Math.max(16,Math.ceil((bot-lim)*1.3));
       }
       cuts.push([y,c]);y=c;if(last)break;
@@ -2097,6 +2122,9 @@ root.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const act=b.dataset.act;
   try{
+    if(act==='np-toggle'){const p=$('q-np-panel');p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));if(!p.hidden){$('q-nps').value='';npRender();$('q-nps').focus()}return}
+    if(act==='np-cur'){const tp=curTpl();if(tp)npInsert(tp.name);return}
+    if(act==='np-ins'){const x=(S.npList||[]).find(y=>y.id===b.dataset.id);if(x){npInsert(x.name);npClose()}return}
     if(act==='ms-bulk'){
       const d=b.closest('details.msel'),key=b.dataset.mk,all=[...d.querySelectorAll('.msel-p input[type=checkbox]')];
       const idOf=i=>i.dataset.sid||i.dataset.gid||i.value;
@@ -2410,7 +2438,7 @@ root.addEventListener('change',async e=>{
     if(t.id==='q-type'){S.qType=t.value}
   }catch(err){flash(fsMsg(err))}
 });
-root.addEventListener('input',e=>{
+root.addEventListener('input',e=>{if(e.target&&e.target.id==='q-nps')npRender();
   if(e.target&&e.target.id==='imp-q'){S.impQ=e.target.value;S.impFocus=true;renderImport();S.impFocus=false;return}
   if(['n-highlights','n-issues','n-plan'].includes(e.target.id))queueNote();
 });
