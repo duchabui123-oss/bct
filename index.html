@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.93 -->
+<!-- Phiên bản 1.94 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -109,6 +109,12 @@ textarea{resize:vertical;min-height:4.5rem}
 .cr-st{border-radius:999px;padding:.1rem .65rem;font-size:.78rem;font-weight:600;background:var(--wait-soft);color:var(--wait)}
 .cr-st-done{background:var(--done-soft);color:var(--done)}.cr-st-dev,.cr-st-it,.cr-st-uat,.cr-st-analysis{background:var(--doing-soft);color:var(--doing)}.cr-st-cancel{background:var(--wait-soft);color:var(--wait);text-decoration:line-through}
 .cr-flag{border-radius:999px;padding:.1rem .6rem;font-size:.78rem;font-weight:700}.cr-flag.late{background:var(--block-soft);color:var(--block)}.cr-flag.soon{background:var(--doing-soft);color:var(--doing)}
+.cr-vw{display:inline-flex;gap:6px;margin-right:10px}
+@media(min-width:1180px){#tab-cr.wide{width:min(1500px,calc(100vw - 40px));max-width:none;margin-left:50%;transform:translateX(-50%)}}
+.crt-wrap{overflow-x:auto}.crt{width:100%;min-width:980px;table-layout:fixed;border-collapse:collapse;font-size:.84rem}
+.crt th,.crt td{border:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top;word-break:break-word}
+.crt th{background:var(--surface-2,var(--accent-soft));font-weight:600;text-align:center;font-size:.8rem}.crt td.c{text-align:center;white-space:nowrap}.crt th:first-child{writing-mode:initial}
+.crt td .cr-st,.crt td .cr-flag{display:inline-block;margin-top:3px}.crt-act{display:flex;flex-direction:column;gap:4px}.crt-tl td{background:var(--accent-soft)}
 .cr-act{display:flex;flex-direction:column;gap:6px;align-items:stretch}.cr-act .btn.danger{background:var(--block);color:#fff;border-color:var(--block)}
 .cr-tl{margin:8px 0 0;padding:8px 10px 8px 12px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;list-style:none;font-size:.88rem;display:flex;flex-direction:column;gap:8px}
 .cr-tst{border-radius:999px;padding:.05rem .5rem;font-size:.74rem;font-weight:600;color:var(--c);background:var(--cs)}.cr-tn{margin:2px 0 0;color:var(--ink)}
@@ -515,7 +521,7 @@ async function boot(){
   teardown();
   S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
   S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sTypes=new Set();S.sTpls=new Set();S.sTq='';S.sFilt=false;S.sFocus='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
-  S.crs=[];S.crLoaded=false;S.crNoRule=false;S.crF={q:'',st:'',mo:'',who:'',flag:''};S.crOpenTl=new Set();S.crLinked={};S.crEdit=null;
+  S.crs=[];S.crLoaded=false;S.crNoRule=false;S.crF={q:'',st:'',mo:'',who:'',flag:''};S.crOpenTl=new Set();S.crLinked={};S.crEdit=null;S.crWhoInit=false;S.crView=(()=>{try{const v=localStorage.getItem('bct-crview');if(v==='table'||v==='card')return v}catch(e){}return window.innerWidth>=900?'table':'card'})();
   buildShell();
   const isAdmin=S.profile.role==='admin';
   unsubs.push(listen(collection(db,'users'),snap=>{
@@ -1800,8 +1806,11 @@ function renderCrFilters(){
   st.innerHTML='<option value="">Mọi trạng thái</option>'+CR_ST.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('');keep(st,S.crF.st);
   const months=[...new Set(S.crs.map(crMonth))].sort().reverse();
   mo.innerHTML='<option value="">Mọi tháng tạo</option>'+months.map(k=>'<option value="'+k+'">'+esc(crMonthName(k))+'</option>').join('');keep(mo,S.crF.mo);if(S.crF.mo&&mo.value!==S.crF.mo)S.crF.mo='';
-  if(wh){const us=[...new Set(S.crs.map(c=>c.uid))].map(u=>[u,userName(u)]).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
-    wh.innerHTML='<option value="">Mọi người phụ trách</option>'+us.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');keep(wh,S.crF.who);wh.closest('label').hidden=!isAdminUser()}
+  if(wh){
+    if(isAdminUser()&&!S.crWhoInit){S.crWhoInit=true;S.crF.who=S.user.uid}
+    const ids=new Set(S.users.map(u=>u.uid));ids.add(S.user.uid);S.crs.forEach(c=>ids.add(c.uid));
+    const us=[...ids].map(u=>[u,userName(u)+(u===S.user.uid?' (tôi)':'')]).sort((a,b)=>(a[0]===S.user.uid?-1:b[0]===S.user.uid?1:a[1].localeCompare(b[1],'vi')));
+    wh.innerHTML='<option value="">Tất cả mọi người</option>'+us.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');keep(wh,S.crF.who);wh.closest('label').hidden=!isAdminUser()}
   const dl=$('cr-unit-dl');if(dl){const u=[...new Set(CR_UNITS.concat(S.crs.map(c=>c.unit).filter(Boolean)))];dl.innerHTML=u.map(x=>'<option value="'+esc(x)+'">').join('')}
 }
 function crTimeline(c){
@@ -1813,11 +1822,35 @@ function crTimeline(c){
     +(t.note?'<div class="cr-tn">'+esc(t.note)+'</div>':'')+(t.result?'<div class="cr-tn muted">Kết quả: '+esc(t.result)+'</div>':'')
     +'<button type="button" class="btn link sm" data-act="cr-useprog" data-id="'+esc(c.id)+'" data-tid="'+esc(t.id)+'">Dùng làm tiến độ hiện tại</button></li>').join('')+'</ul>';
 }
+const crHtkh=c=>c.htkh||crOwnerName(c);
+const crNl=v=>esc(v||'').replace(/\n/g,'<br>');
+function crTable(a){
+  const heads=['STT','Nội dung','Mã IT 360','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Tiến độ hiện tại','Đơn vị thực hiện','Nhân sự phối hợp','TT HTKH','Ngày hoàn thành',''];
+  const w=[4,17,10,7,7,7.5,19,7,9,6,7,7.5];
+  let h='<div class="crt-wrap"><table class="crt"><colgroup>'+w.map(x=>'<col style="width:'+x+'%">').join('')+'</colgroup><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
+  a.forEach((c,i)=>{
+    const late=crLate(c),soon=crSoon(c),open=S.crOpenTl.has(c.id);
+    const flag=late?'<span class="cr-flag late">Quá hạn '+crLateDays(c)+' ngày</span>':soon?'<span class="cr-flag soon">Sắp đến hạn</span>':'';
+    const link=/^https?:\/\//i.test(c.link||'')?'<a class="cr-lk" href="'+esc(c.link)+'" target="_blank" rel="noopener noreferrer">'+esc(c.code)+' ↗</a>':esc(c.code);
+    h+='<tr class="cr" data-id="'+esc(c.id)+'"><td class="c">'+(i+1)+'</td>'
+      +'<td><b>'+esc(c.title)+'</b><div class="cr-meta">'+esc([c.kind||'CR',crSysName(c.system)].concat(isAdminUser()?['Phụ trách: '+crOwnerName(c)]:[]).join(' · '))+'</div></td>'
+      +'<td class="mono">'+link+'<div><span class="cr-st cr-st-'+esc(c.status||'new')+'">'+esc(crStName(c.status))+'</span></div>'+(flag?'<div>'+flag+'</div>':'')+'</td>'
+      +'<td class="c">'+esc(crFmt(c.createdDate))+'</td><td class="c">'+esc(crFmt(c.reviewDate))+'</td><td class="c">'+esc(crFmt(c.dueDate))+'</td>'
+      +'<td>'+(c.progress?crNl(c.progress):'<span class="muted">Chưa ghi tiến độ.</span>')+'</td>'
+      +'<td>'+crNl(c.unit)+'</td><td>'+crNl(c.coop)+'</td><td>'+esc(crHtkh(c))+'</td><td class="c">'+esc(crFmt(c.doneDate))+'</td>'
+      +'<td class="crt-act"><button type="button" class="btn sm" data-act="cr-edit" data-id="'+esc(c.id)+'">Sửa</button>'
+      +'<button type="button" class="btn sm" data-act="cr-addtask" data-id="'+esc(c.id)+'">+ Việc tuần</button>'
+      +'<button type="button" class="btn sm" data-act="cr-tl" data-id="'+esc(c.id)+'" aria-expanded="'+open+'">'+(open?'Ẩn việc':'Việc liên quan')+'</button>'
+      +'<button type="button" class="btn sm danger-o" data-act="cr-del" data-id="'+esc(c.id)+'">Xóa</button></td></tr>'
+      +(open?'<tr class="crt-tl"><td></td><td colspan="11">'+crTimeline(c)+'</td></tr>':'');
+  });
+  return h+'</tbody></table></div>';
+}
 function crRow(c){
   const late=crLate(c),soon=crSoon(c),adm=isAdminUser();
   const flag=late?'<span class="cr-flag late">Quá hạn '+crLateDays(c)+' ngày</span>':soon?'<span class="cr-flag soon">Sắp đến hạn</span>':'';
   const meta=[['Tạo',c.createdDate],['Thẩm định',c.reviewDate],['Hạn hoàn thành',c.dueDate],['Đã hoàn thành',c.doneDate]].filter(x=>x[1]).map(x=>x[0]+' '+crFmt(x[1]));
-  const info=[c.kind||'CR',crSysName(c.system)].filter(Boolean).concat(c.unit?['Đơn vị: '+c.unit]:[],c.coop?['Phối hợp: '+c.coop]:[],adm?['Phụ trách: '+crOwnerName(c)]:[]);
+  const info=[c.kind||'CR',crSysName(c.system)].filter(Boolean).concat(c.unit?['Đơn vị: '+c.unit]:[],c.coop?['Phối hợp: '+c.coop]:[],c.htkh?['TT HTKH: '+c.htkh]:[],adm?['Phụ trách: '+crOwnerName(c)]:[]);
   const open=S.crOpenTl.has(c.id);
   return '<div class="cr" data-id="'+esc(c.id)+'"><div class="cr-main">'
     +'<div class="cr-top"><b class="cr-code mono">'+esc(c.code)+'</b>'+(/^https?:\/\//i.test(c.link||'')?' <a class="cr-lk" href="'+esc(c.link)+'" target="_blank" rel="noopener noreferrer">Mở phiếu ↗</a>':'')
@@ -1838,18 +1871,18 @@ function renderCrList(){
   const base=crFilter(true),f=S.crF.flag;
   const cnt={all:base.length,open:base.filter(crIsOpen).length,late:base.filter(crLate).length,soon:base.filter(crSoon).length,done:base.filter(c=>c.status==='done').length};
   const chip=(k,lab,n,cls)=>'<button type="button" class="cr-chip '+(cls||'')+'" data-act="cr-flag" data-f="'+k+'" aria-pressed="'+((f||'all')===k)+'">'+lab+' <b>'+n+'</b></button>';
-  if(chips)chips.innerHTML=chip('all','Tất cả',cnt.all)+chip('open','Đang xử lý',cnt.open)+chip('late','Quá hạn',cnt.late,cnt.late?'late':'')+chip('soon','Sắp đến hạn (7 ngày)',cnt.soon,cnt.soon?'soon':'')+chip('done','Hoàn thành',cnt.done);
+  if(chips)chips.innerHTML='<span class="cr-vw"><button type="button" class="cr-chip" data-act="cr-view" data-v="table" aria-pressed="'+(S.crView==='table')+'">Dạng bảng (theo mẫu)</button><button type="button" class="cr-chip" data-act="cr-view" data-v="card" aria-pressed="'+(S.crView!=='table')+'">Dạng thẻ</button></span>'+chip('all','Tất cả',cnt.all)+chip('open','Đang xử lý',cnt.open)+chip('late','Quá hạn',cnt.late,cnt.late?'late':'')+chip('soon','Sắp đến hạn (7 ngày)',cnt.soon,cnt.soon?'soon':'')+chip('done','Hoàn thành',cnt.done);
   const list=crFilter(false);
   if(!S.crLoaded){lst.innerHTML='<p class="muted" style="padding:12px">Đang tải…</p>';return}
-  if(!list.length){lst.innerHTML='<p class="muted" style="padding:12px">'+(S.crs.length?'Không có phiếu nào khớp bộ lọc.':'Chưa có phiếu CR/SR nào. Bấm "Thêm phiếu" để nhập phiếu đầu tiên.')+'</p>';return}
+  if(!list.length){lst.innerHTML='<p class="muted" style="padding:12px">'+(S.crs.length?'Không có phiếu nào khớp bộ lọc.'+(isAdminUser()&&S.crF.who?' Chọn "Tất cả mọi người" ở ô Xem phiếu của để xem phiếu của người khác.':''):'Chưa có phiếu CR/SR nào. Bấm "Thêm phiếu" để nhập phiếu đầu tiên.')+'</p>';return}
   const g=new Map();list.forEach(c=>{const k=crMonth(c);if(!g.has(k))g.set(k,[]);g.get(k).push(c)});
   const keys=[...g.keys()].sort().reverse().sort((a,b)=>(a==='none')-(b==='none'));
   lst.innerHTML='<p class="listhint">Bấm vào từng tháng bên dưới để xem chi tiết các phiếu.</p>'+keys.map(k=>{
     const a=g.get(k),dn=a.filter(c=>c.status==='done').length,lt=a.filter(crLate).length,op=a.filter(crIsOpen).length,id='cr-'+k;
     return '<details class="sys" data-sys="'+esc(id)+'"'+(S.expanded.has(id)?' open':'')+'><summary><b>'+esc(crMonthName(k))+'</b><span class="muted">'+a.length+' phiếu · '+dn+' hoàn thành · '+op+' đang xử lý'+(lt?' · <span class="cr-flag late">'+lt+' quá hạn</span>':'')+'</span></summary>'
-      +'<div class="crs">'+a.map(crRow).join('')+'</div></details>'}).join('');
+      +(S.crView==='table'?crTable(a):'<div class="crs">'+a.map(crRow).join('')+'</div>')+'</details>'}).join('');
 }
-function renderCr(){if(!$('cr-list'))return;renderCrFilters();renderCrList()}
+function renderCr(){if(!$('cr-list'))return;const tb=$('tab-cr');if(tb)tb.classList.toggle('wide',S.crView==='table');renderCrFilters();renderCrList()}
 function crSysOpts(sel){
   const al=allowedSys();let l=S.systems.filter(x=>x.active!==false&&(!al||al.has(x.id)));
   if(sel&&!l.some(x=>x.id===sel)){const o=S.systems.find(x=>x.id===sel);if(o)l=l.concat([o])}
@@ -1863,7 +1896,7 @@ function crOpenForm(c){
   set('cr-code',c?c.code:'');set('cr-title',c?c.title:'');set('cr-kind',c?(c.kind||'CR'):'CR');
   set('cr-sys',c?c.system:(S.qSystem&&[...$('cr-sys').options].some(o=>o.value===S.qSystem)?S.qSystem:$('cr-sys').options[0]&&$('cr-sys').options[0].value));
   set('cr-status',c?(c.status||'new'):'new');set('cr-created',c?c.createdDate:iso(new Date()));set('cr-review',c?c.reviewDate:'');set('cr-due',c?c.dueDate:'');set('cr-done',c?c.doneDate:'');
-  set('cr-unit',c?c.unit:'');set('cr-coop',c?c.coop:'');set('cr-prog',c?c.progress:'');set('cr-link',c?c.link:'');
+  set('cr-unit',c?c.unit:'');set('cr-htkh',c?c.htkh:'');set('cr-coop',c?c.coop:'');set('cr-prog',c?c.progress:'');set('cr-link',c?c.link:'');
   $('cr-ftitle').textContent=c?'Sửa phiếu '+c.code:'Thêm phiếu CR/SR';$('cr-save').textContent=c?'Lưu thay đổi':'Thêm phiếu';$('cr-msg').textContent='';
   f.scrollIntoView({block:'nearest',behavior:'smooth'});$('cr-code').focus();
 }
@@ -1883,7 +1916,7 @@ async function crSave(){
   const ed=S.crEdit,uid=ed?ed.uid:S.user.uid;
   if(S.crs.some(x=>x.uid===uid&&String(x.code).toLowerCase()===code.toLowerCase()&&(!ed||x.id!==ed.id))){msg.textContent='Phiếu '+code+' đã có trong danh sách.';return}
   const body={uid:uid,code:code,title:title,kind:$('cr-kind').value,system:sys,status:st,createdDate:cd,reviewDate:rd,dueDate:dd,doneDate:dn,
-    unit:$('cr-unit').value.trim(),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
+    unit:$('cr-unit').value.trim(),htkh:$('cr-htkh').value.trim(),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
   $('cr-save').disabled=true;msg.textContent='Đang lưu…';
   try{
     const id=ed?ed.id:doc(collection(db,'crs')).id;
@@ -1928,7 +1961,7 @@ function buildCrXlsx(x){
     const s=crStats(gp[1]);
     rows.push([{v:crMonthName(gp[0])+' · '+s.n+' phiếu · '+s.done+' hoàn thành'+(s.late?' · '+s.late+' quá hạn':''),s:5}].concat(Array.from({length:H.length-1},()=>({v:'',s:5}))));
     merges.push('A'+rows.length+':'+colL(H.length-1)+rows.length);
-    gp[1].forEach((c,i)=>rows.push([i+1,c.title,c.code,crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),c.progress||'',c.unit||'',c.coop||'',crOwnerName(c),crFmt(c.doneDate),c.status==='done'?'Đã hoàn thành':'Chưa',crStName(c.status),c.kind||'CR',crSysName(c.system),c.link||'']));
+    gp[1].forEach((c,i)=>rows.push([i+1,c.title,c.code,crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),c.progress||'',c.unit||'',c.coop||'',crHtkh(c),crFmt(c.doneDate),c.status==='done'?'Đã hoàn thành':'Chưa',crStName(c.status),c.kind||'CR',crSysName(c.system),c.link||'']));
   });
   const st=crStats(x.list),ov=[['Danh sách phiếu CR/SR'],['Người phụ trách',x.who],['Bộ lọc',x.filt],['Ngày xuất',full(new Date())],[],['Tổng số phiếu',st.n],['Hoàn thành',st.done],['Đang xử lý',st.open],['Quá hạn',st.late],['Sắp đến hạn (7 ngày)',st.soon],[]];
   const heads=[];
@@ -1941,13 +1974,13 @@ function buildCrXlsx(x){
     {name:'Tổng quan',rows:ov,widths:[34,40,16],titleRows:[0],headRows:heads}]);
 }
 function buildCrPrintHtml(x){
-  const st=crStats(x.list),cols=[['Mã IT 360',12],['Nội dung',25],['Ngày tạo',9.5],['Hạn hoàn thành',9.5],['Đơn vị thực hiện',10],['Phối hợp',10],['Trạng thái',9],['Tiến độ hiện tại',22],['Hoàn thành',9.5]],tw=cols.reduce((a,c)=>a+c[1],0);
+  const st=crStats(x.list),cols=[['STT',4.5],['Nội dung',18],['Mã IT 360',10.5],['Ngày tạo',7.5],['Ngày thẩm định',7.5],['Ngày yêu cầu hoàn thành',8],['Tiến độ hiện tại',21],['Đơn vị thực hiện',7],['Nhân sự phối hợp',8],['TT HTKH',6],['Ngày hoàn thành',7.5]],tw=cols.reduce((a,c)=>a+c[1],0);
   const colg='<colgroup>'+cols.map(c=>'<col style="width:'+(c[1]*100/tw).toFixed(2)+'%">').join('')+'</colgroup>';
   const head='<thead><tr>'+cols.map(c=>'<th>'+esc(c[0])+'</th>').join('')+'</tr></thead>';
   let h='<h1>Danh sách phiếu CR/SR</h1><p class="meta">'+esc(x.who)+' · '+esc(x.filt)+' · Ngày xuất '+full(new Date())+'</p>'
     +'<p class="sum"><b>'+st.n+'</b> phiếu · <b>'+st.done+'</b> hoàn thành · '+st.open+' đang xử lý · '+st.late+' quá hạn · '+st.soon+' sắp đến hạn</p>';
   crGroups(x.list).forEach(gp=>{
-    h+='<h2>'+esc(crMonthName(gp[0]))+' ('+gp[1].length+' phiếu)</h2><table class="tk">'+colg+head+'<tbody>'+gp[1].map(c=>'<tr>'+[c.code,c.title,crFmt(c.createdDate),crFmt(c.dueDate),c.unit||'',c.coop||'',crStName(c.status)+(crLate(c)?' (quá hạn)':''),c.progress||'',crFmt(c.doneDate)].map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+    h+='<h2>'+esc(crMonthName(gp[0]))+' ('+gp[1].length+' phiếu)</h2><table class="tk">'+colg+head+'<tbody>'+gp[1].map((c,i)=>'<tr>'+[i+1,c.title,c.code+'\n'+crStName(c.status)+(crLate(c)?' (quá hạn)':''),crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),c.progress||'',c.unit||'',c.coop||'',crHtkh(c),crFmt(c.doneDate)].map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
   });
   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(x.file)+'</title><style>'
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/16px "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
@@ -1984,13 +2017,14 @@ function buildCr(){
   +f('','Ngày yêu cầu hoàn thành','<input id="cr-due" type="date">')
   +f('','Ngày hoàn thành','<input id="cr-done" type="date">')
   +f('','Đơn vị thực hiện','<input id="cr-unit" maxlength="120" list="cr-unit-dl" placeholder="VNPT IT, VNPT AI, Ban Sản phẩm…"><datalist id="cr-unit-dl"></datalist>')
+  +f('','TT HTKH (người phụ trách; bỏ trống = chủ phiếu)','<input id="cr-htkh" maxlength="120" placeholder="Ví dụ: Xuân Hà">')
   +f('','Nhân sự phối hợp','<input id="cr-coop" maxlength="300" placeholder="Ví dụ: DTC: Nguyễn Văn A">')
   +f('','Tiến độ hiện tại','<textarea id="cr-prog" rows="2" maxlength="1500" placeholder="Ví dụ: Phiếu đã chuyển sang IT ở trạng thái Phân tích yêu cầu"></textarea>','wide')
   +f('','Đường dẫn phiếu','<input id="cr-link" maxlength="500" placeholder="https://…">','wide')
   +'</div><div class="actions"><span class="msg" id="cr-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" data-act="cr-cancel">Đóng</button><button type="button" class="btn primary" id="cr-save" data-act="cr-save">Thêm phiếu</button></div></form></section>'
   +'<section class="panel"><div class="cr-filters">'
   +f('','Tìm','<input id="cr-fq" type="search" placeholder="Mã phiếu, nội dung, đơn vị…" autocomplete="off">')
-  +f('','Trạng thái','<select id="cr-fst"></select>')+f('','Tháng tạo','<select id="cr-fmo"></select>')+f('','Người phụ trách','<select id="cr-fwho"></select>')
+  +f('','Trạng thái','<select id="cr-fst"></select>')+f('','Tháng tạo','<select id="cr-fmo"></select>')+f('','Xem phiếu của','<select id="cr-fwho"></select>')
   +'</div><div id="cr-chips" class="cr-chips"></div><div id="cr-list" class="list"></div></section></section>';
 }
 
@@ -2403,6 +2437,7 @@ root.addEventListener('click',async e=>{
     if(act==='cr-cancel'){crCloseForm();return}
     if(act==='cr-save'){await crSave();return}
     if(act==='cr-xlsx'||act==='cr-pdf'){crExport(act==='cr-xlsx'?'xlsx':'pdf');return}
+    if(act==='cr-view'){S.crView=b.dataset.v==='card'?'card':'table';try{localStorage.setItem('bct-crview',S.crView)}catch(e){}renderCr();return}
     if(act==='cr-flag'){S.crF.flag=b.dataset.f==='all'?'':b.dataset.f;renderCrList();return}
     if(act==='cr-edit'){const c=S.crs.find(x=>x.id===b.dataset.id);if(c)crOpenForm(c);return}
     if(act==='cr-tl'){const c=S.crs.find(x=>x.id===b.dataset.id);if(!c)return;if(S.crOpenTl.has(c.id)){S.crOpenTl.delete(c.id);renderCrList()}else{S.crOpenTl.add(c.id);await crLoadLinked(c)}return}
