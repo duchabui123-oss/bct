@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.96 -->
+<!-- Phiên bản 1.97 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,8 +117,10 @@ textarea{resize:vertical;min-height:4.5rem}
 .cr-al-i .cr-flag{display:inline-block;min-width:8.8rem;text-align:center}
 .nbadge{display:inline-block;min-width:1.25rem;margin-left:.35rem;padding:0 .35rem;border-radius:999px;background:var(--doing);color:#fff;font-size:.72rem;font-weight:700;line-height:1.25rem;text-align:center}.nbadge.bad{background:var(--block)}
 .ntc.crn.bad{border-color:var(--block)}
+.idrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:6px;margin:4px 0}.idrow input{min-width:0}.id-lint{margin:8px 0;padding:.6rem .9rem;border:1px solid var(--doing);border-left-width:5px;border-radius:8px;background:var(--doing-soft);font-size:.88rem}.id-lint ul{margin:0;padding-left:1.1rem}
+.idt td{white-space:normal}
 .cr-vw{display:inline-flex;gap:6px;margin-right:10px}
-@media(min-width:1180px){#tab-cr.wide{width:min(1500px,calc(100vw - 40px));max-width:none;margin-left:50%;transform:translateX(-50%)}}
+@media(min-width:1180px){#tab-cr.wide,#tab-ideas.wide{width:min(1500px,calc(100vw - 40px));max-width:none;margin-left:50%;transform:translateX(-50%)}}
 .crt-wrap{overflow-x:auto}.crt{width:100%;min-width:980px;table-layout:fixed;border-collapse:collapse;font-size:.84rem}
 .crt th,.crt td{border:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top;word-break:break-word}
 .crt th{background:var(--surface-2,var(--accent-soft));font-weight:600;text-align:center;font-size:.8rem}.crt td.c{text-align:center;white-space:nowrap}.crt th:first-child{writing-mode:initial}
@@ -514,7 +516,7 @@ function teardown(){
   unsubs.forEach(f=>{try{f()}catch(e){}});unsubs=[];
   weekUnsubs.forEach(f=>{try{f()}catch(e){}});weekUnsubs=[];
   monthUnsubs.forEach(f=>{try{f()}catch(e){}});monthUnsubs=[];S.mTasks=[];S.loadedM=false;
-  crUnsubs.forEach(f=>{try{f()}catch(e){}});crUnsubs=[];S.crs=[];S.crLoaded=false;
+  crUnsubs.forEach(f=>{try{f()}catch(e){}});crUnsubs=[];S.crs=[];S.crLoaded=false;ideaUnsubs.forEach(f=>{try{f()}catch(e){}});ideaUnsubs=[];S.ideas=[];S.ideasLoaded=false;
   S.users=[];S.systems=[];S.types=[];S.tasks=[];S.notes=[];S.loadedTasks=false;S.editing=null;S.tab='report';
 }
 function listen(ref,cb,onErr){
@@ -529,7 +531,7 @@ async function boot(){
   teardown();
   S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
   S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sTypes=new Set();S.sTpls=new Set();S.sTq='';S.sFilt=false;S.sFocus='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
-  S.crs=[];S.crLoaded=false;S.crNoRule=false;S.crF={q:'',st:'',mo:'',who:'',flag:''};S.crOpenTl=new Set();S.crLinked={};S.crEdit=null;S.crWhoInit=false;S.crAlertHide=false;S.crView=(()=>{try{const v=localStorage.getItem('bct-crview');if(v==='table'||v==='card')return v}catch(e){}return window.innerWidth>=900?'table':'card'})();
+  S.ideas=[];S.ideasLoaded=false;S.ideasNoRule=false;S.idF={q:'',year:'',round:'',who:''};S.idWhoInit=false;S.idEdit=null;S.idDraft={leaders:[],members:[]};S.crs=[];S.crLoaded=false;S.crNoRule=false;S.crF={q:'',st:'',mo:'',who:'',flag:''};S.crOpenTl=new Set();S.crLinked={};S.crEdit=null;S.crWhoInit=false;S.crAlertHide=false;S.crView=(()=>{try{const v=localStorage.getItem('bct-crview');if(v==='table'||v==='card')return v}catch(e){}return window.innerWidth>=900?'table':'card'})();
   buildShell();
   const isAdmin=S.profile.role==='admin';
   unsubs.push(listen(collection(db,'users'),snap=>{
@@ -538,7 +540,7 @@ async function boot(){
     if(mine){
       if(mine.active===false){doLogout();return}
       S.profile=Object.assign({},mine);
-      if(S.groupsReady&&effSig()!==S.effKey){S.effKey=effSig();setTimeout(()=>{subWeek();subCrs();if(monthUnsubs.length)subMonth();renderQuickSelects()},0)}
+      if(S.groupsReady&&effSig()!==S.effKey){S.effKey=effSig();setTimeout(()=>{subWeek();subCrs();subIdeas();if(monthUnsubs.length)subMonth();renderQuickSelects()},0)}
       const b=$('me-name');if(b)b.textContent=mine.name||mine.username;
     }
     renderWho();renderReport();renderNotes();renderAdminUsers();if($('stats-body'))renderStats();
@@ -550,8 +552,8 @@ async function boot(){
   unsubs.push(listen(collection(db,'groups'),snap=>{
     S.groups=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
     const k=effSig();
-    if(!S.groupsReady){S.groupsReady=true;S.effKey=k;if(groupsOf(S.profile).length){subWeek();subCrs()}}
-    else if(k!==S.effKey){S.effKey=k;subWeek();subCrs();if(monthUnsubs.length)subMonth()}
+    if(!S.groupsReady){S.groupsReady=true;S.effKey=k;if(groupsOf(S.profile).length){subWeek();subCrs();subIdeas()}}
+    else if(k!==S.effKey){S.effKey=k;subWeek();subCrs();subIdeas();if(monthUnsubs.length)subMonth()}
     renderQuickSelects();renderWho();renderReport();renderCatalog('groups');renderTplAdmin();renderAdminUsers();if($('stats-body'))renderStats();
   }));
   unsubs.push(listen(collection(db,'types'),snap=>{
@@ -568,7 +570,7 @@ async function boot(){
     canonTitles(S.tasks);canonTitles(S.mTasks);canonTypes(S.tasks);canonTypes(S.mTasks);
     renderQuickSelects();renderTplAdmin();renderReport();
   }));
-  if(!groupsOf(S.profile).length){subWeek();subCrs()}
+  if(!groupsOf(S.profile).length){subWeek();subCrs();subIdeas()}
   renderQuickSelects();renderWho();renderReport();renderNotes();
   if(isAdmin)ensureDefaults();
 }
@@ -624,6 +626,7 @@ function buildShell(){
   +'<nav class="tabs" aria-label="Chuyển mục"><button type="button" data-act="tab" data-t="report" aria-pressed="true">Báo cáo</button>'
   +'<button type="button" data-act="tab" data-t="stats" aria-pressed="false">Thống kê</button>'
   +'<button type="button" data-act="tab" data-t="cr" aria-pressed="false">Phiếu CR/SR</button>'
+  +'<button type="button" data-act="tab" data-t="ideas" aria-pressed="false">Sáng kiến</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin" aria-pressed="false">Quản lý</button>':'')+'</nav>'
   +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><button type="button" class="btn sm sr-tbtn" id="sr-tbtn" data-act="sr-types" aria-controls="sr-panel" aria-expanded="false" title="Lọc theo loại việc, việc mẫu">Lọc nâng cao</button><div id="sr-panel" class="sr-panel" hidden></div></form>'
   +'<div class="me"><button type="button" class="btn link" data-act="me" id="me-name">'+esc(S.profile.name||S.profile.username)+'</button>'
@@ -682,12 +685,13 @@ function buildShell(){
   +'<textarea class="report-box" id="report-text" readonly></textarea><div class="actions"><button type="button" class="btn primary" data-act="copy-now">Sao chép</button>'
   +'<button type="button" class="btn link" data-act="report-close">Đóng</button><span class="msg" id="report-msg" role="status"></span></div></section></section>'
 
-  +buildStats()+buildCr()+(admin?buildAdmin():'')
+  +buildStats()+buildCr()+buildIdeas()+(admin?buildAdmin():'')
   +'<footer class="foot"><b>Báo cáo tuần</b>'
   +'<span class="fnote">Ghi nhanh việc mỗi ngày, cuối tuần có ngay bảng tổng hợp để gửi báo cáo.</span>'
   +'<nav class="flinks" aria-label="Liên kết chân trang"><button type="button" data-act="tab" data-t="report">Báo cáo</button>'
   +'<button type="button" data-act="tab" data-t="stats">Thống kê</button>'
   +'<button type="button" data-act="tab" data-t="cr">Phiếu CR/SR</button>'
+  +'<button type="button" data-act="tab" data-t="ideas">Sáng kiến</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin">Quản lý</button>':'')
   +'<button type="button" data-act="to-top">Lên đầu trang ↑</button></nav>'
   +'<span class="fstat" id="foot-stat"></span></footer></div>';
@@ -2132,6 +2136,216 @@ function buildCr(){
   +'</div><div id="cr-chips" class="cr-chips"></div><div id="cr-list" class="list"></div></section></section>';
 }
 
+/* ===== Sáng kiến (nhân viên tự nhập; chỉ chủ sáng kiến và quản trị xem) ===== */
+let ideaUnsubs=[];
+const idTitleWords=new Set(['ts','ths','th.s','pgs','gs','ks','cn','bs','ds','dr','mr','mrs','ms','ông','bà','anh','chị','thạc','tiến']);
+const idCaps=v=>{const s=String(v||'').trim();const L=s.replace(/[^A-Za-zÀ-ỹ]/g,'');return L.length>=3&&s===s.toLocaleUpperCase('vi')&&s!==s.toLocaleLowerCase('vi')};
+const idTok=t=>t.length>=2&&t===t.toLocaleUpperCase('vi')&&t!==t.toLocaleLowerCase('vi');
+const idNameCaps=v=>String(v||'').trim().split(/\s+/).some(idTok);
+const idPct=v=>/\d+\s*%|\(\s*\d|\d+\s*phần trăm/i.test(String(v||''));
+const idHasTitle=v=>{const w=String(v||'').trim().split(/\s+/)[0]||'';return idTitleWords.has(w.replace(/\.$/,'').toLocaleLowerCase('vi'))};
+function idFixName(v){
+  let s=String(v||'').replace(/\(\s*\d+[^)]*\)/g,'').replace(/\d+\s*%/g,'').replace(/[-–:]\s*$/,'').trim();
+  while(idHasTitle(s)&&s.indexOf(' ')>0)s=s.replace(/^\S+\s+/,'');
+  s=s.split(/\s+/).map(t=>idTok(t)?t.charAt(0)+t.slice(1).toLocaleLowerCase('vi'):t).join(' ');
+  return s.replace(/\s+/g,' ').trim();
+}
+function idNames(a){return(a||[]).map(x=>String(x.name||'').trim()).filter(Boolean)}
+function idCodes(a){return(a||[]).map(x=>String(x.code||'').trim()).filter(Boolean)}
+function idLint(d){
+  const w=[];
+  if(idCaps(d.name))w.push('Tên sáng kiến đang viết hoa toàn bộ, hãy viết thường theo câu thông thường.');
+  [['chủ trì',d.leaders],['tham gia',d.members]].forEach(g=>{
+    const ns=idNames(g[1]);
+    if(ns.some(idNameCaps))w.push('Tên tác giả '+g[0]+' có chữ viết hoa toàn bộ (bấm "Sửa giúp tên tác giả").');
+    if(ns.some(idHasTitle))w.push('Tên tác giả '+g[0]+' có chức danh/học vị (Ông, Bà, TS, ThS…), chỉ ghi họ tên.');
+    if(ns.some(idPct))w.push('Tên tác giả '+g[0]+' có tỷ lệ phần trăm, chỉ ghi họ tên.');
+    (g[1]||[]).forEach(x=>{const n=String(x.name||'').trim(),c=String(x.code||'').trim();if(n&&!c)w.push('Tác giả '+g[0]+' "'+n+'" chưa có mã nhân viên.');if(c&&!n)w.push('Mã nhân viên '+g[0]+' "'+c+'" chưa có họ tên.')});
+  });
+  return w;
+}
+function subIdeas(){
+  ideaUnsubs.forEach(f=>{try{f()}catch(e){}});ideaUnsubs=[];S.ideasLoaded=false;
+  const col=collection(db,'ideas'),q=isAdminUser()?query(col):query(col,where('uid','==',S.user.uid));
+  ideaUnsubs.push(onSnapshot(q,snap=>{S.ideasNoRule=false;S.ideas=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.ideasLoaded=true;renderIdeas()},err=>{
+    if(err&&err.code==='permission-denied')S.ideasNoRule=true;S.ideas=[];S.ideasLoaded=true;renderIdeas()}));
+}
+const idKey=i=>(Number(i.year)||0)+'-'+(Number(i.round)||0);
+const idGroupName=k=>{const a=k.split('-');return a[0]==='0'?'Chưa ghi năm':'Năm '+a[0]+' · Đợt '+a[1]+'/'+a[0]};
+function idSorted(list){return list.slice().sort((a,b)=>((a.ts||0)-(b.ts||0))||String(a.name).localeCompare(String(b.name),'vi'))}
+function idFilter(){
+  const f=S.idF,q=normQ(f.q);
+  return idSorted(S.ideas.filter(i=>{
+    if(f.year&&String(i.year)!==f.year)return false;
+    if(f.round&&String(i.round)!==f.round)return false;
+    if(f.who&&i.uid!==f.who)return false;
+    if(q&&normQ([i.name,i.unit,idNames(i.leaders).join(' '),idCodes(i.leaders).join(' '),idNames(i.members).join(' '),idCodes(i.members).join(' '),i.summary,i.benefits].join(' '))
+      .indexOf(q)<0)return false;
+    return true}));
+}
+function renderIdeaFilters(){
+  const ye=$('id-fyear'),ro=$('id-fround'),wh=$('id-fwho');if(!ye||!ro)return;
+  const keep=(el,v)=>{if(v&&[...el.options].some(o=>o.value===v))el.value=v;else el.value=''};
+  const years=[...new Set(S.ideas.map(i=>String(i.year||'')).filter(Boolean))].sort().reverse();
+  ye.innerHTML='<option value="">Mọi năm</option>'+years.map(y=>'<option value="'+y+'">Năm '+y+'</option>').join('');keep(ye,S.idF.year);if(S.idF.year&&ye.value!==S.idF.year)S.idF.year='';
+  const rounds=[...new Set(S.ideas.map(i=>String(i.round||'')).filter(Boolean))].sort();
+  ro.innerHTML='<option value="">Mọi đợt</option>'+rounds.map(r=>'<option value="'+r+'">Đợt '+r+'</option>').join('');keep(ro,S.idF.round);if(S.idF.round&&ro.value!==S.idF.round)S.idF.round='';
+  if(wh){
+    if(isAdminUser()&&!S.idWhoInit){S.idWhoInit=true;S.idF.who=S.user.uid}
+    const ids=new Set(S.users.map(u=>u.uid));ids.add(S.user.uid);S.ideas.forEach(i=>ids.add(i.uid));
+    const us=[...ids].map(u=>[u,userName(u)+(u===S.user.uid?' (tôi)':'')]).sort((a,b)=>(a[0]===S.user.uid?-1:b[0]===S.user.uid?1:a[1].localeCompare(b[1],'vi')));
+    wh.innerHTML='<option value="">Tất cả mọi người</option>'+us.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');keep(wh,S.idF.who);wh.closest('label').hidden=!isAdminUser()}
+}
+const idCell=a=>(a||[]).length?(a||[]).map(x=>esc(x)).join('<br>'):'';
+function idTable(a){
+  const heads=['STT','Tên sáng kiến (1)','Đơn vị (2)','Tác giả chủ trì/đồng chủ trì (3)','Mã NV chủ trì (4)','Tác giả tham gia (5)','Mã NV tham gia (6)','Mô tả tóm tắt (7)','Lợi ích thu được (8)',''];
+  const w=[4,16,8,11,8,11,8,16,16,8];
+  let h='<div class="crt-wrap"><table class="crt idt"><colgroup>'+w.map(x=>'<col style="width:'+x+'%">').join('')+'</colgroup><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
+  a.forEach((i,n)=>{
+    h+='<tr class="cr" data-id="'+esc(i.id)+'"><td class="c">'+(n+1)+'</td><td><b>'+esc(i.name)+'</b>'+(isAdminUser()&&i.uid!==S.user.uid?'<div class="cr-meta">Nhập bởi: '+esc(userName(i.uid))+'</div>':'')+'</td><td>'+esc(i.unit||'')+'</td>'
+      +'<td>'+idCell(idNames(i.leaders))+'</td><td>'+idCell(idCodes(i.leaders))+'</td><td>'+idCell(idNames(i.members))+'</td><td>'+idCell(idCodes(i.members))+'</td>'
+      +'<td>'+esc(i.summary||'').replace(/\n/g,'<br>')+'</td><td>'+esc(i.benefits||'').replace(/\n/g,'<br>')+'</td>'
+      +'<td class="crt-act"><button type="button" class="btn sm" data-act="id-edit" data-id="'+esc(i.id)+'">Sửa</button><button type="button" class="btn sm danger-o" data-act="id-del" data-id="'+esc(i.id)+'">Xóa</button></td></tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function renderIdeaList(){
+  const lst=$('id-list');if(!lst)return;
+  if(S.ideasNoRule){lst.innerHTML='<p class="muted" style="padding:12px">Tài khoản chưa có quyền xem sáng kiến. Quản trị cần dán luật Firestore bản 1.24 trở lên (firestore.rules) vào Firebase Console, xem HUONG-DAN.md.</p>';return}
+  if(!S.ideasLoaded){lst.innerHTML='<p class="muted" style="padding:12px">Đang tải…</p>';return}
+  const list=idFilter();
+  if(!list.length){lst.innerHTML='<p class="muted" style="padding:12px">'+(S.ideas.length?'Không có sáng kiến nào khớp bộ lọc.'+(isAdminUser()&&S.idF.who?' Chọn "Tất cả mọi người" ở ô Xem sáng kiến của để xem của người khác.':''):'Chưa có sáng kiến nào. Bấm "Thêm sáng kiến" để nhập.')+'</p>';return}
+  const g=new Map();list.forEach(i=>{const k=idKey(i);if(!g.has(k))g.set(k,[]);g.get(k).push(i)});
+  const keys=[...g.keys()].sort().reverse().sort((a,b)=>(a.indexOf('0-')===0)-(b.indexOf('0-')===0));
+  lst.innerHTML='<p class="listhint">Bấm vào từng đợt bên dưới để xem chi tiết các sáng kiến.</p>'+keys.map(k=>{
+    const id='id-'+k;
+    return '<details class="sys" data-sys="'+esc(id)+'"'+(S.expanded.has(id)?' open':'')+'><summary><b>'+esc(idGroupName(k))+'</b><span class="muted">'+g.get(k).length+' sáng kiến</span></summary>'+idTable(g.get(k))+'</details>'}).join('');
+}
+function renderIdeas(){if(!$('id-list'))return;const tb=$('tab-ideas');if(tb)tb.classList.add('wide');renderIdeaFilters();renderIdeaList()}
+/* ---- Form ---- */
+function idRowsHtml(g){
+  const arr=S.idDraft[g];
+  return arr.map((x,i)=>'<div class="idrow"><input class="id-in" data-g="'+g+'" data-i="'+i+'" data-k="name" maxlength="80" placeholder="Họ và tên" value="'+esc(x.name)+'" autocomplete="off">'
+    +'<input class="id-in" data-g="'+g+'" data-i="'+i+'" data-k="code" maxlength="30" placeholder="Mã nhân viên" value="'+esc(x.code)+'" autocomplete="off">'
+    +'<button type="button" class="btn sm" data-act="id-rm" data-g="'+g+'" data-i="'+i+'" aria-label="Bỏ dòng này">Bỏ</button></div>').join('');
+}
+function idRenderRows(){const a=$('id-leaders'),b=$('id-members');if(a)a.innerHTML=idRowsHtml('leaders');if(b)b.innerHTML=idRowsHtml('members');idShowLint()}
+function idReadDraft(){
+  const v=id=>$(id).value.trim();
+  return {name:v('id-name'),unit:v('id-unit'),year:Number(v('id-year'))||0,round:Number(v('id-round'))||0,leaders:S.idDraft.leaders,members:S.idDraft.members,summary:v('id-summary'),benefits:v('id-benefits')};
+}
+function idShowLint(){
+  const el=$('id-lint');if(!el)return;const w=idLint(idReadDraft());
+  el.innerHTML=w.length?'<ul>'+w.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';el.hidden=!w.length;
+}
+function idOpenForm(i){
+  S.idEdit=i||null;const f=$('id-form');if(!f)return;f.hidden=false;
+  const set=(id,v)=>{$(id).value=v==null?'':v};
+  set('id-name',i?i.name:'');set('id-unit',i?i.unit:(S.profile&&S.profile.unit)||'');
+  set('id-year',i?i.year:S.idLastYear||new Date().getFullYear());set('id-round',i?i.round:S.idLastRound||1);
+  set('id-summary',i?i.summary:'');set('id-benefits',i?i.benefits:'');
+  const cp=a=>(a&&a.length?a:[{name:'',code:''}]).map(x=>({name:x.name||'',code:x.code||''}));
+  S.idDraft={leaders:cp(i&&i.leaders),members:i&&i.members&&i.members.length?cp(i.members):[]};
+  $('id-ftitle').textContent=i?'Sửa sáng kiến':'Thêm sáng kiến';$('id-save').textContent=i?'Lưu thay đổi':'Thêm sáng kiến';$('id-msg').textContent='';
+  idRenderRows();f.scrollIntoView({block:'nearest',behavior:'smooth'});$('id-name').focus();
+}
+function idCloseForm(){S.idEdit=null;const f=$('id-form');if(f)f.hidden=true}
+async function idSave(){
+  const msg=$('id-msg');msg.className='msg';
+  const d=idReadDraft();
+  const leaders=S.idDraft.leaders.map(x=>({name:x.name.trim(),code:x.code.trim()})).filter(x=>x.name||x.code);
+  const members=S.idDraft.members.map(x=>({name:x.name.trim(),code:x.code.trim()})).filter(x=>x.name||x.code);
+  if(!d.name){msg.textContent='Hãy nhập tên sáng kiến.';$('id-name').focus();return}
+  if(!leaders.some(x=>x.name)){msg.textContent='Hãy nhập ít nhất một tác giả chủ trì.';return}
+  if(d.year<2000||d.year>2100){msg.textContent='Năm không hợp lệ.';$('id-year').focus();return}
+  if(d.round<1||d.round>9){msg.textContent='Đợt phải từ 1 đến 9.';$('id-round').focus();return}
+  const ed=S.idEdit,uid=ed?ed.uid:S.user.uid;
+  const body={uid:uid,name:d.name,unit:d.unit,year:d.year,round:d.round,leaders:leaders,members:members,summary:d.summary,benefits:d.benefits,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
+  $('id-save').disabled=true;msg.textContent='Đang lưu…';
+  try{
+    const id=ed?ed.id:doc(collection(db,'ideas')).id;
+    await setDoc(doc(db,'ideas',id),body);
+    S.idLastYear=d.year;S.idLastRound=d.round;
+    const w=idLint(Object.assign({},d,{leaders:leaders,members:members}));
+    idCloseForm();flash('Đã lưu sáng kiến.'+(w.length?' Lưu ý: '+w[0]+(w.length>1?' (và '+(w.length-1)+' lưu ý khác, bấm Sửa để xem)':''):''),true);
+  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.24, xem HUONG-DAN.md)':'')}
+  $('id-save').disabled=false;
+}
+function idFixAuthors(){
+  ['leaders','members'].forEach(g=>S.idDraft[g].forEach(x=>{x.name=idFixName(x.name)}));
+  idRenderRows();
+}
+/* ---- Xuất báo cáo theo mẫu "Bảng tổng hợp đăng ký sáng kiến" ---- */
+function idCtx(){
+  const list=idFilter(),t=new Date();
+  const ys=[...new Set(list.map(i=>i.year).filter(Boolean))].sort(),rs=[...new Set(list.map(i=>i.round).filter(Boolean))].sort();
+  const year=S.idF.year||(ys.length===1?String(ys[0]):''),round=S.idF.round||(rs.length===1?String(rs[0]):'');
+  const title='BẢNG TỔNG HỢP ĐĂNG KÝ SÁNG KIẾN'+(year?' NĂM '+year:(ys.length?' NĂM '+ys.join(', '):''))+(year&&round?' (ĐỢT '+round+'/'+year+')':(round?' (ĐỢT '+round+')':''));
+  const units=[...new Set(list.map(i=>i.unit).filter(Boolean))];
+  const unit=units.length===1?units[0]:((S.profile&&S.profile.unit)||units.join('; '));
+  return {list:list,title:title,unit:unit,file:'SangKien_'+pad(t.getDate())+'-'+pad(t.getMonth()+1)+'-'+t.getFullYear()};
+}
+const ID_NOTES=['LƯU Ý:','- Mỗi sáng kiến được ghi trên một dòng duy nhất.','- Không viết hoa toàn bộ tên sáng kiến và tên tác giả.','- Cột (3) và (5) chỉ ghi họ tên tác giả, không kèm chức danh, học vị hay tỷ lệ phần trăm đóng góp.'];
+const ID_HEADS=['STT','Tên sáng kiến (1)','Đơn vị (2)','Tác giả chủ trì/đồng chủ trì (3)','Mã nhân viên chủ trì (4)','Tác giả tham gia (5)','Mã nhân viên tham gia (6)','Mô tả tóm tắt (7)','Lợi ích thu được (8)'];
+const idRowVals=(i,n)=>[n,i.name,i.unit||'',idNames(i.leaders).join('\n'),idCodes(i.leaders).join('\n'),idNames(i.members).join('\n'),idCodes(i.members).join('\n'),i.summary||'',i.benefits||''];
+function buildIdeaXlsx(x){
+  const rows=[],merges=[],N=ID_HEADS.length,last=colL(N-1);
+  rows.push([{v:'ĐƠN VỊ: '+x.unit,s:3}]);
+  rows.push([{v:x.title,s:3}]);merges.push('A2:'+last+'2');
+  rows.push([]);
+  ID_NOTES.forEach(t=>{rows.push([t]);merges.push('A'+rows.length+':'+last+rows.length)});
+  rows.push([]);
+  const hr=rows.length;rows.push(ID_HEADS.map(h=>({v:h,s:5})));
+  x.list.forEach((i,n)=>rows.push(idRowVals(i,n+1)));
+  return makeXlsx([{name:'Sáng kiến',rows:rows,merges:merges,widths:[6,36,18,28,16,28,16,46,46]}]);
+}
+function buildIdeaPrintHtml(x){
+  const w=[4,16,8,12,8,12,8,16,16],tw=w.reduce((a,b)=>a+b,0);
+  const colg='<colgroup>'+w.map(c=>'<col style="width:'+(c*100/tw).toFixed(2)+'%">').join('')+'</colgroup>';
+  const head='<thead><tr>'+ID_HEADS.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead>';
+  const body=x.list.map((i,n)=>'<tr>'+idRowVals(i,n+1).map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('');
+  return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(x.file)+'</title><style>'
+    +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/16px "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
+    +'h1{font-size:16px;margin:6px 0 6px;text-align:center}.unit{font-weight:700;margin:0}.note{margin:0;font-size:10.5px}.note b{display:block}'
+    +'table{width:100%;border-collapse:collapse;margin:8px 0 4px}th,td{border:1px solid #999;padding:3px 5px;text-align:left;vertical-align:top;word-break:break-word}'
+    +'th{background:#e6edf5;font-weight:600;text-align:center}.tk{table-layout:fixed}tr{break-inside:avoid}thead{display:table-header-group}'
+    +'</style></head><body><p class="unit">ĐƠN VỊ: '+esc(x.unit)+'</p><h1>'+esc(x.title)+'</h1>'
+    +'<div class="note"><b>'+esc(ID_NOTES[0])+'</b>'+ID_NOTES.slice(1).map(t=>'<div>'+esc(t)+'</div>').join('')+'</div>'
+    +'<table class="tk">'+colg+head+'<tbody>'+body+'</tbody></table></body></html>';
+}
+function idExport(fmt){
+  const x=idCtx();
+  if(!x.list.length){flash('Chưa có sáng kiến nào để xuất.');return}
+  try{
+    if(fmt==='xlsx'){download(buildIdeaXlsx(x),x.file+'.xlsx');flash('Đã tạo file Excel.',true)}
+    else{
+      const html=buildIdeaPrintHtml(x);flash('Đang tạo file PDF…',true);
+      buildPdfBlob(html).then(bl=>{download(bl,x.file+'.pdf');flash('Đã tạo file PDF.',true)})
+        .catch(()=>{printHtml(html);flash('Không tạo được file PDF trực tiếp. Trong hộp thoại in, chọn "Lưu dưới dạng PDF" ở mục Máy in.',true)})}
+  }catch(e){flash('Không xuất được: '+(e&&e.message?e.message:e))}
+}
+function buildIdeas(){
+  const f=(lab,inner,cls)=>'<label class="field'+(cls?' '+cls:'')+'"><span>'+lab+'</span>'+inner+'</label>';
+  return '<section id="tab-ideas" class="app" hidden>'
+  +'<section class="panel"><div class="cr-head"><h2>Sáng kiến</h2><div class="ngrp"><button type="button" class="btn primary" data-act="id-new">Thêm sáng kiến</button>'
+  +'<button type="button" class="btn" data-act="id-xlsx">Xuất Excel</button><button type="button" class="btn" data-act="id-pdf">Xuất PDF</button></div></div>'
+  +'<p class="muted">Nhập sáng kiến của bạn theo đúng các cột của bảng tổng hợp đăng ký sáng kiến. Mỗi sáng kiến một dòng; tên tác giả chỉ ghi họ tên, không viết hoa toàn bộ, không kèm chức danh hay tỷ lệ phần trăm. Báo cáo xuất theo bộ lọc đang chọn.</p>'
+  +'<form id="id-form" class="crf" hidden autocomplete="off"><h3 id="id-ftitle">Thêm sáng kiến</h3><div class="cr-form">'
+  +f('Tên sáng kiến (1) *','<input id="id-name" maxlength="500" placeholder="Tên sáng kiến, viết thường theo câu thông thường">','wide')
+  +f('Đơn vị (2)','<input id="id-unit" maxlength="200">')
+  +f('Năm','<input id="id-year" type="number" min="2000" max="2100">')
+  +f('Đợt','<input id="id-round" type="number" min="1" max="9">')
+  +'<div class="wide"><b>Tác giả chủ trì/đồng chủ trì (3) và mã nhân viên (4) *</b><div id="id-leaders"></div><button type="button" class="btn sm" data-act="id-add" data-g="leaders">+ Thêm tác giả chủ trì</button></div>'
+  +'<div class="wide"><b>Tác giả tham gia (5) và mã nhân viên (6)</b><div id="id-members"></div><button type="button" class="btn sm" data-act="id-add" data-g="members">+ Thêm tác giả tham gia</button> <button type="button" class="btn sm" data-act="id-fix">Sửa giúp tên tác giả</button></div>'
+  +f('Mô tả tóm tắt (7)','<textarea id="id-summary" rows="3" maxlength="3000"></textarea>','wide')
+  +f('Lợi ích thu được (8)','<textarea id="id-benefits" rows="3" maxlength="3000"></textarea>','wide')
+  +'</div><div id="id-lint" class="id-lint" hidden></div><div class="actions"><span class="msg" id="id-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" data-act="id-cancel">Đóng</button><button type="button" class="btn primary" id="id-save" data-act="id-save">Thêm sáng kiến</button></div></form></section>'
+  +'<section class="panel"><div class="cr-filters">'
+  +f('Tìm','<input id="id-fq" type="search" placeholder="Tên sáng kiến, tác giả, mã nhân viên…" autocomplete="off">')
+  +f('Năm','<select id="id-fyear"></select>')+f('Đợt','<select id="id-fround"></select>')+f('Xem sáng kiến của','<select id="id-fwho"></select>')
+  +'</div><div id="id-list" class="list"></div></section></section>';
+}
+
 /* ===== Quản lý ===== */
 function fillMoveSelects(){
   const f=$('mv-from'),t=$('mv-to');if(!f||!t)return;
@@ -2562,6 +2776,20 @@ root.addEventListener('click',async e=>{
     }
     if(act==='cr-scan'){
       b.disabled=true;try{const r=await crScan();flash(r.created?'Đã tạo '+r.created+' phiếu từ báo cáo tuần (tổng '+r.found+' mã IT360 trong các việc của bạn). Bổ sung ngày yêu cầu hoàn thành, đơn vị thực hiện.':'Không có mã IT360 mới: '+r.found+' mã trong báo cáo tuần đã có trong danh sách phiếu.',true)}catch(e){flash('Không lấy được: '+fsMsg(e))}b.disabled=false;return}
+    if(act==='id-new'){idOpenForm(null);return}
+    if(act==='id-cancel'){idCloseForm();return}
+    if(act==='id-save'){await idSave();return}
+    if(act==='id-xlsx'||act==='id-pdf'){idExport(act==='id-xlsx'?'xlsx':'pdf');return}
+    if(act==='id-edit'){const i=S.ideas.find(x=>x.id===b.dataset.id);if(i)idOpenForm(i);return}
+    if(act==='id-add'){S.idDraft[b.dataset.g].push({name:'',code:''});idRenderRows();const ins=document.querySelectorAll('#id-'+b.dataset.g+' .id-in');if(ins.length)ins[ins.length-2].focus();return}
+    if(act==='id-rm'){const g=b.dataset.g,i=Number(b.dataset.i);S.idDraft[g].splice(i,1);if(g==='leaders'&&!S.idDraft.leaders.length)S.idDraft.leaders.push({name:'',code:''});idRenderRows();return}
+    if(act==='id-fix'){idFixAuthors();return}
+    if(act==='id-del'){
+      const i=S.ideas.find(x=>x.id===b.dataset.id);if(!i)return;
+      if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Bấm lại để xóa';b.classList.add('danger');setTimeout(()=>{if(b.isConnected&&b.dataset.armed){delete b.dataset.armed;b.textContent='Xóa';b.classList.remove('danger')}},4000);return}
+      try{await deleteDoc(doc(db,'ideas',i.id));flash('Đã xóa sáng kiến.',true)}catch(err){flash(fsMsg(err))}
+      return;
+    }
     if(act==='cr-view'){S.crView=b.dataset.v==='card'?'card':'table';try{localStorage.setItem('bct-crview',S.crView)}catch(e){}renderCr();return}
     if(act==='cr-flag'){S.crF.flag=b.dataset.f==='all'?'':b.dataset.f;renderCrList();return}
     if(act==='cr-edit'){const c=S.crs.find(x=>x.id===b.dataset.id);if(c)crOpenForm(c);return}
@@ -2624,9 +2852,10 @@ root.addEventListener('click',async e=>{
         renderWho();renderReport();
       }
       document.querySelectorAll('.tabs [data-act="tab"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.tab)));if(b.closest('.foot'))window.scrollTo({top:0,behavior:'smooth'});
-      $('tab-report').hidden=S.tab!=='report';$('tab-stats').hidden=S.tab!=='stats';{const tc=$('tab-cr');if(tc)tc.hidden=S.tab!=='cr'}const ta=$('tab-admin');if(ta)ta.hidden=S.tab!=='admin';
+      $('tab-report').hidden=S.tab!=='report';$('tab-stats').hidden=S.tab!=='stats';{const tc=$('tab-cr');if(tc)tc.hidden=S.tab!=='cr'}{const ti=$('tab-ideas');if(ti)ti.hidden=S.tab!=='ideas'}const ta=$('tab-admin');if(ta)ta.hidden=S.tab!=='admin';
       if(S.tab==='cr'&&prevTab!=='cr'){S.crLinked={};S.crF={q:'',st:'',mo:'',who:isAdminUser()?S.user.uid:'',flag:''};S.crWhoInit=true;const fq=$('cr-fq');if(fq)fq.value='';renderCr()}
       if(S.tab==='stats'){if(!monthUnsubs.length)subMonth();renderStats()}
+      if(S.tab==='ideas'&&prevTab!=='ideas'){S.idF={q:'',year:'',round:'',who:isAdminUser()?S.user.uid:''};S.idWhoInit=true;const fq=$('id-fq');if(fq)fq.value='';idCloseForm();renderIdeas()}
       if(S.tab==='cr')renderCr();
       if(S.tab==='admin')renderSettings();
       return;
@@ -2809,8 +3038,11 @@ root.addEventListener('click',async e=>{
     if(act==='cat-move'){await moveCatalog(b.dataset.k,b.dataset.id,Number(b.dataset.d));return}
   }catch(err){flash(fsMsg(err))}
 });
-root.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='cr-fq'){S.crF.q=t.value;renderCrList()}});
-root.addEventListener('change',e=>{const t=e.target;if(!t)return;const m={'cr-fst':'st','cr-fmo':'mo','cr-fwho':'who'}[t.id];if(m){S.crF[m]=t.value;renderCrList()}});
+root.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='cr-fq'){S.crF.q=t.value;renderCrList()}
+  if(t&&t.id==='id-fq'){S.idF.q=t.value;renderIdeaList()}
+  if(t&&t.classList&&t.classList.contains('id-in')){S.idDraft[t.dataset.g][Number(t.dataset.i)][t.dataset.k]=t.value;idShowLint()}
+  if(t&&t.closest&&t.closest('#id-form')&&!(t.classList&&t.classList.contains('id-in')))idShowLint()});
+root.addEventListener('change',e=>{const t=e.target;if(!t)return;const m={'cr-fst':'st','cr-fmo':'mo','cr-fwho':'who'}[t.id];if(m){S.crF[m]=t.value;renderCrList()}const m2={'id-fyear':'year','id-fround':'round','id-fwho':'who'}[t.id];if(m2){S.idF[m2]=t.value;renderIdeaList()}});
 root.addEventListener('submit',e=>{if(e.target&&e.target.id==='cr-form'){e.preventDefault();crSave()}});
 root.addEventListener('toggle',e=>{if(e.target&&e.target.id==='qf-det')S.qfOpen=e.target.open;if(e.target&&e.target.id==='qf-sdet')S.qfSOpen=e.target.open},true);
 root.addEventListener('change',async e=>{
