@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.95 -->
+<!-- Phiên bản 1.96 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1056,10 +1056,12 @@ async function submitQuick(){
 }
 /* Đẩy thông tin cơ bản của việc tuần có mã phiếu IT360 sang tab Phiếu CR/SR (tạo phiếu nếu chưa có) */
 const crIsCodeTk=v=>/^IT360-\d+$/i.test(crNorm(v));
+/* Tên loại việc (t.title) chỉ là tên chung; GHI CHÚ của việc mới là nội dung/tên phiếu CR/SR */
+const crLine=t=>'- '+dm(t.date)+': '+String(t.title||'').trim()+(t.result?' ('+String(t.result).trim()+')':'');
 function crDraft(t,prev){
   const nt=String(t.title||'')+' '+String(typeName(t.type)||'');
-  return {uid:t.uid,code:crNorm(t.ticket),title:t.title||'',kind:/\bSR\b/.test(nt)&&!/\bCR\b/.test(nt)?'SR':'CR',system:t.system,status:'new',
-    createdDate:t.date,reviewDate:'',dueDate:'',doneDate:'',unit:'',coop:'',htkh:'',progress:t.note||t.result||'',link:'',auto:true,ts:Date.now(),updated:Date.now()};
+  return {uid:t.uid,code:crNorm(t.ticket),title:String(t.note||'').trim()||t.title||'',kind:/\bSR\b/.test(nt)&&!/\bCR\b/.test(nt)?'SR':'CR',system:t.system,status:'new',
+    createdDate:t.date,reviewDate:'',dueDate:'',doneDate:'',unit:'',coop:'',htkh:'',progress:crLine(t),link:'',auto:true,ts:Date.now(),updated:Date.now()};
 }
 async function crAutoFromTask(t){
   if(!S.crLoaded||S.crNoRule||t.uid!==S.user.uid)return '';
@@ -1068,11 +1070,11 @@ async function crAutoFromTask(t){
   }
   const code=crNorm(t.ticket),ex=S.crs.find(c=>c.uid===t.uid&&String(c.code).toLowerCase()===code.toLowerCase());
   if(ex){
-    if(!ex.progress&&(t.note||t.result)){await setDoc(doc(db,'crs',ex.id),Object.assign({},ex,{progress:t.note||t.result,updated:Date.now()}));return 'Đã cập nhật tiến độ phiếu '+code+'.'}
+    if(!ex.progress){await setDoc(doc(db,'crs',ex.id),Object.assign({},ex,{progress:crLine(t),updated:Date.now()}));return 'Đã cập nhật tiến độ phiếu '+code+'.'}
     return '';
   }
   const id=doc(collection(db,'crs')).id;await setDoc(doc(db,'crs',id),crDraft(t));
-  return 'Đã đưa phiếu '+code+' sang tab Phiếu CR/SR. Bổ sung ngày yêu cầu hoàn thành, đơn vị thực hiện ở đó.';
+  return 'Đã đưa phiếu '+code+' sang tab Phiếu CR/SR'+(String(t.note||'').trim()?'':' (ghi chú đang trống nên tên phiếu tạm lấy theo tên việc, hãy nhập tên CR vào ghi chú hoặc sửa ở phiếu)')+'. Bổ sung ngày yêu cầu hoàn thành, đơn vị thực hiện ở đó.';
 }
 /* Quét các việc tuần đã nhập từ trước: tạo phiếu cho mọi mã IT360 chưa có trong tab Phiếu CR/SR */
 async function crScan(){
@@ -1081,11 +1083,11 @@ async function crScan(){
   for(const q of qs)(await getDocs(q)).docs.forEach(d=>all.push(Object.assign({id:d.id},d.data())));
   const by=new Map();
   all.filter(t=>crIsCodeTk(t.ticket)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.ts||0)-(b.ts||0)).forEach(t=>{
-    const k=crNorm(t.ticket).toUpperCase();if(!by.has(k))by.set(k,{first:t,last:t});else by.get(k).last=t});
+    const k=crNorm(t.ticket).toUpperCase();if(!by.has(k))by.set(k,{first:t,all:[t]});else by.get(k).all.push(t)});
   let n=0;
   for(const [k,v] of by){
     if(S.crs.some(c=>c.uid===me&&String(c.code).toUpperCase()===k))continue;
-    const d=crDraft(v.first);d.progress=v.last.note||v.last.result||'';
+    const d=crDraft(v.first),wn=v.all.find(x=>String(x.note||'').trim());if(wn)d.title=String(wn.note).trim();d.progress=v.all.map(crLine).join('\n');
     await setDoc(doc(collection(db,'crs')),d);n++;
   }
   return {found:by.size,created:n};
@@ -2547,7 +2549,7 @@ root.addEventListener('click',async e=>{
       const tb=document.querySelector('button[data-act="tab"][data-t="cr"]');if(tb)tb.click();
       if(act==='tk-newcr'){
         if(!t)return;crOpenForm(null);
-        $('cr-code').value=crNorm(t.ticket);$('cr-title').value=t.title||'';
+        $('cr-code').value=crNorm(t.ticket);$('cr-title').value=String(t.note||'').trim()||t.title||'';$('cr-prog').value=crLine(t);
         const sy=$('cr-sys');if(sy&&[...sy.options].some(o=>o.value===t.system))sy.value=t.system;
         flash('Đã điền sẵn từ việc tuần. Bổ sung ngày, đơn vị, tiến độ rồi bấm Thêm phiếu.',true);return;
       }
