@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.03 -->
+<!-- Phiên bản 2.06 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -220,6 +220,9 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .report-box{min-height:16rem;font-family:var(--font-mono);font-size:.82rem;line-height:1.55}
 
 /* Quản lý */
+.combo-pop{position:fixed;z-index:80;overflow:auto;background:var(--surface,#fff);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:4px}
+.combo-opt{padding:.45rem .7rem;border-radius:7px;cursor:pointer;display:flex;flex-direction:column;gap:1px;font-size:.92rem}.combo-opt small{color:var(--ink-2);font-size:.78rem}
+.combo-opt:hover,.combo-opt.on{background:var(--accent-soft)}
 .agg-wrap{overflow-x:auto;margin:0 0 14px}.agg{border-collapse:collapse;width:100%;font-size:.88rem}.agg th,.agg td{border:1px solid var(--line);padding:.35rem .6rem;text-align:left;vertical-align:top}
 .agg th{background:var(--surface);font-weight:600}.agg td.num,.agg th.num{text-align:right;font-variant-numeric:tabular-nums}.agg tr.tot td{font-weight:700;background:var(--surface)}.agg tr.warn td:first-child{border-left:3px solid #c0392b}
 .agg-kpi{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}.agg-kpi>div{border:1px solid var(--line);border-radius:10px;padding:.5rem .9rem;min-width:120px}.agg-kpi b{display:block;font-size:1.5rem;line-height:1.2}.agg-kpi span{font-size:.8rem;color:var(--muted)}.agg-kpi .bad b{color:#c0392b}
@@ -676,7 +679,7 @@ function buildShell(){
   +'<details class="more" id="q-multi"><summary>Nhiều ngày</summary><div class="qdays" id="q-days"></div><small class="muted">Tích các ngày cần nhập. Mỗi ngày được tạo thành một việc riêng; nếu không tích ngày nào thì dùng ngày đã chọn ở trên.</small></details>'
   +'<details class="more" id="q-more"><summary>Kết quả, mã phiếu, ghi chú</summary><div class="grid">'
   +'<label class="field"><span>Kết quả / số liệu</span><input id="q-result" maxlength="400" autocomplete="off" placeholder="Ví dụ: 12/12 phiếu đã đóng"></label>'
-  +'<label class="field"><span>Mã phiếu/Eof/Email</span><input id="q-ticket" maxlength="120" autocomplete="off" list="q-ticket-dl" placeholder="Ví dụ: INC-2026-0001 hoặc mã phiếu CR/SR"><datalist id="q-ticket-dl"></datalist></label>'
+  +'<label class="field"><span>Mã phiếu/Eof/Email</span><input id="q-ticket" maxlength="120" autocomplete="off" data-combo="q-ticket" placeholder="Ví dụ: INC-2026-0001 hoặc mã phiếu CR/SR"></label>'
   +'<label class="field wide"><span>Ghi chú</span><textarea id="q-note" rows="2" maxlength="800" placeholder="Vướng mắc, người phối hợp, đường dẫn"></textarea></label>'
   +'<div class="field wide np" id="q-np" hidden><div class="np-bar"><span class="muted">Chép nhanh tên việc mẫu vào ghi chú:</span><button type="button" class="btn link" data-act="np-cur" id="q-np-cur" disabled>Chép tên việc đang chọn</button><button type="button" class="btn link" data-act="np-toggle" id="q-np-btn" aria-expanded="false">Gợi ý tên việc mẫu ▾</button></div>'
   +'<div class="np-panel" id="q-np-panel" hidden><input id="q-nps" type="search" autocomplete="off" placeholder="Gõ để lọc tên việc mẫu" aria-label="Lọc tên việc mẫu"><div class="np-list" id="q-np-list"></div></div></div></div></details>'
@@ -708,6 +711,39 @@ function buildShell(){
   +'<button type="button" data-act="to-top">Lên đầu trang ↑</button></nav>'
   +'<span class="fstat" id="foot-stat"></span></footer></div>';
 }
+/* ===== Ô nhập có danh sách gợi ý tự vẽ (thay datalist vì mỗi trình duyệt hiển thị một kiểu: Edge, Firefox, Chrome) ===== */
+const COMBOS={
+  'cr-unit':()=>[...new Map(CR_UNITS.concat(S.crs.map(c=>c.unit)).map(x=>String(x||'').trim()).filter(Boolean).map(x=>[x.toLowerCase(),x])).values()].map(v=>({v:v})),
+  'id-grade':()=>[...new Map(S.ideas.map(x=>String(x.grade||'').trim()).filter(Boolean).map(x=>[x.toLowerCase(),x])).values()].sort((a,b)=>a.localeCompare(b,'vi')).map(v=>({v:v})),
+  'q-ticket':()=>S.crs.filter(c=>S.user&&c.uid===S.user.uid&&crIsOpen(c)).sort((a,b)=>String(b.createdDate||'').localeCompare(String(a.createdDate||''))).map(c=>({v:c.code,l:c.title}))
+};
+let comboEl=null,comboInp=null,comboAct=-1;
+function comboPop(){if(!comboEl){comboEl=document.createElement('div');comboEl.className='combo-pop';comboEl.setAttribute('role','listbox');comboEl.hidden=true;document.body.appendChild(comboEl)}return comboEl}
+function comboHide(){if(comboEl)comboEl.hidden=true;comboAct=-1}
+function comboShow(inp){
+  const get=COMBOS[inp.dataset.combo];if(!get)return;comboInp=inp;
+  let list=get();const raw=inp.value.trim(),q=normQ(raw);
+  if(q&&!list.some(o=>o.v.toLowerCase()===raw.toLowerCase()))list=list.filter(o=>normQ(o.v+' '+(o.l||'')).indexOf(q)>=0);
+  const el=comboPop();if(!list.length){comboHide();return}
+  el.innerHTML=list.map((o,i)=>'<div class="combo-opt" role="option" data-i="'+i+'" data-v="'+esc(o.v)+'"><span>'+esc(o.v)+'</span>'+(o.l?'<small>'+esc(o.l)+'</small>':'')+'</div>').join('');
+  const r=inp.getBoundingClientRect();
+  el.style.left=Math.max(4,r.left)+'px';el.style.top=(r.bottom+4)+'px';el.style.minWidth=Math.max(160,r.width)+'px';el.style.maxHeight=Math.max(120,Math.min(260,window.innerHeight-r.bottom-16))+'px';
+  el.hidden=false;comboAct=-1;
+}
+function comboPick(v){if(!comboInp)return;comboInp.value=v;comboInp.dispatchEvent(new Event('input',{bubbles:true}));comboInp.dispatchEvent(new Event('change',{bubbles:true}));comboHide();comboInp.focus()}
+document.addEventListener('focusin',e=>{const t=e.target;if(t&&t.matches&&t.matches('input[data-combo]'))comboShow(t)});
+document.addEventListener('click',e=>{const t=e.target;if(t&&t.matches&&t.matches('input[data-combo]')&&(!comboEl||comboEl.hidden))comboShow(t)});
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.matches&&t.matches('input[data-combo]')&&document.activeElement===t)comboShow(t)});
+document.addEventListener('mousedown',e=>{const o=e.target&&e.target.closest&&e.target.closest('.combo-opt');if(o){e.preventDefault();comboPick(o.dataset.v);return}if(comboEl&&!comboEl.hidden&&e.target!==comboInp)comboHide()});
+document.addEventListener('focusout',e=>{if(e.target&&e.target.matches&&e.target.matches('input[data-combo]'))setTimeout(()=>{if(document.activeElement!==comboInp)comboHide()},120)});
+document.addEventListener('keydown',e=>{
+  if(!comboEl||comboEl.hidden||e.target!==comboInp)return;
+  const n=comboEl.querySelectorAll('.combo-opt').length;
+  if(e.key==='Escape'){comboHide();return}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();comboAct=(comboAct+(e.key==='ArrowDown'?1:-1)+n)%n;comboEl.querySelectorAll('.combo-opt').forEach((x,i)=>{x.classList.toggle('on',i===comboAct);if(i===comboAct)x.scrollIntoView({block:'nearest'})});return}
+  if(e.key==='Enter'&&comboAct>=0){e.preventDefault();comboPick(comboEl.querySelectorAll('.combo-opt')[comboAct].dataset.v)}
+});
+window.addEventListener('scroll',()=>comboHide(),true);window.addEventListener('resize',comboHide);
 /* ===== Tổng hợp CR/SR và Sáng kiến (chỉ quản trị, bản 2.00) ===== */
 const AGG_NOGRADE='(Chưa xếp loại)';
 function aggData(){
@@ -1999,7 +2035,7 @@ function crTimeline(c){
   if(!L||L.loading)return '<div class="cr-tl"><small class="muted">Đang tải các việc trong báo cáo tuần…</small></div>';
   if(L.err)return '<div class="cr-tl"><small class="muted">'+esc(L.err)+'</small></div>';
   if(!L.list.length)return '<div class="cr-tl"><small class="muted">Chưa có việc nào trong báo cáo tuần ghi mã phiếu '+esc(c.code)+'. Khi thêm việc, nhập mã này ở mục "Kết quả, mã phiếu, ghi chú" (hoặc bấm "Thêm việc tuần" ở phiếu).</small></div>';
-  return '<ul class="cr-tl">'+L.list.map(t=>'<li><span class="mono">'+esc(dm(t.date))+'</span> <b>'+esc(t.title||'')+'</b> <span class="cr-tst s-'+(ST[t.status]?t.status:'wait')+'">'+esc((ST[t.status]||ST.wait).label)+'</span>'
+  return '<ul class="cr-tl">'+L.list.map(t=>'<li><span class="mono">'+esc(crWk(t.date))+' · '+esc(dm(t.date))+'</span> <b>'+esc(t.title||'')+'</b> <span class="cr-tst s-'+(ST[t.status]?t.status:'wait')+'">'+esc((ST[t.status]||ST.wait).label)+'</span>'
     +(t.note?'<div class="cr-tn">'+esc(t.note)+'</div>':'')+(t.result?'<div class="cr-tn muted">Kết quả: '+esc(t.result)+'</div>':'')
     +'<button type="button" class="btn link sm" data-act="cr-useprog" data-id="'+esc(c.id)+'" data-tid="'+esc(t.id)+'">Dùng làm tiến độ hiện tại</button></li>').join('')+'</ul>';
 }
@@ -2028,7 +2064,11 @@ function crTable(a){
   return h+'</tbody></table></div>';
 }
 function crMiss(c){return crIsOpen(c)&&!c.dueDate?'<div class="cr-n"><span class="cr-flag soon">Chưa có ngày yêu cầu hoàn thành</span></div>':''}
-function crLinkInfo(c){const L=S.crLinked[c.id];if(!L||!L.list)return '';const n=L.list.length;if(!n)return '<div class="cr-n muted">Chưa có việc tuần</div>';const t=L.list[n-1];return '<div class="cr-n"><b>'+n+' việc tuần</b> · gần nhất '+esc(dm(t.date))+'</div>'}
+const crWk=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')?'Tuần '+weekNo(mondayOf(parse(d))):'';
+function crLinkInfo(c){const L=S.crLinked[c.id];if(!L||!L.list)return '';const n=L.list.length;if(!n)return '<div class="cr-n muted">Chưa có việc tuần</div>';
+  const a=L.list[0],z=L.list[n-1],wa=crWk(a.date),wz=crWk(z.date);
+  const wk=wa===wz?wa:wa+' đến '+wz,dt=n===1||a.date===z.date?dm(a.date):dm(a.date)+' – '+dm(z.date);
+  return '<div class="cr-n"><b>'+n+' việc</b> thuộc '+esc(wk)+' ('+esc(dt)+')</div>'}
 function crRow(c){
   const late=crLate(c),soon=crSoon(c),adm=crSeesAll();
   const flag=crFlagHtml(c);
@@ -2238,7 +2278,7 @@ function buildCr(){
   +f('','Ngày thẩm định','<input id="cr-review" type="date">')
   +f('','Ngày yêu cầu hoàn thành','<input id="cr-due" type="date">')
   +f('','Ngày hoàn thành','<input id="cr-done" type="date">')
-  +f('','Đơn vị thực hiện','<input id="cr-unit" maxlength="120" list="cr-unit-dl" placeholder="VNPT IT, VNPT AI, Ban Sản phẩm…"><datalist id="cr-unit-dl"></datalist>')
+  +f('','Đơn vị thực hiện','<input id="cr-unit" maxlength="120" autocomplete="off" data-combo="cr-unit" placeholder="VNPT IT, VNPT AI, Ban Sản phẩm…">')
   +f('','TT DVKH (người phụ trách; bỏ trống = chủ phiếu)','<input id="cr-htkh" maxlength="120" placeholder="Ví dụ: Nguyễn Văn A">')
   +f('','Nhân sự phối hợp','<textarea id="cr-coop" rows="3" maxlength="800" placeholder="Mỗi người một dòng (Enter để xuống dòng), ví dụ:&#10;- Nguyễn Văn A&#10;- Trần Văn B"></textarea>')
   +f('','Tiến độ hiện tại','<textarea id="cr-prog" rows="2" maxlength="1500" placeholder="Ví dụ: Phiếu đã chuyển sang IT ở trạng thái Phân tích yêu cầu"></textarea>','wide')
@@ -2464,7 +2504,7 @@ function buildIdeas(){
   +'<div class="wide"><b>Tác giả tham gia (5) và mã nhân viên (6)</b><div id="id-members"></div><button type="button" class="btn sm" data-act="id-add" data-g="members">+ Thêm tác giả tham gia</button> <button type="button" class="btn sm" data-act="id-fix">Sửa giúp tên tác giả</button></div>'
   +f('Mô tả tóm tắt (7)','<textarea id="id-summary" rows="3" maxlength="3000"></textarea>','wide')
   +f('Lợi ích thu được (8)','<textarea id="id-benefits" rows="3" maxlength="3000"></textarea>','wide')
-  +f('Xếp loại (9)','<input id="id-grade" maxlength="60" list="id-grade-dl" placeholder="Ví dụ: Loại A (gõ hoặc chọn giá trị đã dùng)"><datalist id="id-grade-dl"></datalist>')
+  +f('Xếp loại (9)','<input id="id-grade" maxlength="60" autocomplete="off" data-combo="id-grade" placeholder="Ví dụ: Loại A (gõ hoặc chọn giá trị đã dùng)">')
   +'</div><div id="id-lint" class="id-lint" hidden></div><div class="actions"><span class="msg" id="id-msg" role="status" aria-live="polite"></span><button type="button" class="btn link" data-act="id-cancel">Đóng</button><button type="button" class="btn primary" id="id-save" data-act="id-save">Thêm sáng kiến</button></div></form></section>'
   +'<section class="panel"><div class="cr-filters">'
   +f('Tìm','<input id="id-fq" type="search" placeholder="Tên sáng kiến, tác giả, mã nhân viên…" autocomplete="off">')
