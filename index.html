@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.08 -->
+<!-- Phiên bản 2.11 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -107,7 +107,7 @@ textarea{resize:vertical;min-height:4.5rem}
 .cr-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.cr-code{font-size:.95rem}.cr-lk{font-size:.82rem;color:var(--accent);font-weight:600}
 .cr-title{font-weight:600;margin:2px 0}.cr-meta{color:var(--ink-2);font-size:.84rem}.cr-prog{margin-top:4px;font-size:.9rem}
 .cr-st{border-radius:999px;padding:.1rem .65rem;font-size:.78rem;font-weight:600;background:var(--wait-soft);color:var(--wait)}
-.cr-st-done{background:var(--done-soft);color:var(--done)}.cr-st-dev,.cr-st-it,.cr-st-uat,.cr-st-analysis{background:var(--doing-soft);color:var(--doing)}.cr-st-cancel{background:var(--wait-soft);color:var(--wait);text-decoration:line-through}
+.cr-st-done{background:var(--done-soft);color:var(--done)}.cr-st-dev,.cr-st-approved,.cr-st-it,.cr-st-uat,.cr-st-analysis{background:var(--doing-soft);color:var(--doing)}.cr-st-cancel{background:var(--wait-soft);color:var(--wait);text-decoration:line-through}
 .cr-flag{border-radius:999px;padding:.1rem .6rem;font-size:.78rem;font-weight:700}.cr-flag.late{background:var(--block-soft);color:var(--block)}.cr-flag.soon{background:var(--doing-soft);color:var(--doing)}
 .cr-lkchip{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:.1rem .65rem;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer}.cr-lkchip.new{border-style:dashed;background:transparent}.cr-n{margin-top:3px;font-size:.78rem;font-family:inherit}
 .cr-flag.today{background:var(--block-soft);color:var(--block)}
@@ -179,6 +179,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .sys>summary::-webkit-details-marker{display:none}
 .sys>summary::before{content:"";width:.5rem;height:.5rem;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(-45deg);transition:transform .15s}
 .sys[open]>summary::before{transform:rotate(45deg)}
+.sys.usr{overflow:visible}.sys.usr>summary{border-radius:8px}.sys.usr[open]>summary{border-radius:8px 8px 0 0}.sys.usr>summary .mono{min-width:8rem}.sys.usr.off{opacity:.6}.usr-body{padding:6px 16px 12px}.usr-body .urow:first-child{border-top:0}.sys.tpg>summary h3{margin:0;font-size:1rem}.sys.tpg .trow:first-child{border-top:0}.sys.tpg>.tpg-body{padding:4px 12px 8px}
 .sys h2,.day h3{font-family:var(--font-display);font-weight:800;font-size:1.1rem}
 .head-end{margin-left:auto;display:flex;align-items:center;gap:10px}
 .mini{display:inline-block;width:5.5rem;height:6px;border-radius:3px;background:var(--wait-soft);overflow:hidden}
@@ -844,6 +845,7 @@ function buildAdmin(){
   +'<div class="usys" style="margin-top:10px"><b>Nhóm</b> <span id="u-gchips"></span></div>'
   +'<div class="usys" style="margin-top:6px"><b>Hệ thống phụ trách</b> <span id="u-schips"></span> <small>(không tích = theo hệ thống mặc định của các nhóm; không có thì thấy tất cả. Chọn tối đa 5 nhóm.)</small></div>'
   +'<div class="actions"><button type="submit" class="btn primary">Tạo tài khoản</button><span class="msg" id="u-msg" role="status" aria-live="polite"></span></div></form>'
+  +'<details class="sys uimp" data-sys="uimp" style="margin-bottom:14px"><summary><h2>Nhập danh sách người dùng từ Excel</h2></summary><div class="usr-body"><p class="muted">Tải file mẫu, điền mỗi người một dòng (cùng các trường như khi thêm người dùng: họ tên, tên đăng nhập, mật khẩu, đơn vị, quyền, chức năng, quản lý CR/SR, nhóm, hệ thống phụ trách), rồi chọn tệp .xlsx hoặc .csv. Hệ thống xem trước và báo lỗi từng dòng, bấm tạo mới ghi dữ liệu.</p><div class="ngrp"><button type="button" class="btn" data-act="uimp-tpl">Tải file mẫu người dùng</button><input type="file" id="uimp-file" accept=".xlsx,.csv,.tsv,.txt"></div><div id="uimp-box"></div><div class="actions"><button type="button" class="btn primary" id="uimp-go" data-act="uimp-go" disabled>Tạo tài khoản</button></div></div></details>'
   +'<section class="panel"><h2>Danh sách người dùng</h2><div class="tbl" id="user-list"></div>'
   +'<label class="check" style="margin-top:12px"><input type="checkbox" id="del-data"><span>Khi xóa người dùng, xóa luôn toàn bộ báo cáo, phiếu CR/SR và sáng kiến của người đó<br><small class="muted">Nếu không chọn, báo cáo cũ vẫn được giữ lại và hiện tên "(Không rõ)" khi xem tất cả mọi người.</small></span></label>'
   +'<p class="muted">Xóa người dùng sẽ gỡ hồ sơ, người đó không đăng nhập được nữa. Muốn đặt lại đúng tên đăng nhập cũ cho người khác, cần xóa thêm tài khoản đó trong Firebase (Authentication > Users). Nếu chỉ cần ngừng cho dùng tạm thời, hãy dùng nút Khóa.</p>'
@@ -1196,7 +1198,7 @@ const crLine=t=>'- '+dm(t.date)+': '+String(t.title||'').trim()+(t.result?' ('+S
 function crDraft(t,prev){
   const nt=String(t.title||'')+' '+String(typeName(t.type)||'');
   return {uid:t.uid,code:crNorm(t.ticket),title:String(t.note||'').trim()||t.title||'',kind:/\bSR\b/.test(nt)&&!/\bCR\b/.test(nt)?'SR':'CR',system:t.system,status:'new',
-    createdDate:t.date,reviewDate:'',dueDate:'',doneDate:'',unit:'',coop:'',htkh:'',progress:crLine(t),link:'',auto:true,ts:Date.now(),updated:Date.now()};
+    createdDate:t.date,reviewDate:'',dueDate:'',expDate:'',doneDate:'',unit:'',coop:'',htkh:'',progress:crLine(t),link:'',auto:true,ts:Date.now(),updated:Date.now()};
 }
 async function crAutoFromTask(t){
   if(!S.crLoaded||S.crNoRule||!modOn('cr')||t.uid!==S.user.uid||!crIsTrigger(t))return '';
@@ -1225,6 +1227,234 @@ async function crScan(){
     await setDoc(doc(collection(db,'crs')),d);n++;
   }
   return {found:by.size,created:n};
+}
+
+/* ===== Nhập danh sách phiếu CR/SR từ Excel (.xlsx) hoặc CSV ===== */
+const IMP_HEADS=['Mã IT 360','Nội dung','Chủ phiếu (tên tài khoản)','Loại','Hệ thống','Trạng thái','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Ngày dự kiến hoàn thành','Ngày hoàn thành','Đơn vị thực hiện','Nhân sự phối hợp','TT DVKH','Tiến độ hiện tại','Đường dẫn'];
+/* Từ khóa nhận dạng cột theo tên tiêu đề (không phân biệt hoa thường, dấu); file xuất từ nút "Xuất Excel" cũng nhập lại được */
+const IMP_KEYS=[['code',['ma it 360','ma it360','ma phieu','ma cr','ma']],['title',['noi dung','ten phieu','ten cr']],['owner',['chu phieu','chu phieu (ten tai khoan)','nguoi tao','nguoi phu trach']],['kind',['loai']],['system',['he thong']],['status',['trang thai']],['created',['ngay tao']],['review',['ngay tham dinh']],['due',['ngay yeu cau hoan thanh','han hoan thanh']],['exp',['ngay du kien hoan thanh','du kien hoan thanh']],['done',['ngay hoan thanh']],['unit',['don vi thuc hien','don vi']],['coop',['nhan su phoi hop','phoi hop']],['htkh',['tt dvkh','dvkh']],['progress',['tien do hien tai','tien do']],['link',['duong dan','duong dan phieu','link']]];
+async function impInflate(u8){const ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();w.write(u8);w.close();return new Uint8Array(await new Response(ds.readable).arrayBuffer())}
+async function impUnzip(buf){
+  const u=new Uint8Array(buf),dv=new DataView(buf),out={};let e=u.length-22;
+  while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  if(e<0)throw new Error('Tệp không phải Excel .xlsx hợp lệ.');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const td=new TextDecoder();
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    const meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    const name=td.decode(u.subarray(p+46,p+46+nl));p+=46+nl+el+cl;
+    if(!/^xl\/(workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/[^/]+\.xml)$/.test(name))continue;
+    const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=u.subarray(ds,ds+csz);
+    out[name]=td.decode(meth===0?raw:await impInflate(raw));
+  }
+  return out;
+}
+const impCol=r=>{const m=/^([A-Z]+)/.exec(r||'');let n=0;if(m)for(const ch of m[1])n=n*26+ch.charCodeAt(0)-64;return n-1};
+async function impReadXlsx(buf){
+  const z=await impUnzip(buf),X=s=>new DOMParser().parseFromString(s,'application/xml');
+  const wb=X(z['xl/workbook.xml']||''),rels=X(z['xl/_rels/workbook.xml.rels']||'');
+  const sh=[...wb.getElementsByTagName('sheet')].map(s=>({name:s.getAttribute('name'),rid:s.getAttribute('r:id')||s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')}));
+  const tgt=id=>{const r=[...rels.getElementsByTagName('Relationship')].find(x=>x.getAttribute('Id')===id);if(!r)return '';let t=r.getAttribute('Target')||'';t=t.replace(/^\//,'');return t.indexOf('xl/')===0?t:'xl/'+t};
+  const pick=sh.find(s=>/nhap phieu|phieu cr/.test(normQ(s.name)))||sh[0];
+  const path=pick?tgt(pick.rid):'xl/worksheets/sheet1.xml';
+  if(!z[path])throw new Error('Không đọc được trang tính trong tệp Excel.');
+  const ss=z['xl/sharedStrings.xml']?[...X(z['xl/sharedStrings.xml']).getElementsByTagName('si')].map(si=>[...si.getElementsByTagName('t')].map(t=>t.textContent).join('')):[];
+  const rows=[];
+  [...X(z[path]).getElementsByTagName('row')].forEach(r=>{
+    const row=[];
+    [...r.getElementsByTagName('c')].forEach(c=>{
+      const t=c.getAttribute('t'),vv=c.getElementsByTagName('v')[0],i=impCol(c.getAttribute('r'));let v='';
+      if(t==='s')v=ss[Number(vv&&vv.textContent)]||'';
+      else if(t==='inlineStr')v=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');
+      else if(vv)v=t==='n'||!t?Number(vv.textContent):vv.textContent;
+      row[i<0?row.length:i]=v});
+    rows.push(Array.from(row,x=>x==null?'':x));
+  });
+  return rows;
+}
+function impReadCsv(text){
+  const first=text.split(/\r?\n/)[0]||'',sep=first.split('\t').length>=first.split(';').length&&first.indexOf('\t')>=0?'\t':(first.split(';').length>first.split(',').length?';':',');
+  const rows=[];let row=[],cur='',q=false;text=text.replace(/^﻿/,'');
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;else if(ch===sep){row.push(cur);cur=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cur);rows.push(row);row=[];cur=''}
+    else cur+=ch}
+  if(cur||row.length){row.push(cur);rows.push(row)}
+  return rows;
+}
+const impOkYmd=(y,m,d)=>{const t=new Date(Date.UTC(+y,+m-1,+d));return t.getUTCFullYear()===+y&&t.getUTCMonth()===+m-1&&t.getUTCDate()===+d};
+function impDate(v){
+  const r=impDate0(v);return r&&!impOkYmd(r.slice(0,4),r.slice(5,7),r.slice(8,10))?null:r}
+function impDate0(v){
+  if(v===''||v==null)return '';
+  if(typeof v==='number'){if(v<20000||v>80000)return null;const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0')}
+  const s=String(v).trim();let m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)))return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  if((m=/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/.exec(s)))return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  if(/^\d{5}$/.test(s))return impDate(Number(s));
+  return null;
+}
+/* Phân tích các dòng đã đọc thành danh sách phiếu + lỗi từng dòng */
+function impParse(rows){
+  const me=S.user.uid,adm=isAdminUser();
+  let hi=rows.findIndex(r=>r.some(x=>IMP_KEYS[0][1].includes(normQ(x)))&&r.some(x=>IMP_KEYS[1][1].includes(normQ(x))));
+  if(hi<0)return {err:'Không thấy dòng tiêu đề có cột "Mã IT 360" và "Nội dung". Hãy dùng file mẫu (nút "Tải file mẫu") hoặc file xuất từ nút "Xuất Excel".'};
+  const idx={};rows[hi].forEach((h,i)=>{const k=normQ(h);IMP_KEYS.forEach(([f,names])=>{if(idx[f]===undefined&&names.includes(k))idx[f]=i})});
+  const get=(r,f)=>idx[f]===undefined?'':(r[idx[f]]==null?'':r[idx[f]]);
+  const sysBy=new Map(S.systems.map(s=>[normQ(s.name),s.id]).concat(S.systems.map(s=>[normQ(s.id),s.id])));
+  const stBy=new Map(CR_ST.map(s=>[normQ(s[1]),s[0]]).concat(CR_ST.map(s=>[s[0],s[0]]),[['da phe duyet','approved'],['chuyen it','approved'],['dang phan tich','new'],['huy','cancel'],['analysis','new'],['it','approved']]));
+  const list=[],seen=new Set();
+  rows.slice(hi+1).forEach((r,ri)=>{
+    const line=hi+ri+2,codeRaw=String(get(r,'code')).trim(),title=String(get(r,'title')).trim();
+    if(!codeRaw&&!title)return;
+    if(!codeRaw||!title){if(!codeRaw&&title&&!/^\d+$/.test(title)&&r.filter(x=>x!=='').length<=2)return;list.push({line,err:'Thiếu '+(codeRaw?'nội dung':'mã phiếu')});return}
+    const e=[],code=crNorm(codeRaw),d={};
+    let uid=me;const ow=String(get(r,'owner')).trim();
+    if(ow){const k=normQ(ow),m=S.users.filter(u=>normQ(u.name||'')===k||normQ(u.username||'')===k);
+      if(m.length!==1)e.push('Chủ phiếu "'+ow+'" '+(m.length?'trùng tên nhiều tài khoản':'không khớp tài khoản nào'));
+      else if(m[0].uid!==me&&!adm)e.push('Chỉ quản trị mới nhập phiếu cho người khác');
+      else uid=m[0].uid}
+    const sy=String(get(r,'system')).trim();let sys='';
+    if(sy){sys=sysBy.get(normQ(sy))||'';if(!sys)e.push('Hệ thống "'+sy+'" không có trong danh mục')}
+    const kd=String(get(r,'kind')).trim().toUpperCase();if(kd&&kd!=='CR'&&kd!=='SR')e.push('Loại phải là CR hoặc SR');
+    const stv=String(get(r,'status')).trim();let st='';
+    if(stv){st=stBy.get(normQ(stv))||'';if(!st)e.push('Trạng thái "'+stv+'" không hợp lệ')}
+    const dt={};[['created','createdDate'],['review','reviewDate'],['due','dueDate'],['exp','expDate'],['done','doneDate']].forEach(([f,k])=>{const v=impDate(get(r,f));if(v===null)e.push('Ngày "'+get(r,f)+'" sai định dạng (dùng dd/mm/yyyy)');else if(v)dt[k]=v});
+    const lk=String(get(r,'link')).trim();if(lk&&!/^https?:\/\//i.test(lk))e.push('Đường dẫn phải bắt đầu bằng http:// hoặc https://');
+    const key=uid+'|'+code.toLowerCase();if(seen.has(key))e.push('Trùng mã '+code+' với dòng phía trên trong file');seen.add(key);
+    const tx=f=>String(get(r,f)).trim();
+    Object.assign(d,{code:code,title:title.slice(0,500),uid:uid},dt);
+    if(kd)d.kind=kd;if(sys)d.system=sys;if(st)d.status=st;
+    if(tx('unit'))d.unit=crUnitN(tx('unit').slice(0,120));if(tx('coop'))d.coop=tx('coop').replace(/^• /gm,'- ').slice(0,800);
+    if(tx('htkh')){d.htkh=tx('htkh').slice(0,120);const hu=crHtkhUid(d.htkh);d.htkhUid=hu;if(hu)d.htkh=userName(hu)}
+    if(tx('progress'))d.progress=tx('progress').slice(0,1500);if(lk)d.link=lk.slice(0,500);
+    const ex=S.crs.find(c=>c.uid===uid&&String(c.code).toLowerCase()===code.toLowerCase());
+    if(!ex&&!d.system)e.push('Phiếu mới cần cột Hệ thống');
+    list.push(e.length?{line,err:e.join('; '),code:code}:{line,d:d,ex:ex||null,code:code,title:d.title,owner:userName(uid)});
+  });
+  return {list:list};
+}
+let impPlan=null;
+function impRender(box,msg){
+  if(!box)return;
+  if(msg){box.innerHTML='<p class="muted">'+esc(msg)+'</p>';return}
+  const ok=impPlan.list.filter(x=>x.d),bad=impPlan.list.filter(x=>!x.d),nNew=ok.filter(x=>!x.ex).length,nUp=ok.length-nNew;
+  let h='<p><b>'+impPlan.list.length+' dòng</b>: '+nNew+' phiếu mới, '+nUp+' phiếu cập nhật'+(bad.length?', <span style="color:#b42318"><b>'+bad.length+' dòng lỗi (sẽ bỏ qua)</b></span>':'')+'.</p>';
+  if(bad.length)h+='<ul class="imp-err">'+bad.slice(0,50).map(x=>'<li>Dòng '+x.line+(x.code?' ('+esc(x.code)+')':'')+': '+esc(x.err)+'</li>').join('')+(bad.length>50?'<li>… và '+(bad.length-50)+' dòng khác</li>':'')+'</ul>';
+  if(ok.length)h+='<div class="crt-wrap"><table class="crt"><thead><tr><th>Dòng</th><th>Mã IT 360</th><th>Nội dung</th><th>Chủ phiếu</th><th>Việc sẽ làm</th></tr></thead><tbody>'+ok.slice(0,30).map(x=>'<tr><td class="c">'+x.line+'</td><td class="mono">'+esc(x.code)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.owner)+'</td><td>'+(x.ex?'Cập nhật':'Thêm mới')+'</td></tr>').join('')+'</tbody></table></div>'+(ok.length>30?'<p class="muted">Hiện 30 dòng đầu trong '+ok.length+' dòng hợp lệ.</p>':'');
+  box.innerHTML=h;const go=$('cr-imp-go');if(go){go.disabled=!ok.length;go.textContent=ok.length?'Nhập '+ok.length+' phiếu':'Không có dòng hợp lệ'}
+}
+async function impLoadRows(file){
+  let rows;
+  if(/\.xlsx$/i.test(file.name))rows=await impReadXlsx(await file.arrayBuffer());
+  else if(/\.(csv|tsv|txt)$/i.test(file.name))rows=impReadCsv(await file.text());
+  else throw new Error('Chỉ nhận tệp .xlsx hoặc .csv.');
+  if(rows.length>1001)throw new Error('Tệp có quá 1000 dòng, hãy chia nhỏ rồi nhập từng phần.');
+  return rows;
+}
+async function impFile(file){
+  const box=$('cr-imp-box'),go=$('cr-imp-go');impPlan=null;if(go){go.disabled=true;go.textContent='Nhập phiếu'}
+  if(!file)return;
+  impRender(box,'Đang đọc tệp…');
+  try{
+    const rows=await impLoadRows(file);
+    const r=impParse(rows);if(r.err)throw new Error(r.err);
+    impPlan=r;if(!r.list.length)throw new Error('Không có dòng dữ liệu nào dưới dòng tiêu đề.');
+    impRender(box);
+  }catch(e){impPlan=null;impRender(box,e&&e.message||'Không đọc được tệp.')}
+}
+async function impRun(){
+  if(!impPlan)return;const ok=impPlan.list.filter(x=>x.d);if(!ok.length)return;
+  const go=$('cr-imp-go');go.disabled=true;go.textContent='Đang nhập…';let n=0;
+  try{
+    for(let i=0;i<ok.length;i+=400){
+      const b=writeBatch(db);
+      ok.slice(i,i+400).forEach(x=>{
+        if(x.ex)b.set(doc(db,'crs',x.ex.id),Object.assign({},x.ex,x.d,{uid:x.ex.uid,updated:Date.now()}));
+        else{const d=Object.assign({status:'new',kind:'CR',createdDate:iso(new Date()),reviewDate:'',dueDate:'',expDate:'',doneDate:'',unit:'',coop:'',htkh:'',htkhUid:'',progress:'',link:'',ts:Date.now()},x.d,{updated:Date.now()});
+          if(d.status==='done'&&!d.doneDate)d.doneDate=iso(new Date());if(d.status!=='done')d.doneDate='';
+          b.set(doc(collection(db,'crs')),d)}});
+      await b.commit();n+=Math.min(400,ok.length-i)}
+    flash('Đã nhập '+n+' phiếu CR/SR.',true);impClose();
+  }catch(e){flash(fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.28, xem HUONG-DAN.md)':'')+(n?' Đã nhập trước đó '+n+' phiếu.':''));go.disabled=false;go.textContent='Nhập '+ok.length+' phiếu'}
+}
+function impClose(){impPlan=null;const p=$('cr-imp');if(p)p.hidden=true;const f=$('cr-imp-file');if(f)f.value='';const b=$('cr-imp-box');if(b)b.innerHTML=''}
+function impTemplate(){
+  const ex=['IT360-163228','Xây dựng module phân tích cuộc gọi IB',isAdminUser()?'Nguyễn Văn A':'','CR',(S.systems.find(s=>s.active!==false)||{name:'IPCC Voice'}).name,'Đang phát triển','01/11/2026','05/11/2026','30/12/2026','15/12/2026','','VNPT IT','- Nguyễn Văn A\n- Trần Văn B','Nguyễn Văn A','Đã chuyển IT ở trạng thái phân tích yêu cầu','https://'];
+  const guide=[['Hướng dẫn nhập danh sách phiếu CR/SR'],[''],['1. Điền mỗi phiếu một dòng ở trang "Nhập phiếu", bắt đầu từ dòng 3 (dòng 2 là ví dụ, có thể xóa hoặc ghi đè).'],['2. Bắt buộc: Mã IT 360 và Nội dung. Phiếu mới còn cần Hệ thống (đúng tên trong danh mục).'],['3. Chủ phiếu: tên tài khoản người sở hữu phiếu. Bỏ trống = tài khoản đang nhập. Chỉ quản trị mới nhập được cho người khác.'],['4. Loại: CR hoặc SR. Trạng thái: '+CR_ST.map(s=>s[1]).join(', ')+'.'],['5. Ngày ghi dạng dd/mm/yyyy (ví dụ 31/10/2026).'],['6. Nhân sự phối hợp: nhiều người thì xuống dòng trong ô (Alt+Enter).'],['7. TT DVKH: tên tài khoản người phụ trách; người đó sẽ thấy phiếu ở chế độ chỉ xem.'],['8. Mã phiếu đã có của cùng chủ phiếu thì phiếu cũ được cập nhật; cột để trống thì giữ nguyên dữ liệu cũ.'],[''],['Hệ thống hiện có: '+S.systems.filter(s=>s.active!==false).map(s=>s.name).join(', ')]];
+  download(makeXlsx([{name:'Nhập phiếu',rows:[IMP_HEADS,ex],headRows:[0],freeze:1,widths:[16,44,22,8,18,18,12,12,14,14,12,16,24,18,40,30]},{name:'Hướng dẫn',rows:guide,titleRows:[0],widths:[110]}]),'Mau_nhap_phieu_CR-SR.xlsx');
+}
+
+/* ===== Nhập danh sách người dùng từ Excel (.xlsx) hoặc CSV ===== */
+const UIMP_HEADS=['Họ tên','Tên đăng nhập','Mật khẩu (tối thiểu 6 ký tự)','Đơn vị','Quyền','Chức năng được dùng','Quản lý CR/SR','Nhóm','Hệ thống phụ trách'];
+const UIMP_KEYS=[['name',['ho ten','ho va ten','ten']],['user',['ten dang nhap','tai khoan','username']],['pass',['mat khau']],['unit',['don vi']],['role',['quyen']],['mods',['chuc nang']],['crall',['quan ly cr']],['groups',['nhom']],['systems',['he thong']]];
+let uimpPlan=null;
+const uimpList=v=>String(v||'').split(/[;\n]+/).map(x=>x.trim()).filter(Boolean);
+function uimpParse(rows){
+  const hi=rows.findIndex(r=>r.some(x=>normQ(x).indexOf('ten dang nhap')===0)&&r.some(x=>normQ(x).indexOf('mat khau')===0));
+  if(hi<0)return {err:'Không thấy dòng tiêu đề có cột "Tên đăng nhập" và "Mật khẩu". Hãy dùng file mẫu (nút "Tải file mẫu người dùng").'};
+  const idx={};rows[hi].forEach((h,i)=>{const k=normQ(h);UIMP_KEYS.forEach(([f,names])=>{if(idx[f]===undefined&&names.some(n=>k===n||(n.length>3&&k.indexOf(n)===0)))idx[f]=i})});
+  const get=(r,f)=>String(idx[f]===undefined||r[idx[f]]==null?'':r[idx[f]]).trim();
+  const gBy=new Map(S.groups.filter(g=>g.active!==false).map(g=>[normQ(g.name),g.id])),sBy=new Map(S.systems.filter(x=>x.active!==false).map(x=>[normQ(x.name),x.id]));
+  const have=new Set(S.users.map(u=>String(u.username||'').toLowerCase())),seen=new Set(),list=[];
+  rows.slice(hi+1).forEach((r,ri)=>{
+    const line=hi+ri+2;if(!r.some(x=>String(x).trim()!==''))return;
+    const e=[],name=get(r,'name'),user=normUser(get(r,'user')),pass=get(r,'pass'),role=/quan tri|admin/.test(normQ(get(r,'role')))?'admin':'user';
+    if(!name)e.push('Thiếu họ tên');
+    if(!userOk(user))e.push(user?'Tên đăng nhập "'+user+'" không hợp lệ ('+USER_HINT+')':'Thiếu tên đăng nhập');
+    else if(have.has(user))e.push('Tên đăng nhập "'+user+'" đã có trong hệ thống');
+    else if(seen.has(user))e.push('Trùng tên đăng nhập "'+user+'" với dòng phía trên');
+    if(user)seen.add(user);
+    if(pass.length<6)e.push('Mật khẩu cần tối thiểu 6 ký tự');
+    const mods=[];
+    uimpList(get(r,'mods')).forEach(x=>{const k=normQ(x),m=/bao cao|thong ke/.test(k)?'report':/cr|sr|phieu/.test(k)?'cr':/sang kien/.test(k)?'ideas':'';if(!m)e.push('Chức năng "'+x+'" không hợp lệ (Báo cáo tuần, Phiếu CR/SR, Sáng kiến)');else if(mods.indexOf(m)<0)mods.push(m)});
+    const groups=[],systems=[];
+    uimpList(get(r,'groups')).forEach(x=>{const id=gBy.get(normQ(x));if(!id)e.push('Nhóm "'+x+'" không có trong danh mục');else if(groups.indexOf(id)<0)groups.push(id)});
+    uimpList(get(r,'systems')).forEach(x=>{const id=sBy.get(normQ(x));if(!id)e.push('Hệ thống "'+x+'" không có trong danh mục');else if(systems.indexOf(id)<0)systems.push(id)});
+    if(groups.length>5)e.push('Mỗi người chọn tối đa 5 nhóm');
+    const crAll=/^(co|x|yes|true|1|v)$/.test(normQ(get(r,'crall')));
+    const gn=groups.map(id=>(S.groups.find(g=>g.id===id)||{}).name).join('; '),sn=systems.map(id=>(S.systems.find(x=>x.id===id)||{}).name).join('; ');
+    list.push(e.length?{line:line,err:e.join('; '),user:user}:{line:line,u:{name:name,user:user,pass:pass,unit:get(r,'unit').slice(0,80),role:role,mods:role==='admin'||!mods.length?MODS.map(x=>x[0]):mods,groups:groups,systems:systems,crAll:crAll&&role!=='admin'},gn:gn,sn:sn});
+  });
+  return {list:list};
+}
+function uimpRender(box,msg){
+  if(!box)return;
+  if(msg){box.innerHTML='<p class="muted">'+esc(msg)+'</p>';return}
+  const ok=uimpPlan.list.filter(x=>x.u),bad=uimpPlan.list.filter(x=>!x.u);
+  let h='<p><b>'+uimpPlan.list.length+' dòng</b>: '+ok.length+' tài khoản sẽ được tạo'+(bad.length?', <span style="color:#b42318"><b>'+bad.length+' dòng lỗi (sẽ bỏ qua)</b></span>':'')+'.</p>';
+  if(bad.length)h+='<ul class="imp-err">'+bad.slice(0,50).map(x=>'<li>Dòng '+x.line+(x.user?' ('+esc(x.user)+')':'')+': '+esc(x.err)+'</li>').join('')+(bad.length>50?'<li>… và '+(bad.length-50)+' dòng khác</li>':'')+'</ul>';
+  if(ok.length)h+='<div class="crt-wrap"><table class="crt"><thead><tr><th>Dòng</th><th>Họ tên</th><th>Tên đăng nhập</th><th>Đơn vị</th><th>Quyền</th><th>Nhóm</th><th>Hệ thống phụ trách</th></tr></thead><tbody>'+ok.slice(0,40).map(x=>'<tr><td class="c">'+x.line+'</td><td>'+esc(x.u.name)+'</td><td class="mono">'+esc(x.u.user)+'</td><td>'+esc(x.u.unit)+'</td><td>'+(x.u.role==='admin'?'Quản trị':'Người dùng'+(x.u.crAll?' · Quản lý CR/SR':''))+'</td><td>'+esc(x.gn)+'</td><td>'+esc(x.sn)+'</td></tr>').join('')+'</tbody></table></div>'+(ok.length>40?'<p class="muted">Hiện 40 dòng đầu trong '+ok.length+' dòng hợp lệ.</p>':'');
+  box.innerHTML=h;const go=$('uimp-go');if(go){go.disabled=!ok.length;go.textContent=ok.length?'Tạo '+ok.length+' tài khoản':'Không có dòng hợp lệ'}
+}
+async function uimpFile(file){
+  const box=$('uimp-box'),go=$('uimp-go');uimpPlan=null;if(go){go.disabled=true;go.textContent='Tạo tài khoản'}
+  if(!file)return;uimpRender(box,'Đang đọc tệp…');
+  try{
+    const r=uimpParse(await impLoadRows(file));if(r.err)throw new Error(r.err);
+    if(!r.list.length)throw new Error('Không có dòng dữ liệu nào dưới dòng tiêu đề.');
+    uimpPlan=r;uimpRender(box);
+  }catch(e){uimpPlan=null;uimpRender(box,e&&e.message||'Không đọc được tệp.')}
+}
+async function uimpRun(){
+  if(!uimpPlan)return;const ok=uimpPlan.list.filter(x=>x.u);if(!ok.length)return;
+  const go=$('uimp-go'),box=$('uimp-box');go.disabled=true;let n=0;const fails=[];
+  for(const x of ok){
+    go.textContent='Đang tạo '+(n+fails.length+1)+'/'+ok.length+'…';
+    try{await createUserAsAdmin(x.u.name,x.u.user,x.u.pass,x.u.unit,x.u.role,x.u.groups,x.u.systems,x.u.mods,x.u.crAll);n++}
+    catch(e){fails.push('Dòng '+x.line+' ('+x.u.user+'): '+authMsg(e))}
+  }
+  uimpPlan=null;const f=$('uimp-file');if(f)f.value='';
+  go.disabled=true;go.textContent='Tạo tài khoản';
+  box.innerHTML='<p><b>Đã tạo '+n+' tài khoản.</b>'+(fails.length?' <span style="color:#b42318">'+fails.length+' dòng không tạo được:</span>':' Hãy gửi tên đăng nhập và mật khẩu cho từng người, rồi xóa file Excel chứa mật khẩu.')+'</p>'+(fails.length?'<ul class="imp-err">'+fails.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'');
+  flash('Đã tạo '+n+' tài khoản'+(fails.length?', '+fails.length+' dòng lỗi.':'.'),!fails.length);
+}
+function uimpTemplate(){
+  const g1=S.groups.filter(g=>g.active!==false),s1=S.systems.filter(x=>x.active!==false);
+  const ex=['Nguyễn Văn A','nguyenvana','matkhau123','Phòng Hệ thống','Người dùng','Báo cáo tuần; Phiếu CR/SR; Sáng kiến','Không',g1.length?g1[0].name:'',s1.slice(0,2).map(x=>x.name).join('; ')];
+  const guide=[['Hướng dẫn nhập danh sách người dùng'],[''],['1. Điền mỗi người một dòng ở trang "Nhập người dùng", bắt đầu từ dòng 3 (dòng 2 là ví dụ, có thể xóa hoặc ghi đè).'],['2. Bắt buộc: Họ tên, Tên đăng nhập (3–30 ký tự: chữ không dấu, số, dấu chấm, gạch dưới, gạch ngang), Mật khẩu (tối thiểu 6 ký tự).'],['3. Quyền: Người dùng (mặc định) hoặc Quản trị.'],['4. Chức năng được dùng: '+MODS.map(x=>x[1]).join('; ')+'. Nhiều chức năng ngăn cách bằng dấu chấm phẩy; bỏ trống = tất cả. Quản trị luôn dùng được tất cả.'],['5. Quản lý CR/SR: ghi "Có" để người đó xem phiếu CR/SR của mọi người và dùng Tổng hợp CR/SR (chỉ xem).'],['6. Nhóm (tối đa 5) và Hệ thống phụ trách: ghi đúng tên trong danh mục, nhiều mục ngăn cách bằng dấu chấm phẩy hoặc xuống dòng trong ô. Hệ thống để trống = theo nhóm.'],['7. Tên đăng nhập đã có thì dòng đó bị bỏ qua. Sau khi nhập xong, hãy xóa file này vì có chứa mật khẩu.'],[''],['Nhóm hiện có: '+g1.map(g=>g.name).join('; ')],['Hệ thống hiện có: '+s1.map(x=>x.name).join('; ')]];
+  download(makeXlsx([{name:'Nhập người dùng',rows:[UIMP_HEADS,ex],headRows:[0],freeze:1,widths:[24,18,22,22,14,40,14,26,44]},{name:'Hướng dẫn',rows:guide,titleRows:[0],widths:[120]}]),'Mau_nhap_nguoi_dung.xlsx');
 }
 
 /* ===== Báo cáo văn bản ===== */
@@ -1964,8 +2194,12 @@ function exportReport(kind,fmt){
 /* ===== Phiếu CR/SR =====
    Mỗi nhân viên tự nhập và theo dõi phiếu của mình (chủ phiếu và quản trị xem được, giống đầu việc).
    Liên kết với báo cáo tuần bằng mã phiếu: việc nào có ô "Mã phiếu/Eof/Email" trùng mã phiếu CR/SR thì hiện trong dòng thời gian của phiếu. */
-const CR_ST=[['new','Mới tạo'],['analysis','Đang phân tích'],['it','Chuyển IT'],['dev','Đang phát triển'],['uat','Nghiệm thu / UAT'],['hold','Tạm dừng'],['done','Hoàn thành'],['cancel','Hủy']];
-const CR_UNITS=['VNPT IT','VNPT AI','Ban Sản phẩm'];
+const CR_ST=[['new','Mới tạo'],['approved','Đã phê duyệt (Chuyển IT/Media)'],['dev','Đang phát triển'],['uat','Nghiệm thu / UAT'],['hold','Tạm dừng'],['done','Hoàn thành'],['cancel','Huỷ']];
+/* Trạng thái cũ (bản trước 2.11) quy về trạng thái mới khi tải: Đang phân tích -> Mới tạo, Chuyển IT -> Đã phê duyệt */
+const CR_ST_OLD={analysis:'new',it:'approved'};
+/* Đơn vị "Media" và "VNPT Media" là một: quy về VNPT Media */
+const crUnitN=u=>/^\s*media\s*$/i.test(String(u||''))?'VNPT Media':u;
+const CR_UNITS=['VNPT IT','VNPT AI','Ban Sản phẩm','VNPT Media'];
 const crStName=id=>{const x=CR_ST.find(y=>y[0]===id);return x?x[1]:'Mới tạo'};
 const crIsOpen=c=>c.status!=='done'&&c.status!=='cancel';
 const crFmt=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'')?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4):'';
@@ -1994,7 +2228,7 @@ function subCrs(){
   if(!all)qs=qs.concat(al?[...al].map(id=>query(col,where('system','==',id),where('htkhUid','==',S.user.uid))):[query(col,where('htkhUid','==',S.user.uid))]);
   const parts=new Array(qs.length).fill(null);
   const fin=()=>{if(!parts.every(x=>x))return;S.crs=[...new Map([].concat(...parts).map(c=>[c.id,c])).values()];crBackfill();S.crLoaded=true;renderCr();aggRefresh();fillTicketList();if(S.tab==='report'&&typeof renderReport==='function')try{renderReport()}catch(e){}updateNotices()};
-  qs.forEach((q,i)=>crUnsubs.push(onSnapshot(q,snap=>{S.crNoRule=false;parts[i]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));fin()},err=>{
+  qs.forEach((q,i)=>crUnsubs.push(onSnapshot(q,snap=>{S.crNoRule=false;parts[i]=snap.docs.map(d=>{const x=Object.assign({id:d.id},d.data());if(CR_ST_OLD[x.status])x.status=CR_ST_OLD[x.status];if(x.unit)x.unit=crUnitN(x.unit);return x});fin()},err=>{
     if(err&&err.code==='permission-denied')S.crNoRule=true;
     parts[i]=[];fin()})));
   if(!qs.length){S.crs=[];S.crLoaded=true}
@@ -2055,8 +2289,8 @@ const crHtkh=c=>c.htkh||crOwnerName(c);
 const crHtkhUid=n=>{const k=normQ(n||'');if(!k)return '';const m=S.users.filter(u=>normQ(u.name||u.username||'')===k);return m.length===1?m[0].uid:''};
 const crNl=v=>esc(v||'').replace(/\n/g,'<br>');
 function crTable(a){
-  const heads=['STT','Nội dung','Mã IT 360','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Tiến độ hiện tại','Đơn vị thực hiện','Nhân sự phối hợp','TT DVKH','Ngày hoàn thành',''];
-  const w=[4,17,10,7,7,7.5,19,7,9,6,7,7.5];
+  const heads=['STT','Nội dung','Mã IT 360','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Ngày dự kiến hoàn thành','Tiến độ hiện tại','Đơn vị thực hiện','Nhân sự phối hợp','TT DVKH','Ngày hoàn thành',''];
+  const w=[4,15,10,6.5,6.5,7,7,17,7,8.5,6,6.5,7.5];
   let h='<div class="crt-wrap"><table class="crt"><colgroup>'+w.map(x=>'<col style="width:'+x+'%">').join('')+'</colgroup><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
   a.forEach((c,i)=>{
     const late=crLate(c),soon=crSoon(c),open=S.crOpenTl.has(c.id);
@@ -2065,14 +2299,14 @@ function crTable(a){
     h+='<tr class="cr'+crUrgCls(c)+'" data-id="'+esc(c.id)+'"><td class="c">'+(i+1)+'</td>'
       +'<td><b>'+esc(c.title)+'</b><div class="cr-meta">'+esc([c.kind||'CR',crSysName(c.system)].concat((crSeesAll()||c.uid!==S.user.uid)?['Chủ phiếu: '+crOwnerName(c)]:[]).join(' · '))+'</div></td>'
       +'<td class="mono">'+link+'<div><span class="cr-st cr-st-'+esc(c.status||'new')+'">'+esc(crStName(c.status))+'</span></div>'+(flag?'<div>'+flag+'</div>':'')+crMiss(c)+crLinkInfo(c)+'</td>'
-      +'<td class="c">'+esc(crFmt(c.createdDate))+'</td><td class="c">'+esc(crFmt(c.reviewDate))+'</td><td class="c">'+esc(crFmt(c.dueDate))+'</td>'
+      +'<td class="c">'+esc(crFmt(c.createdDate))+'</td><td class="c">'+esc(crFmt(c.reviewDate))+'</td><td class="c">'+esc(crFmt(c.dueDate))+'</td><td class="c">'+esc(crFmt(c.expDate))+'</td>'
       +'<td>'+(c.progress?crNl(c.progress):'<span class="muted">Chưa ghi tiến độ.</span>')+'</td>'
       +'<td>'+crNl(c.unit)+'</td><td>'+crNl(c.coop)+'</td><td>'+esc(crHtkh(c))+'</td><td class="c">'+esc(crFmt(c.doneDate))+'</td>'
       +'<td class="crt-act">'+(crCanEdit(c)?'<button type="button" class="btn sm" data-act="cr-edit" data-id="'+esc(c.id)+'">Sửa</button>'
       +'<button type="button" class="btn sm" data-act="cr-addtask" data-id="'+esc(c.id)+'">+ Việc tuần</button>'
       +'<button type="button" class="btn sm" data-act="cr-tl" data-id="'+esc(c.id)+'" aria-expanded="'+open+'">'+(open?'Ẩn việc':'Việc liên quan')+'</button>'
       +'<button type="button" class="btn sm danger-o" data-act="cr-del" data-id="'+esc(c.id)+'">Xóa</button>':'<span class="muted">Chỉ xem</span>')+'</td></tr>'
-      +(open?'<tr class="crt-tl"><td></td><td colspan="11">'+crTimeline(c)+'</td></tr>':'');
+      +(open?'<tr class="crt-tl"><td></td><td colspan="12">'+crTimeline(c)+'</td></tr>':'');
   });
   return h+'</tbody></table></div>';
 }
@@ -2086,7 +2320,7 @@ function crLinkInfo(c){const L=S.crLinked[c.id];if(!L||!L.list)return '';const n
 function crRow(c){
   const late=crLate(c),soon=crSoon(c),adm=crSeesAll();
   const flag=crFlagHtml(c);
-  const meta=[['Tạo',c.createdDate],['Thẩm định',c.reviewDate],['Hạn hoàn thành',c.dueDate],['Đã hoàn thành',c.doneDate]].filter(x=>x[1]).map(x=>x[0]+' '+crFmt(x[1]));
+  const meta=[['Tạo',c.createdDate],['Thẩm định',c.reviewDate],['Hạn hoàn thành',c.dueDate],['Dự kiến hoàn thành',c.expDate],['Đã hoàn thành',c.doneDate]].filter(x=>x[1]).map(x=>x[0]+' '+crFmt(x[1]));
   const info=[c.kind||'CR',crSysName(c.system)].filter(Boolean).concat(c.unit?['Đơn vị: '+c.unit]:[],c.coop?['Phối hợp: '+String(c.coop).split(/\n+/).map(x=>x.replace(/^\s*[-•]\s*/,'').trim()).filter(Boolean).join('; ')]:[],c.htkh?['TT DVKH: '+c.htkh]:[],(adm||c.uid!==S.user.uid)?['Chủ phiếu: '+crOwnerName(c)]:[]);
   const open=S.crOpenTl.has(c.id);
   return '<div class="cr'+crUrgCls(c)+'" data-id="'+esc(c.id)+'"><div class="cr-main">'
@@ -2160,7 +2394,7 @@ function crOpenForm(c){
   const set=(id,v)=>{$(id).value=v==null?'':v};
   set('cr-code',c?c.code:'');set('cr-title',c?c.title:'');set('cr-kind',c?(c.kind||'CR'):'CR');
   set('cr-sys',c?c.system:(S.qSystem&&[...$('cr-sys').options].some(o=>o.value===S.qSystem)?S.qSystem:$('cr-sys').options[0]&&$('cr-sys').options[0].value));
-  set('cr-status',c?(c.status||'new'):'new');set('cr-created',c?c.createdDate:iso(new Date()));set('cr-review',c?c.reviewDate:'');set('cr-due',c?c.dueDate:'');set('cr-done',c?c.doneDate:'');
+  set('cr-status',c?(c.status||'new'):'new');set('cr-created',c?c.createdDate:iso(new Date()));set('cr-review',c?c.reviewDate:'');set('cr-due',c?c.dueDate:'');set('cr-exp',c?c.expDate:'');set('cr-done',c?c.doneDate:'');
   set('cr-unit',c?c.unit:'');set('cr-htkh',c?c.htkh:'');set('cr-coop',c?c.coop:'');set('cr-prog',c?c.progress:'');set('cr-link',c?c.link:'');
   $('cr-ftitle').textContent=c?'Sửa phiếu '+c.code:'Thêm phiếu CR/SR';$('cr-save').textContent=c?'Lưu thay đổi':'Thêm phiếu';$('cr-msg').textContent='';
   f.scrollIntoView({block:'nearest',behavior:'smooth'});$('cr-code').focus();
@@ -2181,7 +2415,7 @@ async function crSave(){
   const ed=S.crEdit,uid=ed?ed.uid:S.user.uid;
   if((!ed||String(ed.code).toLowerCase()!==code.toLowerCase())&&S.crs.some(x=>x.uid===uid&&String(x.code).toLowerCase()===code.toLowerCase()&&(!ed||x.id!==ed.id))){msg.textContent='Phiếu '+code+' đã có trong danh sách.';return}
   const body={uid:uid,code:code,title:title,kind:$('cr-kind').value,system:sys,status:st,createdDate:cd,reviewDate:rd,dueDate:dd,doneDate:dn,
-    unit:$('cr-unit').value.trim(),htkh:(crHtkhUid($('cr-htkh').value)?userName(crHtkhUid($('cr-htkh').value)):$('cr-htkh').value.trim()),htkhUid:crHtkhUid($('cr-htkh').value),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
+    unit:crUnitN($('cr-unit').value.trim()),expDate:$('cr-exp').value,htkh:(crHtkhUid($('cr-htkh').value)?userName(crHtkhUid($('cr-htkh').value)):$('cr-htkh').value.trim()),htkhUid:crHtkhUid($('cr-htkh').value),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
   $('cr-save').disabled=true;msg.textContent='Đang lưu…';
   try{
     const id=ed?ed.id:doc(collection(db,'crs')).id;
@@ -2231,13 +2465,13 @@ function crGroups(list){
   return [...g.keys()].sort().reverse().sort((a,b)=>(a==='none')-(b==='none')).map(k=>[k,g.get(k)]);
 }
 function buildCrXlsx(x){
-  const H=['STT','Nội dung','Mã IT 360','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Tiến độ hiện tại','Đơn vị thực hiện','Nhân sự phối hợp','TT DVKH','Ngày hoàn thành','Đã hoàn thành','Trạng thái','Loại','Hệ thống','Đường dẫn phiếu'];
+  const H=['STT','Nội dung','Mã IT 360','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Ngày dự kiến hoàn thành','Tiến độ hiện tại','Đơn vị thực hiện','Nhân sự phối hợp','TT DVKH','Ngày hoàn thành','Đã hoàn thành','Trạng thái','Loại','Hệ thống','Đường dẫn phiếu'];
   const rows=[H],merges=[];
   crGroups(x.list).forEach(gp=>{
     const s=crStats(gp[1]);
     rows.push([{v:crMonthName(gp[0])+' · '+s.n+' phiếu · '+s.done+' hoàn thành'+(s.late?' · '+s.late+' quá hạn':''),s:5}].concat(Array.from({length:H.length-1},()=>({v:'',s:5}))));
     merges.push('A'+rows.length+':'+colL(H.length-1)+rows.length);
-    gp[1].forEach((c,i)=>rows.push([i+1,c.title,c.code,crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),c.progress||'',c.unit||'',c.coop||'',crHtkh(c),crFmt(c.doneDate),c.status==='done'?'Đã hoàn thành':'Chưa',crStName(c.status),c.kind||'CR',crSysName(c.system),c.link||'']));
+    gp[1].forEach((c,i)=>rows.push([i+1,c.title,c.code,crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),crFmt(c.expDate),c.progress||'',c.unit||'',c.coop||'',crHtkh(c),crFmt(c.doneDate),c.status==='done'?'Đã hoàn thành':'Chưa',crStName(c.status),c.kind||'CR',crSysName(c.system),c.link||'']));
   });
   const st=crStats(x.list),ov=[['Danh sách phiếu CR/SR'],['Người phụ trách',x.who],['Bộ lọc',x.filt],['Ngày xuất',full(new Date())],[],['Tổng số phiếu',st.n],['Hoàn thành',st.done],['Đang xử lý',st.open],['Quá hạn',st.late],['Sắp đến hạn (7 ngày)',st.soon],[]];
   const heads=[];
@@ -2246,17 +2480,17 @@ function buildCrXlsx(x){
   tbl(['Tháng tạo','Số phiếu','Đã hoàn thành'],crGroups(x.list).map(gp=>[crMonthName(gp[0]),gp[1].length,gp[1].filter(c=>c.status==='done').length]));
   const un=new Map();x.list.forEach(c=>{const k=c.unit||'(Chưa ghi)';un.set(k,(un.get(k)||0)+1)});
   tbl(['Đơn vị thực hiện','Số phiếu'],[...un.entries()].sort((a,b)=>b[1]-a[1]));
-  return makeXlsx([{name:'Phiếu CR-SR',rows:rows,headRows:[0],freeze:1,merges:merges,widths:[6,46,18,12,12,14,44,18,22,18,12,14,16,8,18,36]},
+  return makeXlsx([{name:'Phiếu CR-SR',rows:rows,headRows:[0],freeze:1,merges:merges,widths:[6,46,18,12,12,14,14,44,18,22,18,12,14,16,8,18,36]},
     {name:'Tổng quan',rows:ov,widths:[34,40,16],titleRows:[0],headRows:heads}]);
 }
 function buildCrPrintHtml(x){
-  const st=crStats(x.list),cols=[['STT',4.5],['Nội dung',18],['Mã IT 360',10.5],['Ngày tạo',7.5],['Ngày thẩm định',7.5],['Ngày yêu cầu hoàn thành',8],['Tiến độ hiện tại',18],['Đơn vị thực hiện',7],['Nhân sự phối hợp',11],['TT DVKH',6],['Ngày hoàn thành',7.5]],tw=cols.reduce((a,c)=>a+c[1],0);
+  const st=crStats(x.list),cols=[['STT',4.5],['Nội dung',18],['Mã IT 360',10.5],['Ngày tạo',7.5],['Ngày thẩm định',7.5],['Ngày yêu cầu hoàn thành',7],['Ngày dự kiến hoàn thành',7],['Tiến độ hiện tại',17],['Đơn vị thực hiện',7],['Nhân sự phối hợp',10],['TT DVKH',6],['Ngày hoàn thành',7]],tw=cols.reduce((a,c)=>a+c[1],0);
   const colg='<colgroup>'+cols.map(c=>'<col style="width:'+(c[1]*100/tw).toFixed(2)+'%">').join('')+'</colgroup>';
   const head='<thead><tr>'+cols.map(c=>'<th>'+esc(c[0])+'</th>').join('')+'</tr></thead>';
   let h='<h1>Danh sách phiếu CR/SR</h1><p class="meta">'+esc(x.who)+' · '+esc(x.filt)+' · Ngày xuất '+full(new Date())+'</p>'
     +'<p class="sum"><b>'+st.n+'</b> phiếu · <b>'+st.done+'</b> hoàn thành · '+st.open+' đang xử lý · '+st.late+' quá hạn · '+st.soon+' sắp đến hạn</p>';
   crGroups(x.list).forEach(gp=>{
-    h+='<h2>'+esc(crMonthName(gp[0]))+' ('+gp[1].length+' phiếu)</h2><table class="tk">'+colg+head+'<tbody>'+gp[1].map((c,i)=>'<tr>'+[i+1,c.title,c.code+'\n'+crStName(c.status)+(crLate(c)?' (quá hạn)':''),crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),c.progress||'',c.unit||'',c.coop||'',crHtkh(c),crFmt(c.doneDate)].map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+    h+='<h2>'+esc(crMonthName(gp[0]))+' ('+gp[1].length+' phiếu)</h2><table class="tk">'+colg+head+'<tbody>'+gp[1].map((c,i)=>'<tr>'+[i+1,c.title,c.code+'\n'+crStName(c.status)+(crLate(c)?' (quá hạn)':''),crFmt(c.createdDate),crFmt(c.reviewDate),crFmt(c.dueDate),crFmt(c.expDate),c.progress||'',c.unit||'',c.coop||'',crHtkh(c),crFmt(c.doneDate)].map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
   });
   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(x.file)+'</title><style>'
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/16px "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
@@ -2280,8 +2514,9 @@ function buildCr(){
   const f=(id,lab,inner,cls)=>'<label class="field'+(cls?' '+cls:'')+'"><span>'+lab+'</span>'+inner+'</label>';
   return '<section id="tab-cr" class="app" hidden>'
   +'<section class="panel"><div class="cr-head"><h2>Phiếu CR/SR</h2><div class="ngrp"><button type="button" class="btn primary" data-act="cr-new">Thêm phiếu</button>'
-  +'<button type="button" class="btn" data-act="cr-scan" title="Tạo phiếu từ các việc tuần đã nhập có mã IT360">Lấy từ báo cáo tuần</button><button type="button" class="btn" data-act="cr-xlsx">Xuất Excel</button><button type="button" class="btn" data-act="cr-pdf">Xuất PDF</button></div></div>'
+  +'<button type="button" class="btn" data-act="cr-scan" title="Tạo phiếu từ các việc tuần đã nhập có mã IT360">Lấy từ báo cáo tuần</button><button type="button" class="btn" data-act="cr-imp-open" title="Nhập nhiều phiếu cùng lúc từ file Excel hoặc CSV">Nhập từ Excel</button><button type="button" class="btn" data-act="cr-xlsx">Xuất Excel</button><button type="button" class="btn" data-act="cr-pdf">Xuất PDF</button></div></div>'
   +'<p class="muted">Nhập phiếu của bạn một lần, theo dõi tiến độ tại đây. Việc trong báo cáo tuần ghi cùng mã phiếu sẽ hiện trong dòng thời gian của phiếu. Báo cáo xuất theo bộ lọc đang chọn.</p>'
+  +'<div id="cr-imp" class="crf" hidden><h3>Nhập danh sách phiếu từ Excel</h3><p class="muted">Tải file mẫu, điền mỗi phiếu một dòng rồi chọn tệp .xlsx hoặc .csv. Hệ thống xem trước và báo lỗi từng dòng, bấm nhập mới ghi dữ liệu. Mã phiếu đã có thì cập nhật. <span id="cr-imp-hint"></span></p><div class="ngrp"><button type="button" class="btn" data-act="cr-imp-tpl">Tải file mẫu</button><input type="file" id="cr-imp-file" accept=".xlsx,.csv,.tsv,.txt"></div><div id="cr-imp-box"></div><div class="actions"><button type="button" class="btn link" data-act="cr-imp-close">Đóng</button><button type="button" class="btn primary" id="cr-imp-go" data-act="cr-imp-go" disabled>Nhập phiếu</button></div></div>'
   +'<form id="cr-form" class="crf" hidden autocomplete="off"><h3 id="cr-ftitle">Thêm phiếu CR/SR</h3><div class="cr-form">'
   +f('','Mã phiếu IT360 *','<input id="cr-code" maxlength="200" placeholder="IT360-163228 (hoặc dán đường dẫn phiếu)">')
   +f('','Loại','<select id="cr-kind"><option value="CR">CR</option><option value="SR">SR</option></select>')
@@ -2291,6 +2526,7 @@ function buildCr(){
   +f('','Ngày tạo','<input id="cr-created" type="date">')
   +f('','Ngày thẩm định','<input id="cr-review" type="date">')
   +f('','Ngày yêu cầu hoàn thành','<input id="cr-due" type="date">')
+  +f('','Ngày dự kiến hoàn thành','<input id="cr-exp" type="date">')
   +f('','Ngày hoàn thành','<input id="cr-done" type="date">')
   +f('','Đơn vị thực hiện','<input id="cr-unit" maxlength="120" autocomplete="off" data-combo="cr-unit" placeholder="VNPT IT, VNPT AI, Ban Sản phẩm…">')
   +f('','TT DVKH (người phụ trách; bỏ trống = chủ phiếu)','<input id="cr-htkh" maxlength="120" autocomplete="off" data-combo="cr-htkh" placeholder="Chọn tên tài khoản, ví dụ: Nguyễn Văn A">')
@@ -2555,10 +2791,13 @@ function renderAdminUsers(){
   fillMoveSelects();
   const el=$('user-list');if(!el)return;
   const me=S.user.uid;
-  el.innerHTML='<div class="urow head"><span>Họ tên</span><span>Tên đăng nhập</span><span>Đơn vị</span><span>Quyền</span><span></span></div>'
-   +S.users.map(u=>{
+  const q=normQ(S.uQ);
+  const shown=S.users.filter(u=>!q||normQ([u.name,u.username,u.unit].join(' ')).indexOf(q)>=0);
+  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button><span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
+   +(shown.map(u=>{
      const self=u.uid===me;
-     return '<div class="urow'+(u.active===false?' off':'')+'" data-uid="'+esc(u.uid)+'"><span class="nm">'+esc(u.name||'')+(self?' (bạn)':'')+(u.active===false?' · đã khóa':'')+'</span>'
+     return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span><span class="muted">'+esc(u.unit||'')+'</span><span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
+     +'<div class="urow'+(u.active===false?' off':'')+'" data-uid="'+esc(u.uid)+'"><span class="nm">'+esc(u.name||'')+(self?' (bạn)':'')+(u.active===false?' · đã khóa':'')+'</span>'
       +'<span class="mono">'+esc(u.username||'')+'</span><span>'+esc(u.unit||'')+'</span>'
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
       +'<span class="tbtns"><button type="button" class="btn sm" data-act="user-reset" data-user="'+esc(u.username||'')+'"'+(self?' disabled':'')+'>Cấp lại mật khẩu</button><button type="button" class="btn sm'+(u.active===false?'':' danger')+'" data-act="user-toggle" data-uid="'+esc(u.uid)+'"'+(self?' disabled':'')+'>'+(u.active===false?'Mở khóa':'Khóa')+'</button>'
@@ -2566,8 +2805,8 @@ function renderAdminUsers(){
       +(S.rstOpen&&S.rstOpen===u.username&&rstSrc(u.username).uid===u.uid?'<div class="rst"><b>Mật khẩu tạm</b> <input id="rst-pw" type="text" autocomplete="off" maxlength="40" value="'+esc(S.rstPw)+'"'+(S.rstOk||S.rstBusy?' readonly':'')+' aria-label="Mật khẩu tạm"> '+(S.rstOk?'<button type="button" class="btn sm" data-act="user-reset-close">Đóng</button>':'<button type="button" class="btn sm primary" data-act="user-reset-go" data-user="'+esc(u.username||'')+'"'+(S.rstBusy?' disabled':'')+'>'+(S.rstArm?'Bấm lại để xác nhận':'Cấp lại')+'</button><button type="button" class="btn sm" data-act="user-reset-close"'+(S.rstBusy?' disabled':'')+'>Hủy</button>')+'<span class="msg'+(S.rstOk?' ok':'')+'" role="status">'+esc(S.rstMsg)+'</span></div>':'')
       +'<div class="usys"><b>Chức năng được dùng</b> '+MODS.map(x=>'<label class="check"><input type="checkbox" data-umod="'+esc(u.uid)+'" data-m="'+x[0]+'"'+(modsOf(u).indexOf(x[0])>=0?' checked':'')+(u.role==='admin'?' disabled':'')+'><span>'+x[1]+'</span></label>').join('')+(u.role==='admin'?' <small>(quản trị luôn dùng được tất cả)</small>':'')+'</div>'
       +(u.role==='admin'?'':'<div class="usys"><label class="check"><input type="checkbox" data-ucrall="'+esc(u.uid)+'"'+(u.crAll===true?' checked':'')+'><span><b>Quản lý CR/SR</b>: xem phiếu CR/SR của mọi người và dùng mục Tổng hợp CR/SR (chỉ xem, không sửa hay xóa phiếu của người khác)</span></label></div>')
-      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm',true)+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div>';
-   }).join('');
+      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm',true)+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div></div></details>';
+   }).join('')||'<p class="muted">Không có người dùng nào khớp.</p>')+'</div>';
 }
 function renderCatalog(kind){
   const el=$('cat-'+kind);if(!el)return;
@@ -2803,11 +3042,12 @@ function renderTplAdmin(){
   if(gc){const keep=new Set([...gc.querySelectorAll('input:checked')].map(i=>i.dataset.tgnew));
     gc.innerHTML=S.groups.filter(g=>g.active!==false).map(g=>'<label class="qf-chip"><input type="checkbox" data-tgnew="'+esc(g.id)+'"'+(keep.has(g.id)?' checked':'')+'> '+esc(g.name)+'</label>').join('')||'<small class="muted">Chưa có nhóm nào. Thêm ở mục Nhóm.</small>'}
   const vis=S.tpls.filter(tplVisible);
-  let prev=null,no=0;
-  ls.innerHTML=vis.map((x,i)=>{
-    const g=x.system||'',head=(!S.tplFilter&&g!==prev)?'<div class="tgroup">'+(g?esc(sysName(g)):'Dùng chung (không gắn hệ thống)')+'</div>':'';
-    if(g!==prev)no=0;no++;prev=g;
-    return head+'<div class="trow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
+  let prev=null,no=0;const tg=[];
+  vis.forEach((x,i)=>{
+    const g=x.system||'';
+    if(!tg.length||g!==prev){tg.push({g:g,n:0,h:''});no=0}
+    no++;prev=g;const G=tg[tg.length-1];G.n++;
+    G.h+='<div class="trow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
     +'<div class="tnm"><span class="no" aria-hidden="true">'+no+'.</span><input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="500" aria-label="Tên đầu việc"></div>'
     +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống">'+opt(S.systems,'— Tất cả hệ thống —',x.system)+'</select>'
     +'<select data-tpltype="'+esc(x.id)+'" aria-label="Loại việc">'+opt(S.types,'— Không gắn loại việc —',x.type)+'</select>'
@@ -2818,7 +3058,10 @@ function renderTplAdmin(){
     +'<button type="button" class="btn sm" data-act="tpl-del" data-id="'+esc(x.id)+'">Xóa</button></span>'
     +'<details class="tgrp" data-tgid="'+esc(x.id)+'"'+(S.tplOpen.has(x.id)?' open':'')+'><summary>Dành cho: '+esc(grpSummary(x))+'<span class="tuse" data-tid="'+esc(x.id)+'" title="Tính trên các tuần và tháng đang tải">'+usesText(tplUses(x))+'</span></summary><div class="qdays">'
     +S.groups.filter(g=>g.active!==false||(x.groups||[]).indexOf(g.id)>=0).map(g=>'<label class="qf-chip"><input type="checkbox" data-tplg="'+esc(x.id)+'" data-gid="'+esc(g.id)+'"'+((x.groups||[]).indexOf(g.id)>=0?' checked':'')+'> '+esc(g.name)+'</label>').join('')
-    +'</div></details></div>'}).join('')
+    +'</div></details></div>'});
+  ls.innerHTML=(vis.length?'<div class="ngrp" style="margin-bottom:10px"><button type="button" class="btn sm" data-act="tpg-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="tpg-all" data-m="close">Thu gọn tất cả</button><span class="muted">'+vis.length+' việc mẫu · '+tg.length+' nhóm hệ thống</span></div>':'')
+    +tg.map(G=>{const key='tp-'+(G.g||'common'),op=S.expanded.has(key)||(S.tplFilter&&tg.length===1);
+      return '<details class="sys tpg" data-sys="'+esc(key)+'"'+(op?' open':'')+'><summary><h3>'+(G.g?esc(sysName(G.g)):'Dùng chung (không gắn hệ thống)')+'</h3><span class="muted">'+G.n+' việc mẫu</span></summary><div class="tpg-body">'+G.h+'</div></details>'}).join('')
     ||'<p class="muted">Chưa có việc mẫu nào. Hãy thêm ở ô phía trên.</p>';
 }
 function applyWeekSetting(){
@@ -2833,7 +3076,7 @@ function renderSettings(){
   const c=$('allow-signup');if(c)c.checked=!!S.settings.allowSignup;
   const bl=$('bk-last');if(bl){const l=Number(S.settings.lastBackup)||0;bl.textContent=l?'Lần sao lưu đầy đủ gần nhất: '+new Date(l).toLocaleString('vi-VN')+'.':'Chưa ghi nhận lần sao lưu nào.'}
 }
-async function createUserAsAdmin(name,username,password,unit,role,groups,systems,modules){
+async function createUserAsAdmin(name,username,password,unit,role,groups,systems,modules,crAll){
   const sec=getApps().find(a=>a.name==='secondary')||initializeApp(firebaseConfig,'secondary');
   const sAuth=getAuth(sec);
   const cred=await createUserWithEmailAndPassword(sAuth,username+'@'+EMAIL_DOMAIN,password);
@@ -2843,6 +3086,7 @@ async function createUserAsAdmin(name,username,password,unit,role,groups,systems
   if(groups&&groups.length){prof.groups=groups;prof.group=groups[0]}
   if(systems&&systems.length)prof.systems=systems;
   if(role!=='admin'&&modules&&modules.length&&modules.length<MODS.length)prof.modules=modules;
+  if(role!=='admin'&&crAll===true)prof.crAll=true;
   await setDoc(doc(db,'users',uid),prof);
 }
 /* Quản trị cấp lại mật khẩu: gói Firebase miễn phí không cho đổi mật khẩu người khác, nên tạo tài khoản đăng nhập mới (thế hệ kế tiếp) cùng tên đăng nhập,
@@ -2928,7 +3172,7 @@ function setWeek(d){
   const ss=$('save-state');if(ss)ss.textContent='';
   subWeek();renderQuickSelects();renderReport();renderNotes();
 }
-root.addEventListener('change',e=>{const t=e.target,d=t&&t.closest&&t.closest('#f-adduser details.msel');if(!d||t.type!=='checkbox')return;
+root.addEventListener('change',e=>{if(e.target&&e.target.id==='cr-imp-file'){impFile(e.target.files&&e.target.files[0]);return}if(e.target&&e.target.id==='uimp-file'){uimpFile(e.target.files&&e.target.files[0]);return}const t=e.target,d=t&&t.closest&&t.closest('#f-adduser details.msel');if(!d||t.type!=='checkbox')return;
   const n=[...d.querySelectorAll('input:checked')].map(i=>i.parentNode.textContent.trim()),sm=d.querySelector('summary');
   sm.textContent=!n.length?(d.dataset.mk==='u-g'?'— Chưa chọn —':'Theo nhóm'):(n.length<=2?n.join(', '):n.length+' đã chọn');sm.title=n.join(', ')});
 root.addEventListener('keydown',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('msel-q')){if(e.key==='Enter')e.preventDefault();if(e.key==='Escape'){const d=e.target.closest('details');d.open=false;S.msOpen.delete(d.dataset.mk)}}});
@@ -2959,6 +3203,14 @@ root.addEventListener('click',async e=>{
       const el=document.querySelector('#cr-list tr.cr[data-id="'+c.id+'"], #cr-list div.cr[data-id="'+c.id+'"]');if(el)el.scrollIntoView({block:'center'});return;
     }
     if(act==='agg-xlsx'){aggExport();return}
+    if(act==='tpg-all'){const ks=[...document.querySelectorAll('#tpl-list details.tpg')].map(d=>d.dataset.sys);ks.forEach(k=>b.dataset.m==='open'?S.expanded.add(k):S.expanded.delete(k));document.querySelectorAll('#tpl-list details.tpg').forEach(d=>{d.open=b.dataset.m==='open'});return}
+    if(act==='uimp-tpl'){uimpTemplate();return}
+    if(act==='uimp-go'){await uimpRun();return}
+    if(act==='usr-all'){S.users.forEach(u=>b.dataset.m==='open'?S.expanded.add('usr-'+u.uid):S.expanded.delete('usr-'+u.uid));renderAdminUsers();return}
+    if(act==='cr-imp-open'){const pn=$('cr-imp');if(pn){const h=$('cr-imp-hint');if(h)h.textContent=isAdminUser()?'Quản trị ghi tên tài khoản ở cột "Chủ phiếu" để nhập phiếu cho người khác.':'Phiếu nhập sẽ thuộc tài khoản của bạn.';pn.hidden=false;pn.scrollIntoView({block:'nearest'})}return}
+    if(act==='cr-imp-close'){impClose();return}
+    if(act==='cr-imp-tpl'){impTemplate();return}
+    if(act==='cr-imp-go'){await impRun();return}
     if(act==='cr-scan'){
       b.disabled=true;try{const r=await crScan();flash(r.created?'Đã tạo '+r.created+' phiếu từ báo cáo tuần (tổng '+r.found+' mã IT360 trong các việc của bạn). Bổ sung ngày yêu cầu hoàn thành, đơn vị thực hiện.':'Không có mã IT360 mới: '+r.found+' mã trong báo cáo tuần đã có trong danh sách phiếu.',true)}catch(e){flash('Không lấy được: '+fsMsg(e))}b.disabled=false;return}
     if(act==='id-new'){idOpenForm(null);return}
@@ -3349,6 +3601,7 @@ root.addEventListener('input',e=>{if(e.target&&e.target.id==='q-nps')npRender();
   if(e.target&&e.target.id==='imp-q'){S.impQ=e.target.value;S.impFocus=true;renderImport();S.impFocus=false;return}
   if(['n-highlights','n-issues','n-plan'].includes(e.target.id))queueNote();
 });
+root.addEventListener('input',e=>{if(e.target&&e.target.id==='u-q'){S.uQ=e.target.value;const pos=e.target.selectionStart;renderAdminUsers();const n=$('u-q');if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}}});
 root.addEventListener('toggle',e=>{
   if(e.target&&e.target.dataset&&e.target.dataset.mk){const i=e.target.dataset.mk;e.target.open?S.msOpen.add(i):S.msOpen.delete(i);if(e.target.open){const q=e.target.querySelector('.msel-q');if(q)setTimeout(()=>q.focus(),0)}return}
   if(e.target&&e.target.dataset&&e.target.dataset.tgid){const i=e.target.dataset.tgid;e.target.open?S.tplOpen.add(i):S.tplOpen.delete(i);return}
