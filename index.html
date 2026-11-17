@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.99 -->
+<!-- Phiên bản 2.00 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -218,6 +218,9 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .report-box{min-height:16rem;font-family:var(--font-mono);font-size:.82rem;line-height:1.55}
 
 /* Quản lý */
+.agg-wrap{overflow-x:auto;margin:0 0 14px}.agg{border-collapse:collapse;width:100%;font-size:.88rem}.agg th,.agg td{border:1px solid var(--line);padding:.35rem .6rem;text-align:left;vertical-align:top}
+.agg th{background:var(--surface);font-weight:600}.agg td.num,.agg th.num{text-align:right;font-variant-numeric:tabular-nums}.agg tr.tot td{font-weight:700;background:var(--surface)}.agg tr.warn td:first-child{border-left:3px solid #c0392b}
+.agg-kpi{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}.agg-kpi>div{border:1px solid var(--line);border-radius:10px;padding:.5rem .9rem;min-width:120px}.agg-kpi b{display:block;font-size:1.5rem;line-height:1.2}.agg-kpi span{font-size:.8rem;color:var(--muted)}.agg-kpi .bad b{color:#c0392b}
 .subtabs{display:flex;flex-wrap:wrap;gap:6px}
 .subtabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:.35rem .9rem;cursor:pointer;font-size:.88rem;font-weight:500}
 .subtabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -401,7 +404,7 @@ let auth=null,db=null;
 
 /* ===== Trạng thái ===== */
 const S={units:[],msOpen:new Set(),msQ:{},user:null,profile:null,users:[],systems:[],types:[],tpls:[],qTpl:'',tplFilter:'',qfSys:new Set(),groups:[],tplGroup:'',wGroup:'',mGroup:'',tplOpen:new Set(),groupsReady:false,effKey:'',qfSOpen:false,qfSel:null,qfOpen:false,settings:{},tasks:[],notes:[],
-  loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',
+  loadedTasks:false,weekStart:mondayOf(new Date()),who:null,view:'system',tab:'report',admTab:'users',agF:{year:''},
   editing:null,qDate:'',qSystem:'',qType:'',qStatus:'done',expanded:new Set(),busyAuth:false,publicSignup:false,rstOpen:'',rstPw:'',rstMsg:'',rstOk:false,rstBusy:false,rstArm:false,
   month:new Date(new Date().getFullYear(),new Date().getMonth(),1),mWho:null,mTasks:[],loadedM:false};
 let unsubs=[],weekUnsubs=[],monthUnsubs=[],crUnsubs=[],msgTimer=null;
@@ -530,7 +533,7 @@ function listen(ref,cb,onErr){
 }
 async function boot(){
   teardown();
-  S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
+  S.who=S.user.uid;S.view='system';S.tab='report';S.admTab='users';S.agF={year:''};S.qStatus='done';S.units=[];S.groups=[];S.groupsReady=false;S.effKey='';S.wGroup='';S.mGroup='';
   S.mWho=S.user.uid;S.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);S.sq='';S.sTypes=new Set();S.sTpls=new Set();S.sTq='';S.sFilt=false;S.sFocus='';S.sOpen=false;S.sAll=false;S.allMine=null;S.sBusy=false;
   S.ideas=[];S.ideasLoaded=false;S.ideasNoRule=false;S.idF={q:'',year:'',round:'',who:''};S.idWhoInit=false;S.idEdit=null;S.idDraft={leaders:[],members:[]};S.crs=[];S.crLoaded=false;S.crNoRule=false;S.crF={q:'',st:'',mo:'',who:'',flag:''};S.crOpenTl=new Set();S.crLinked={};S.crEdit=null;S.crWhoInit=false;S.crAlertHide=false;S.crView=(()=>{try{const v=localStorage.getItem('bct-crview');if(v==='table'||v==='card')return v}catch(e){}return window.innerWidth>=900?'table':'card'})();
   buildShell();applyModules();
@@ -599,6 +602,7 @@ function listenTasks(a,b,cb){
 function subWeek(){
   weekUnsubs.forEach(f=>{try{f()}catch(e){}});weekUnsubs=[];
   S.loadedTasks=false;
+  if(!modOn('report')){S.tasks=[];S.notes=[];S.loadedTasks=true;return}
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
     canonTitles(list);canonTypes(list);S.tasks=list;S.loadedTasks=true;try{renderUnits();refreshTplUses()}catch(e){}
@@ -698,10 +702,84 @@ function buildShell(){
   +'<button type="button" data-act="to-top">Lên đầu trang ↑</button></nav>'
   +'<span class="fstat" id="foot-stat"></span></footer></div>';
 }
+/* ===== Tổng hợp CR/SR và Sáng kiến (chỉ quản trị, bản 2.00) ===== */
+const AGG_NOGRADE='(Chưa xếp loại)';
+function aggData(){
+  const y=S.agF.year;
+  const crs=S.crs.filter(c=>!y||String(c.createdDate||'').slice(0,4)===y);
+  const ids=S.ideas.filter(i=>!y||String(i.year)===y);
+  const uinfo=uid=>{const u=S.users.find(x=>x.uid===uid);return {name:u?(u.name||u.username):'(Không rõ)',unit:u&&u.unit||''}};
+  /* Phiếu theo người */
+  const bu=new Map();crs.forEach(c=>{if(!bu.has(c.uid))bu.set(c.uid,[]);bu.get(c.uid).push(c)});
+  const crUsers=[...bu.entries()].map(([uid,l])=>Object.assign({uid:uid},uinfo(uid),crStats(l))).sort((a,b)=>(b.late-a.late)||(b.n-a.n)||a.name.localeCompare(b.name,'vi'));
+  const crTot=crStats(crs);
+  const late=crs.filter(crLate).sort((a,b)=>(a.dueDate<b.dueDate?-1:a.dueDate>b.dueDate?1:0));
+  const soon=crs.filter(crSoon).sort((a,b)=>(a.dueDate<b.dueDate?-1:a.dueDate>b.dueDate?1:0));
+  const byStatus=CR_ST.map(s=>[s[1],crs.filter(c=>(c.status||'new')===s[0]).length]).filter(r=>r[1]);
+  /* Sáng kiến theo đợt x xếp loại */
+  const grades=[...new Set(ids.map(i=>String(i.grade||'').trim()||AGG_NOGRADE))].sort((a,b)=>(a===AGG_NOGRADE)-(b===AGG_NOGRADE)||a.localeCompare(b,'vi'));
+  const rounds=[...new Set(ids.map(idKey))].sort().reverse();
+  const matrix=rounds.map(k=>{const l=ids.filter(i=>idKey(i)===k);return {name:idGroupName(k),n:l.length,cells:grades.map(g=>l.filter(i=>(String(i.grade||'').trim()||AGG_NOGRADE)===g).length)}});
+  const gradeTot=grades.map(g=>ids.filter(i=>(String(i.grade||'').trim()||AGG_NOGRADE)===g).length);
+  const bi=new Map();ids.forEach(i=>{if(!bi.has(i.uid))bi.set(i.uid,[]);bi.get(i.uid).push(i)});
+  const idUsers=[...bi.entries()].map(([uid,l])=>Object.assign({uid:uid},uinfo(uid),{n:l.length,nog:l.filter(i=>!String(i.grade||'').trim()).length})).sort((a,b)=>(b.n-a.n)||a.name.localeCompare(b.name,'vi'));
+  const years=[...new Set(S.crs.map(c=>String(c.createdDate||'').slice(0,4)).concat(S.ideas.map(i=>String(i.year||''))).filter(v=>/^\d{4}$/.test(v)))].sort().reverse();
+  return {y:y,crs:crs,ids:ids,crUsers:crUsers,crTot:crTot,late:late,soon:soon,byStatus:byStatus,grades:grades,matrix:matrix,gradeTot:gradeTot,idUsers:idUsers,years:years,uinfo:uinfo};
+}
+function aggTbl(heads,rows,foot){
+  const r=v=>typeof v==='number';
+  const tr=(cells,tag,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'>'+cells.map(v=>'<'+tag+(r(v)?' class="num"':'')+'>'+(r(v)?v:esc(v))+'</'+tag+'>').join('')+'</tr>';
+  return '<div class="agg-wrap"><table class="agg"><thead>'+tr(heads,'th')+'</thead><tbody>'+rows.map(x=>tr(x,'td',x._cls)).join('')+(foot?tr(foot,'td','tot'):'')+'</tbody></table></div>';
+}
+function renderAgg(){
+  const box=$('agg-box');if(!box||!isAdminUser())return;
+  if(!S.crLoaded||!S.ideasLoaded){box.innerHTML='<p class="muted">Đang tải dữ liệu…</p>';return}
+  const d=aggData(),pct=(a,b)=>b?Math.round(a*100/b)+'%':'';
+  const yopt='<option value="">Tất cả các năm</option>'+d.years.map(y=>'<option value="'+y+'"'+(y===S.agF.year?' selected':'')+'>'+y+'</option>').join('');
+  let h='<div class="cr-head"><h2>Tổng hợp CR/SR và sáng kiến</h2><div class="ngrp"><label class="field" style="margin:0"><span>Năm</span><select id="agg-year">'+yopt+'</select></label>'
+    +'<button type="button" class="btn" data-act="agg-xlsx">Xuất Excel</button></div></div>'
+    +'<p class="muted">Chỉ quản trị thấy mục này. Phiếu lọc theo năm của ngày tạo phiếu, sáng kiến lọc theo năm ghi trên sáng kiến. Số liệu tính theo ngày hôm nay ('+full(new Date())+').</p>';
+  h+='<h3>Phiếu CR/SR</h3><div class="agg-kpi"><div><b>'+d.crTot.n+'</b><span>Tổng số phiếu</span></div><div><b>'+d.crTot.open+'</b><span>Đang xử lý</span></div><div class="'+(d.crTot.late?'bad':'')+'"><b>'+d.crTot.late+'</b><span>Quá hạn</span></div><div><b>'+d.crTot.soon+'</b><span>Sắp đến hạn (7 ngày)</span></div><div><b>'+d.crTot.done+'</b><span>Hoàn thành ('+pct(d.crTot.done,d.crTot.n)+')</span></div></div>';
+  if(!d.crs.length)h+='<p class="muted">Chưa có phiếu nào trong phạm vi đã chọn.</p>';
+  else{
+    h+='<h4>Theo người (xếp người có nhiều phiếu quá hạn lên trước)</h4>'+aggTbl(['Người','Đơn vị','Tổng','Đang xử lý','Quá hạn','Sắp đến hạn','Hoàn thành','Tỷ lệ hoàn thành'],
+      d.crUsers.map(u=>{const x=[u.name,u.unit,u.n,u.open,u.late,u.soon,u.done,pct(u.done,u.n)];if(u.late)x._cls='warn';return x}),
+      ['Tổng cộng','',d.crTot.n,d.crTot.open,d.crTot.late,d.crTot.soon,d.crTot.done,pct(d.crTot.done,d.crTot.n)]);
+    const lrow=c=>[c.code,c.title,d.uinfo(c.uid).name,crFmt(c.dueDate),crStName(c.status)];
+    h+='<h4>Phiếu quá hạn ('+d.late.length+')</h4>'+(d.late.length?aggTbl(['Mã phiếu','Nội dung','Người phụ trách','Hạn hoàn thành','Trạng thái','Quá hạn (ngày)'],d.late.map(c=>lrow(c).concat([crLateDays(c)]))):'<p class="muted">Không có phiếu quá hạn.</p>');
+    h+='<h4>Phiếu sắp đến hạn trong 7 ngày ('+d.soon.length+')</h4>'+(d.soon.length?aggTbl(['Mã phiếu','Nội dung','Người phụ trách','Hạn hoàn thành','Trạng thái','Còn lại (ngày)'],d.soon.map(c=>lrow(c).concat([crDaysLeft(c)]))):'<p class="muted">Không có phiếu sắp đến hạn.</p>');
+    h+='<h4>Theo trạng thái</h4>'+aggTbl(['Trạng thái','Số phiếu'],d.byStatus);
+  }
+  h+='<h3>Sáng kiến</h3><div class="agg-kpi"><div><b>'+d.ids.length+'</b><span>Tổng số sáng kiến</span></div><div><b>'+d.idUsers.length+'</b><span>Người có sáng kiến</span></div><div><b>'+(d.gradeTot[d.grades.indexOf(AGG_NOGRADE)]||0)+'</b><span>Chưa xếp loại</span></div></div>';
+  if(!d.ids.length)h+='<p class="muted">Chưa có sáng kiến nào trong phạm vi đã chọn.</p>';
+  else{
+    h+='<h4>Theo đợt và xếp loại</h4>'+aggTbl(['Năm · Đợt'].concat(d.grades,['Tổng']),d.matrix.map(m=>[m.name].concat(m.cells,[m.n])),['Tổng cộng'].concat(d.gradeTot,[d.ids.length]));
+    h+='<h4>Theo người nhập</h4>'+aggTbl(['Người','Đơn vị','Số sáng kiến','Chưa xếp loại'],d.idUsers.map(u=>[u.name,u.unit,u.n,u.nog]));
+  }
+  box.innerHTML=h;
+}
+function aggRefresh(){if(S.tab==='admin'&&S.admTab==='agg')renderAgg()}
+function aggExport(){
+  if(!S.crLoaded||!S.ideasLoaded){flash('Dữ liệu đang tải, thử lại sau giây lát.');return}
+  const d=aggData(),pct=(a,b)=>b?Math.round(a*100/b)/100:'';
+  const scope=d.y?('Năm '+d.y):'Tất cả các năm',sheets=[];
+  const mk=(name,title,heads,rows,foot,widths)=>{const r=[[title],['Phạm vi',scope],['Ngày xuất',full(new Date())],[],heads].concat(rows);if(foot)r.push(foot);sheets.push({name:name,rows:r,widths:widths,titleRows:[0],headRows:[4],freeze:5})};
+  mk('CR-SR theo người','Phiếu CR/SR theo người',['Người','Đơn vị','Tổng','Đang xử lý','Quá hạn','Sắp đến hạn (7 ngày)','Hoàn thành','Tỷ lệ hoàn thành (%)'],
+    d.crUsers.map(u=>[u.name,u.unit,u.n,u.open,u.late,u.soon,u.done,u.n?Math.round(u.done*100/u.n):'']),['Tổng cộng','',d.crTot.n,d.crTot.open,d.crTot.late,d.crTot.soon,d.crTot.done,d.crTot.n?Math.round(d.crTot.done*100/d.crTot.n):''],[26,22,10,12,10,16,12,18]);
+  const lr=(c,k)=>[c.code,c.title,d.uinfo(c.uid).name,crFmt(c.dueDate),crStName(c.status),k];
+  mk('CR-SR quá hạn và sắp đến hạn','Phiếu quá hạn và sắp đến hạn',['Mã phiếu','Nội dung','Người phụ trách','Hạn hoàn thành','Trạng thái','Tình trạng'],
+    d.late.map(c=>lr(c,'Quá hạn '+crLateDays(c)+' ngày')).concat(d.soon.map(c=>lr(c,'Còn '+crDaysLeft(c)+' ngày'))),null,[16,50,26,16,18,20]);
+  mk('CR-SR theo trạng thái','Phiếu CR/SR theo trạng thái',['Trạng thái','Số phiếu'],d.byStatus,null,[26,12]);
+  mk('Sáng kiến theo đợt','Sáng kiến theo đợt và xếp loại',['Năm · Đợt'].concat(d.grades,['Tổng']),d.matrix.map(m=>[m.name].concat(m.cells,[m.n])),['Tổng cộng'].concat(d.gradeTot,[d.ids.length]),[26].concat(d.grades.map(()=>16),[10]));
+  mk('Sáng kiến theo người','Sáng kiến theo người nhập',['Người','Đơn vị','Số sáng kiến','Chưa xếp loại'],d.idUsers.map(u=>[u.name,u.unit,u.n,u.nog]),null,[26,22,14,14]);
+  try{download(makeXlsx(sheets),'TongHop_CR-SR_SangKien_'+full(new Date()).replace(/\//g,'-')+'.xlsx');flash('Đã tạo file Excel tổng hợp.',true)}catch(e){flash('Không xuất được: '+(e&&e.message?e.message:e))}
+}
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='agg-year'){S.agF.year=e.target.value;renderAgg()}});
 function buildAdmin(){
   return '<section id="tab-admin" class="app" hidden>'
   +'<div class="subtabs" role="group" aria-label="Mục quản lý">'
   +'<button type="button" data-act="adm" data-t="users" aria-pressed="true">Người dùng</button>'
+  +'<button type="button" data-act="adm" data-t="agg" aria-pressed="false">Tổng hợp</button>'
   +'<button type="button" data-act="adm" data-t="systems" aria-pressed="false">Hệ thống</button>'
   +'<button type="button" data-act="adm" data-t="groups" aria-pressed="false">Nhóm</button>'
   +'<button type="button" data-act="adm" data-t="types" aria-pressed="false">Loại việc</button>'
@@ -729,6 +807,7 @@ function buildAdmin(){
   +'<div class="grid"><label class="field"><span>Từ tài khoản</span><select id="mv-from"></select></label><label class="field"><span>Sang tài khoản</span><select id="mv-to"></select></label></div>'
   +'<div class="actions"><button type="button" class="btn" data-act="mv-run">Chuyển toàn bộ việc, tổng kết tuần, phiếu CR/SR và sáng kiến</button><span class="msg" id="mv-msg" role="status"></span></div></section></div>'
 
+  +'<div id="adm-agg" class="app" hidden><section class="panel"><div id="agg-box"></div></section></div>'
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
   +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="300" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
   +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên. <b>Xóa</b> hệ thống sẽ gỡ nó khỏi người dùng, nhóm và ẩn các việc mẫu của hệ thống đó; báo cáo cũ hiện là "(Hệ thống đã xóa)".<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
@@ -1086,6 +1165,7 @@ async function crAutoFromTask(t){
 }
 /* Quét các việc tuần đã nhập từ trước: tạo phiếu cho mọi mã IT360 chưa có trong tab Phiếu CR/SR */
 async function crScan(){
+  if(!modOn('report'))throw new Error('Bạn không được dùng chức năng Báo cáo tuần nên không lấy được việc tuần.');
   const col=collection(db,'tasks'),al=allowedSys(),me=S.user.uid,all=[];
   const qs=al?[...al].map(id=>query(col,where('uid','==',me),where('system','==',id))):[query(col,where('uid','==',me))];
   for(const q of qs)(await getDocs(q)).docs.forEach(d=>all.push(Object.assign({id:d.id},d.data())));
@@ -1859,7 +1939,7 @@ function subCrs(){
   const al=allowedSys(),col=collection(db,'crs'),own=isAdminUser()?[]:[where('uid','==',S.user.uid)];
   const qs=al?[...al].map(id=>query(col,where('system','==',id),...own)):[query(col,...own)];
   const parts=new Array(qs.length).fill(null);
-  const fin=()=>{if(!parts.every(x=>x))return;S.crs=[].concat(...parts);S.crLoaded=true;renderCr();fillTicketList();if(S.tab==='report'&&typeof renderReport==='function')try{renderReport()}catch(e){}updateNotices()};
+  const fin=()=>{if(!parts.every(x=>x))return;S.crs=[].concat(...parts);S.crLoaded=true;renderCr();aggRefresh();fillTicketList();if(S.tab==='report'&&typeof renderReport==='function')try{renderReport()}catch(e){}updateNotices()};
   qs.forEach((q,i)=>crUnsubs.push(onSnapshot(q,snap=>{S.crNoRule=false;parts[i]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));fin()},err=>{
     if(err&&err.code==='permission-denied')S.crNoRule=true;
     parts[i]=[];fin()})));
@@ -2038,7 +2118,7 @@ async function crSave(){
     await setDoc(doc(db,'crs',id),body);
     if(ed&&ed.code!==code)delete S.crLinked[ed.id];
     crCloseForm();flash('Đã lưu phiếu '+code+'.',true);
-  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.24, xem HUONG-DAN.md)':'')}
+  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.25, xem HUONG-DAN.md)':'')}
   $('cr-save').disabled=false;
 }
 let crAutoT=0;
@@ -2051,6 +2131,7 @@ function crAutoLoad(){
   },80);
 }
 async function crLoadLinked(c,quiet){
+  if(!modOn('report')){S.crLinked[c.id]={err:'Bạn không được dùng chức năng Báo cáo tuần nên không xem được diễn tiến việc tuần.'};if(!quiet)renderCrList();return}
   S.crLinked[c.id]={loading:true};if(!quiet)renderCrList();
   try{
     const col=collection(db,'tasks'),al=allowedSys();
@@ -2184,7 +2265,7 @@ function subIdeas(){
   ideaUnsubs.forEach(f=>{try{f()}catch(e){}});ideaUnsubs=[];S.ideasLoaded=false;
   if(!modOn('ideas')){S.ideas=[];S.ideasLoaded=true;S.ideasNoRule=false;return}
   const col=collection(db,'ideas'),q=isAdminUser()?query(col):query(col,where('uid','==',S.user.uid));
-  ideaUnsubs.push(onSnapshot(q,snap=>{S.ideasNoRule=false;S.ideas=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.ideasLoaded=true;renderIdeas()},err=>{
+  ideaUnsubs.push(onSnapshot(q,snap=>{S.ideasNoRule=false;S.ideas=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.ideasLoaded=true;renderIdeas();aggRefresh()},err=>{
     if(err&&err.code==='permission-denied')S.ideasNoRule=true;S.ideas=[];S.ideasLoaded=true;renderIdeas()}));
 }
 const idKey=i=>(Number(i.year)||0)+'-'+(Number(i.round)||0);
@@ -2285,7 +2366,7 @@ async function idSave(){
     S.idLastYear=d.year;S.idLastRound=d.round;
     const w=idLint(Object.assign({},d,{leaders:leaders,members:members}));
     idCloseForm();flash('Đã lưu sáng kiến.'+(w.length?' Lưu ý: '+w[0]+(w.length>1?' (và '+(w.length-1)+' lưu ý khác, bấm Sửa để xem)':''):''),true);
-  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.24, xem HUONG-DAN.md)':'')}
+  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.25, xem HUONG-DAN.md)':'')}
   $('id-save').disabled=false;
 }
 function idFixAuthors(){
@@ -2548,6 +2629,7 @@ function renderSearch(){
   box.hidden=false;box.scrollTop=keepP;const tl1=$('sr-tl');if(tl1)tl1.scrollTop=keepL;
   if(S.sFocus){const f=box.querySelector('[data-'+S.sFocus.k+'="'+String(S.sFocus.v).replace(/"/g,'')+'"]');S.sFocus=null;if(f)f.focus()}}
 async function srLoadAll(){
+  if(!modOn('report'))return;
   S.sBusy=true;renderSearch();
   try{const me=S.user.uid,al=allowedSys();
     const qs=al?[...al].map(id=>query(collection(db,'tasks'),where('uid','==',me),where('system','==',id))):[query(collection(db,'tasks'),where('uid','==',me))];
@@ -2804,6 +2886,7 @@ root.addEventListener('click',async e=>{
       await crLoadLinked(c);
       const el=document.querySelector('#cr-list tr.cr[data-id="'+c.id+'"], #cr-list div.cr[data-id="'+c.id+'"]');if(el)el.scrollIntoView({block:'center'});return;
     }
+    if(act==='agg-xlsx'){aggExport();return}
     if(act==='cr-scan'){
       b.disabled=true;try{const r=await crScan();flash(r.created?'Đã tạo '+r.created+' phiếu từ báo cáo tuần (tổng '+r.found+' mã IT360 trong các việc của bạn). Bổ sung ngày yêu cầu hoàn thành, đơn vị thực hiện.':'Không có mã IT360 mới: '+r.found+' mã trong báo cáo tuần đã có trong danh sách phiếu.',true)}catch(e){flash('Không lấy được: '+fsMsg(e))}b.disabled=false;return}
     if(act==='id-new'){idOpenForm(null);return}
@@ -2892,9 +2975,9 @@ root.addEventListener('click',async e=>{
       return;
     }
     if(act==='adm'){
-      S.admTab=b.dataset.t;if(S.admTab==='settings')renderSettings();
+      S.admTab=b.dataset.t;if(S.admTab==='settings')renderSettings();if(S.admTab==='agg')renderAgg();
       document.querySelectorAll('[data-act="adm"]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===S.admTab)));
-      ['users','systems','groups','types','units','tpls','settings'].forEach(k=>{const p=$('adm-'+k);if(p)p.hidden=k!==S.admTab});return;
+      ['users','agg','systems','groups','types','units','tpls','settings'].forEach(k=>{const p=$('adm-'+k);if(p)p.hidden=k!==S.admTab});return;
     }
     if(act==='me'){
       const p=$('me-panel');p.hidden=!p.hidden;
