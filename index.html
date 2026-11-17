@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.19 -->
+<!-- Phiên bản 2.20 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -611,7 +611,9 @@ function listenTasks(a,b,cb){
   const rall=repSeesAll(),osc=rall&&orgScope();
   const mk=(own)=>al?[...al].map(id=>query(col,where('system','==',id),...own,where('date','>=',a),where('date','<=',b))):[query(col,...own,where('date','>=',a),where('date','<=',b))];
   /* quản trị / quản lý chưa gán đơn vị: đọc hết; quản lý thuộc đơn vị: việc của đơn vị + việc của chính mình (việc cũ chưa gắn đơn vị) */
-  const qs=(rall&&!osc)?mk([]):osc?mk([where('org','==',myOrg())]).concat(mk([where('uid','==',S.user.uid)])):mk([where('uid','==',S.user.uid)]);
+  /* Bản 2.20: người quản lý báo cáo tuần (không phải quản trị) xem việc của người khác ở MỌI hệ thống, không bị giới hạn bởi hệ thống mình phụ trách; việc của chính mình vẫn theo hệ thống mình phụ trách */
+  const dq=[where('date','>=',a),where('date','<=',b)];
+  const qs=isAdminUser()?mk([]):repMgrOnly()?(osc?[query(col,where('org','==',myOrg()),...dq)].concat(mk([where('uid','==',S.user.uid)])):[query(col,...dq)]):mk([where('uid','==',S.user.uid)]);
   const parts=new Array(qs.length).fill(null);
   const merge=()=>{const m=new Map();parts.forEach(p=>p.forEach(x=>m.set(x.id,x)));return [...m.values()]};
   qs.forEach((q,i)=>un.push(listen(q,snap=>{
@@ -949,7 +951,7 @@ const userName=uid=>{const u=S.users.find(x=>x.uid===uid);return u?(u.name||u.us
 const sysIdx=id=>{const i=S.systems.findIndex(x=>x.id===id);return i<0?99:i};
 const cmp=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0));
 function visibleTasks(){
-  let l=S.tasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
+  let l=S.tasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system)||(repMgrOnly()&&t.uid!==S.user.uid));
   if(S.who!=='all')l=l.filter(t=>t.uid===S.who);else if(S.wGroup)l=l.filter(t=>userGroup(t.uid).indexOf(S.wGroup)>=0);
   return l.sort(cmp);
 }
@@ -1565,7 +1567,7 @@ function subMonth(){
 }
 function setMonth(d){S.expanded.clear();S.month=d;S.mTasks=[];subMonth();renderStats()}
 function monthTasks(){
-  let l=S.mTasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system));
+  let l=S.mTasks.slice();const al=allowedSys();if(al)l=l.filter(t=>al.has(t.system)||(repMgrOnly()&&t.uid!==S.user.uid));
   if(S.mWho!=='all')l=l.filter(t=>t.uid===S.mWho);else if(S.mGroup)l=l.filter(t=>userGroup(t.uid).indexOf(S.mGroup)>=0);
   return l;
 }
@@ -2290,10 +2292,14 @@ function subCrs(){
   if(!modOn('cr')){S.crs=[];S.crLoaded=true;S.crNoRule=false;clearNet();return}
   const al=allowedSys(),col=collection(db,'crs'),all=crSeesAll(),osc=all&&orgScope(),own=(all&&!osc)?[]:[where('uid','==',S.user.uid)];
   let qs=al?[...al].map(id=>query(col,where('system','==',id),...own)):[query(col,...own)];
+  /* Bản 2.20: người quản lý CR/SR (không phải quản trị) xem phiếu của người khác ở MỌI hệ thống, không bị giới hạn bởi hệ thống mình phụ trách */
+  const mgr=crMgrOnly();
+  if(mgr){const mine=u=>al?[...al].map(id=>query(col,where('system','==',id),where(u,'==',S.user.uid))):[query(col,where(u,'==',S.user.uid))];
+    qs=osc?[query(col,where('org','==',myOrg()))].concat(mine('uid'),mine('htkhUid')):[query(col)]}
   /* Người quản lý thuộc một đơn vị: đọc phiếu của cả đơn vị (kèm điều kiện org), phiếu của mình đọc bằng truy vấn riêng ở trên */
-  if(osc)qs=qs.concat(al?[...al].map(id=>query(col,where('system','==',id),where('org','==',myOrg()))):[query(col,where('org','==',myOrg()))]);
+  if(osc&&!mgr)qs=qs.concat(al?[...al].map(id=>query(col,where('system','==',id),where('org','==',myOrg()))):[query(col,where('org','==',myOrg()))]);
   /* Phiếu người khác giao cho mình làm TT DVKH (htkhUid = uid của mình): đọc thêm, chỉ xem */
-  if(!all||osc)qs=qs.concat(al?[...al].map(id=>query(col,where('system','==',id),where('htkhUid','==',S.user.uid))):[query(col,where('htkhUid','==',S.user.uid))]);
+  if((!all||osc)&&!mgr)qs=qs.concat(al?[...al].map(id=>query(col,where('system','==',id),where('htkhUid','==',S.user.uid))):[query(col,where('htkhUid','==',S.user.uid))]);
   const parts=new Array(qs.length).fill(null);
   const fin=()=>{if(!parts.every(x=>x))return;S.crs=[...new Map([].concat(...parts).map(c=>[c.id,c])).values()];crBackfill();S.crLoaded=true;renderCr();aggRefresh();fillTicketList();if(S.tab==='report'&&typeof renderReport==='function')try{renderReport()}catch(e){}updateNotices()};
   qs.forEach((q,i)=>crUnsubs.push(onSnapshot(q,snap=>{S.crNoRule=false;parts[i]=snap.docs.map(d=>{const x=Object.assign({id:d.id},d.data());if(CR_ST_OLD[x.status])x.status=CR_ST_OLD[x.status];if(x.unit)x.unit=crUnitN(x.unit);return x});fin()},err=>{
