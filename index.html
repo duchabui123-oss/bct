@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 1.97 -->
+<!-- Phiên bản 1.98 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -877,7 +877,7 @@ function crChip(t,mine){
   if(!S.crLoaded||S.crNoRule)return '';
   const c=crFor(t);
   if(c)return '<button type="button" class="cr-lkchip" data-act="tk-opencr" data-id="'+esc(c.id)+'" title="Mở phiếu '+esc(c.code)+' trong tab Phiếu CR/SR">'+esc(c.kind||'CR')+': '+esc(crStName(c.status))+(crLate(c)?' · quá hạn':'')+' ↗</button>';
-  if(mine&&/^it360-\d+$/i.test(crNorm(t.ticket)))return '<button type="button" class="cr-lkchip new" data-act="tk-newcr" title="Mã này chưa có trong tab Phiếu CR/SR">+ Tạo phiếu CR/SR</button>';
+  if(mine&&crIsTrigger(t)&&/^it360-\d+$/i.test(crNorm(t.ticket)))return '<button type="button" class="cr-lkchip new" data-act="tk-newcr" title="Mã này chưa có trong tab Phiếu CR/SR">+ Tạo phiếu CR/SR</button>';
   return '';
 }
 function row(t,mode){
@@ -1059,6 +1059,9 @@ async function submitQuick(){
   $('q-save').disabled=false;
 }
 /* Đẩy thông tin cơ bản của việc tuần có mã phiếu IT360 sang tab Phiếu CR/SR (tạo phiếu nếu chưa có) */
+/* Chỉ việc có đúng tên này mới được đưa sang tab Phiếu CR/SR */
+const CR_TRIGGER_TITLE='Hoàn thành đầu bài & Tạo task chuyển đơn vị Factory triển khai';
+const crIsTrigger=t=>titleKey(t.title)===titleKey(CR_TRIGGER_TITLE);
 const crIsCodeTk=v=>/^IT360-\d+$/i.test(crNorm(v));
 /* Tên loại việc (t.title) chỉ là tên chung; GHI CHÚ của việc mới là nội dung/tên phiếu CR/SR */
 const crLine=t=>'- '+dm(t.date)+': '+String(t.title||'').trim()+(t.result?' ('+String(t.result).trim()+')':'');
@@ -1068,10 +1071,8 @@ function crDraft(t,prev){
     createdDate:t.date,reviewDate:'',dueDate:'',doneDate:'',unit:'',coop:'',htkh:'',progress:crLine(t),link:'',auto:true,ts:Date.now(),updated:Date.now()};
 }
 async function crAutoFromTask(t){
-  if(!S.crLoaded||S.crNoRule||t.uid!==S.user.uid)return '';
-  if(!crIsCodeTk(t.ticket)){
-    return /^\s*(CR|SR)\b/i.test(typeName(t.type)||'')?'Việc loại CR/SR chưa có mã phiếu: nhập mã IT360 ở "Kết quả, mã phiếu, ghi chú" để phiếu được đưa sang tab Phiếu CR/SR.':'';
-  }
+  if(!S.crLoaded||S.crNoRule||t.uid!==S.user.uid||!crIsTrigger(t))return '';
+  if(!crIsCodeTk(t.ticket))return 'Việc này chưa có mã phiếu: nhập mã IT360 ở "Kết quả, mã phiếu, ghi chú" để phiếu được đưa sang tab Phiếu CR/SR.';
   const code=crNorm(t.ticket),ex=S.crs.find(c=>c.uid===t.uid&&String(c.code).toLowerCase()===code.toLowerCase());
   if(ex){
     if(!ex.progress){await setDoc(doc(db,'crs',ex.id),Object.assign({},ex,{progress:crLine(t),updated:Date.now()}));return 'Đã cập nhật tiến độ phiếu '+code+'.'}
@@ -1086,7 +1087,7 @@ async function crScan(){
   const qs=al?[...al].map(id=>query(col,where('uid','==',me),where('system','==',id))):[query(col,where('uid','==',me))];
   for(const q of qs)(await getDocs(q)).docs.forEach(d=>all.push(Object.assign({id:d.id},d.data())));
   const by=new Map();
-  all.filter(t=>crIsCodeTk(t.ticket)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.ts||0)-(b.ts||0)).forEach(t=>{
+  all.filter(t=>crIsTrigger(t)&&crIsCodeTk(t.ticket)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.ts||0)-(b.ts||0)).forEach(t=>{
     const k=crNorm(t.ticket).toUpperCase();if(!by.has(k))by.set(k,{first:t,all:[t]});else by.get(k).all.push(t)});
   let n=0;
   for(const [k,v] of by){
