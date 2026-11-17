@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.15 -->
+<!-- Phiên bản 2.16 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2864,10 +2864,10 @@ function renderAdminUsers(){
   const me=S.user.uid;
   const q=normQ(S.uQ);
   const shown=S.users.filter(u=>!q||normQ([u.name,u.username,u.unit].join(' ')).indexOf(q)>=0);
-  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button>'+'<button type="button" class="btn sm" data-act="usr-orgdata" title="Ghi đơn vị của chủ lên các phiếu CR/SR và sáng kiến đã có">Gán đơn vị cho dữ liệu cũ</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
+  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button>'+(S.orgs.length&&S.users.some(u=>u.role!=='admin'&&!u.org)?'<select id="u-bulkorg" aria-label="Đơn vị để gán"><option value="">Chọn đơn vị…</option>'+S.orgs.filter(o=>o.active!==false).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join('')+'</select><button type="button" class="btn sm" data-act="usr-orgbulk" title="Gán đơn vị đã chọn cho mọi người dùng chưa có đơn vị">Gán cho '+S.users.filter(u=>u.role!=='admin'&&!u.org).length+' người chưa có đơn vị</button>':'')+'<button type="button" class="btn sm" data-act="usr-orgdata" title="Ghi đơn vị của chủ lên các phiếu CR/SR và sáng kiến đã có">Gán đơn vị cho dữ liệu cũ</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
    +(shown.map(u=>{
      const self=u.uid===me;
-     return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span><span class="muted">'+esc(u.unit||'')+'</span><span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
+     return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span><span class="muted">'+esc(u.unit||'')+'</span>'+(u.role!=='admin'?'<span class="muted">'+(u.org?'[Đơn vị: '+esc(orgName(u.org))+']':'[Chưa gán đơn vị]')+'</span>':'')+'<span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
      +'<div class="urow'+(u.active===false?' off':'')+'" data-uid="'+esc(u.uid)+'"><span class="nm">'+esc(u.name||'')+(self?' (bạn)':'')+(u.active===false?' · đã khóa':'')+'</span>'
       +'<span class="mono">'+esc(u.username||'')+'</span><span>'+esc(u.unit||'')+'</span>'
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
@@ -3282,6 +3282,15 @@ root.addEventListener('click',async e=>{
     if(act==='tpg-all'){const ks=[...document.querySelectorAll('#tpl-list details.tpg')].map(d=>d.dataset.sys);ks.forEach(k=>b.dataset.m==='open'?S.expanded.add(k):S.expanded.delete(k));document.querySelectorAll('#tpl-list details.tpg').forEach(d=>{d.open=b.dataset.m==='open'});return}
     if(act==='uimp-tpl'){uimpTemplate();return}
     if(act==='uimp-go'){await uimpRun();return}
+    if(act==='usr-orgbulk'){
+      const sel=$('u-bulkorg'),o=sel&&S.orgs.find(x=>x.id===sel.value);
+      if(!o){flash('Hãy chọn đơn vị ở ô bên cạnh trước.');return}
+      const l=S.users.filter(u=>u.role!=='admin'&&!u.org);if(!l.length)return;
+      if(!confirm('Gán đơn vị "'+o.name+'" cho '+l.length+' người dùng chưa có đơn vị?\n\nSau đó bấm "Gán đơn vị cho dữ liệu cũ" để việc tuần, phiếu CR/SR và sáng kiến đã có theo đơn vị.'))return;
+      b.disabled=true;
+      try{for(let i=0;i<l.length;i+=400){const bt=writeBatch(db);l.slice(i,i+400).forEach(u=>bt.update(doc(db,'users',u.uid),{org:o.id}));await bt.commit()}flash('Đã gán đơn vị "'+o.name+'" cho '+l.length+' người dùng.',true)}catch(err){flash(fsMsg(err)+(err&&err.code?' [mã lỗi: '+err.code+']':''))}
+      b.disabled=false;return;
+    }
     if(act==='usr-orgdata'){
       b.disabled=true;const old=b.textContent;b.textContent='Đang quét…';
       try{
@@ -3626,7 +3635,7 @@ root.addEventListener('change',async e=>{
     if(t.matches&&t.matches('select[data-uorg]')){
       const uid=t.dataset.uorg,u=S.users.find(x=>x.uid===uid);if(!u)return;
       const o=S.orgs.find(x=>x.id===t.value),patch={org:t.value};if(o)patch.unit=o.name;
-      try{await updateDoc(doc(db,'users',uid),patch);flash(o?'Đã gán '+(u.name||u.username)+' vào đơn vị "'+o.name+'". Bấm "Gán đơn vị cho dữ liệu cũ" để phiếu và sáng kiến đã có theo đơn vị mới.':'Đã bỏ đơn vị của '+(u.name||u.username)+'.',true)}catch(err){flash(fsMsg(err));renderAdminUsers()}return;
+      try{await updateDoc(doc(db,'users',uid),patch);flash(o?'Đã gán '+(u.name||u.username)+' vào đơn vị "'+o.name+'". Bấm "Gán đơn vị cho dữ liệu cũ" để phiếu và sáng kiến đã có theo đơn vị mới.':'Đã bỏ đơn vị của '+(u.name||u.username)+'.',true)}catch(err){flash(fsMsg(err)+(err&&err.code?' [mã lỗi: '+err.code+']':''));renderAdminUsers()}return;
     }
     if(t.matches&&t.matches('input[data-uideaall]')){
       const uid=t.dataset.uideaall,u=S.users.find(x=>x.uid===uid);if(!u)return;
