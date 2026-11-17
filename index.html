@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.07 -->
+<!-- Phiên bản 2.08 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2076,7 +2076,8 @@ function crTable(a){
   });
   return h+'</tbody></table></div>';
 }
-function crMiss(c){return crIsOpen(c)&&!c.dueDate?'<div class="cr-n"><span class="cr-flag soon">Chưa có ngày yêu cầu hoàn thành</span></div>':''}
+const crDupN=c=>S.crs.filter(x=>x.uid===c.uid&&x.id!==c.id&&String(x.code).toLowerCase()===String(c.code).toLowerCase()).length;
+function crMiss(c){return (crDupN(c)?'<div class="cr-n"><span class="cr-flag late">Trùng mã với phiếu khác, hãy xóa bớt một phiếu</span></div>':'')+(crIsOpen(c)&&!c.dueDate?'<div class="cr-n"><span class="cr-flag soon">Chưa có ngày yêu cầu hoàn thành</span></div>':'')}
 const crWk=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')?'Tuần '+weekNo(mondayOf(parse(d))):'';
 function crLinkInfo(c){const L=S.crLinked[c.id];if(!L||!L.list)return '';const n=L.list.length;if(!n)return '<div class="cr-n muted">Chưa có việc tuần</div>';
   const a=L.list[0],z=L.list[n-1],wa=crWk(a.date),wz=crWk(z.date);
@@ -2178,7 +2179,7 @@ async function crSave(){
   if(st==='done'&&!dn)dn=iso(new Date());if(st!=='done')dn='';
   if(cd&&dd&&dd<cd){msg.textContent='Ngày yêu cầu hoàn thành đang trước ngày tạo, hãy kiểm tra lại.';$('cr-due').focus();return}
   const ed=S.crEdit,uid=ed?ed.uid:S.user.uid;
-  if(S.crs.some(x=>x.uid===uid&&String(x.code).toLowerCase()===code.toLowerCase()&&(!ed||x.id!==ed.id))){msg.textContent='Phiếu '+code+' đã có trong danh sách.';return}
+  if((!ed||String(ed.code).toLowerCase()!==code.toLowerCase())&&S.crs.some(x=>x.uid===uid&&String(x.code).toLowerCase()===code.toLowerCase()&&(!ed||x.id!==ed.id))){msg.textContent='Phiếu '+code+' đã có trong danh sách.';return}
   const body={uid:uid,code:code,title:title,kind:$('cr-kind').value,system:sys,status:st,createdDate:cd,reviewDate:rd,dueDate:dd,doneDate:dn,
     unit:$('cr-unit').value.trim(),htkh:(crHtkhUid($('cr-htkh').value)?userName(crHtkhUid($('cr-htkh').value)):$('cr-htkh').value.trim()),htkhUid:crHtkhUid($('cr-htkh').value),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
   $('cr-save').disabled=true;msg.textContent='Đang lưu…';
