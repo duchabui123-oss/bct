@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.20 -->
+<!-- Phiên bản 2.21 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1712,7 +1712,9 @@ const myGroup=()=>groupsOf(S.profile);
 /* việc mẫu không gắn nhóm = dùng chung; chưa có ngữ cảnh nhóm (g rỗng) = thấy tất cả */
 const tplForGroup=(x,g)=>{const ga=[].concat(g||[]);return !ga.length||!(Array.isArray(x.groups)&&x.groups.length)||ga.some(id=>x.groups.indexOf(id)>=0)};
 const effSig=()=>{const a=allowedSys();return JSON.stringify([a?[...a].sort():null,S.profile&&S.profile.role,modsOf(S.profile),!!(S.profile&&S.profile.crAll),!!(S.profile&&S.profile.ideaAll),!!(S.profile&&S.profile.repAll),myOrg()])};
-function hiddenSys(){
+function hiddenSys(list){
+  /* Bản 2.21: người quản lý báo cáo tuần xem việc của người khác ở mọi hệ thống nên không ẩn hệ thống nào khi danh sách có việc của người khác (bảng tổng hợp, xuất Excel/PDF, thống kê) */
+  if(repMgrOnly()&&Array.isArray(list)&&S.user&&(list.length?list.some(t=>t.uid!==S.user.uid):(S.tab==='stats'?S.mWho:S.who)!==S.user.uid))return new Set();
   const a=allowedSys();
   return a?new Set(S.systems.filter(x=>!a.has(x.id)).map(x=>x.id)):new Set();
 }
