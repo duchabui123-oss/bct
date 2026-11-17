@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.16 -->
+<!-- Phiên bản 2.19 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -530,11 +530,17 @@ function teardown(){
   S.users=[];S.systems=[];S.types=[];S.tasks=[];S.notes=[];S.loadedTasks=false;S.editing=null;S.tab='report';
 }
 /* Quản trị vừa đổi chức năng của tài khoản đang mở: Firestore ngắt các truy vấn cũ bằng permission-denied trước khi web kịp huỷ, nên xoá cảnh báo sau khi đã huỷ */
-function clearNet(){const n=$('net');if(n){n.textContent='';n.hidden=true}}
+function clearNet(){const n=$('net');if(n){n.textContent='';delete n.dataset.idx;n.hidden=true}}
 function listen(ref,cb,onErr){
   const u=onSnapshot(ref,cb,err=>{
     if(onErr)onErr(err);
-    const n=$('net');if(n){n.textContent=err&&err.code==='permission-denied'?'Tài khoản chưa có quyền xem dữ liệu này.':err&&err.code==='failed-precondition'?'Cần tạo chỉ mục Firestore (tasks: system tăng dần, date tăng dần). Xem HUONG-DAN.md.':'Không đọc được dữ liệu. Hãy kiểm tra mạng rồi tải lại trang.';n.hidden=false}
+    const n=$('net');if(n){
+      if(err&&err.code==='failed-precondition'){
+        if(!n.dataset.idx){n.dataset.idx='1';n.textContent='Cần tạo chỉ mục Firestore để xem được dữ liệu này (báo quản trị tạo, xem HUONG-DAN.md). ';
+          const m=/https:\/\/console\.firebase\.google\.com\/[^\s"')]+/.exec(err.message||'');
+          if(m){const a=document.createElement('a');a.href=m[0];a.target='_blank';a.rel='noopener';a.textContent='Quản trị bấm vào đây để tạo chỉ mục (bấm Create index, chờ vài phút rồi tải lại trang).';n.appendChild(a)}}
+      }else{delete n.dataset.idx;n.textContent=err&&err.code==='permission-denied'?'Tài khoản chưa có quyền xem dữ liệu này.':'Không đọc được dữ liệu. Hãy kiểm tra mạng rồi tải lại trang.'}
+      n.hidden=false}
     S.loadedTasks=true;S.loadedM=true;renderReport();renderStats();
   });
   return u;
@@ -614,7 +620,7 @@ function listenTasks(a,b,cb){
   },err=>{
     /* một hệ thống lỗi (chưa có chỉ mục, thiếu quyền...) thì các hệ thống còn lại vẫn hiển thị */
     parts[i]=[];if(parts.every(x=>x))cb(merge(),null);
-    const n=$('net');if(n)setTimeout(()=>{n.textContent+=' [mã lỗi: '+(err&&err.code||'?')+']'+(S.profile&&S.profile.role!=='admin'?' [hs: '+(allowedSys()?[...allowedSys()].join(','):'tất cả')+']':'');n.hidden=false},0);
+    const n=$('net');if(n)setTimeout(()=>{const dg=' [mã lỗi: '+(err&&err.code||'?')+']'+(S.profile&&S.profile.role!=='admin'?' [hs: '+(allowedSys()?[...allowedSys()].join(','):'tất cả')+']':'');if(n.textContent.indexOf(dg)<0)n.appendChild(document.createTextNode(dg));n.hidden=false},0);
   })));
   if(!qs.length)cb([],null);
   return ()=>un.forEach(f=>{try{f()}catch(e){}});
@@ -885,10 +891,10 @@ function buildAdmin(){
   +'<div class="usys" style="margin-top:6px"><b>Hệ thống phụ trách</b> <span id="u-schips"></span> <small>(không tích = theo hệ thống mặc định của các nhóm; không có thì thấy tất cả. Chọn tối đa 5 nhóm.)</small></div>'
   +'<div class="actions"><button type="submit" class="btn primary">Tạo tài khoản</button><span class="msg" id="u-msg" role="status" aria-live="polite"></span></div></form>'
   +'<details class="sys uimp" data-sys="uimp" style="margin-bottom:14px"><summary><h2>Nhập danh sách người dùng từ Excel</h2></summary><div class="usr-body"><p class="muted">Tải file mẫu, điền mỗi người một dòng (cùng các trường như khi thêm người dùng: họ tên, tên đăng nhập, mật khẩu, đơn vị, quyền, chức năng, quản lý CR/SR, nhóm, hệ thống phụ trách), rồi chọn tệp .xlsx hoặc .csv. Hệ thống xem trước và báo lỗi từng dòng, bấm tạo mới ghi dữ liệu.</p><div class="ngrp"><button type="button" class="btn" data-act="uimp-tpl">Tải file mẫu người dùng</button><input type="file" id="uimp-file" accept=".xlsx,.csv,.tsv,.txt"></div><div id="uimp-box"></div><div class="actions"><button type="button" class="btn primary" id="uimp-go" data-act="uimp-go" disabled>Tạo tài khoản</button></div></div></details>'
-  +'<section class="panel"><h2>Danh sách người dùng</h2><div class="tbl" id="user-list"></div>'
+  +'<section class="panel"><details class="sys" id="usr-panel" data-sys="uusr"><summary><h2>Danh sách người dùng</h2><span class="muted" id="usr-count"></span></summary><div class="usr-body"><div class="tbl" id="user-list"></div>'
   +'<label class="check" style="margin-top:12px"><input type="checkbox" id="del-data"><span>Khi xóa người dùng, xóa luôn toàn bộ báo cáo, phiếu CR/SR và sáng kiến của người đó<br><small class="muted">Nếu không chọn, báo cáo cũ vẫn được giữ lại và hiện tên "(Không rõ)" khi xem tất cả mọi người.</small></span></label>'
   +'<p class="muted">Xóa người dùng sẽ gỡ hồ sơ, người đó không đăng nhập được nữa. Muốn đặt lại đúng tên đăng nhập cũ cho người khác, cần xóa thêm tài khoản đó trong Firebase (Authentication > Users). Nếu chỉ cần ngừng cho dùng tạm thời, hãy dùng nút Khóa.</p>'
-  +'<p class="muted">Khóa tài khoản để người đó không đăng nhập được nữa mà vẫn giữ nguyên báo cáo cũ.</p></section>'
+  +'<p class="muted">Khóa tài khoản để người đó không đăng nhập được nữa mà vẫn giữ nguyên báo cáo cũ.</p></div></details></section>'
   +'<section class="panel" style="margin-top:14px"><h2>Chuyển dữ liệu giữa hai tài khoản</h2>'
   +'<p class="muted">Chuyển toàn bộ đầu việc, tổng kết tuần, phiếu CR/SR và sáng kiến từ tài khoản này sang tài khoản khác. Nếu tài khoản nhận đã có tổng kết ở cùng tuần thì nội dung được nối thêm phía sau. Trước khi chuyển, trình duyệt tự tải về một tệp lưu lại dữ liệu sắp chuyển để có thể quay lại.</p>'
   +'<div class="grid"><label class="field"><span>Từ tài khoản</span><select id="mv-from"></select></label><label class="field"><span>Sang tài khoản</span><select id="mv-to"></select></label></div>'
@@ -1346,7 +1352,7 @@ function impParse(rows){
   const idx={};rows[hi].forEach((h,i)=>{const k=normQ(h);IMP_KEYS.forEach(([f,names])=>{if(idx[f]===undefined&&names.includes(k))idx[f]=i})});
   const get=(r,f)=>idx[f]===undefined?'':(r[idx[f]]==null?'':r[idx[f]]);
   const sysBy=new Map(S.systems.map(s=>[normQ(s.name),s.id]).concat(S.systems.map(s=>[normQ(s.id),s.id])));
-  const stBy=new Map(CR_ST.map(s=>[normQ(s[1]),s[0]]).concat(CR_ST.map(s=>[s[0],s[0]]),[['da phe duyet','approved'],['chuyen it','approved'],['dang phan tich','new'],['huy','cancel'],['analysis','new'],['it','approved']]));
+  const stBy=new Map(CR_ST.map(s=>[normQ(s[1]),s[0]]).concat(CR_ST.map(s=>[s[0],s[0]]),[['da phe duyet','approved'],['chuyen it','approved'],['dang phan tich','analysis'],['phan tich','analysis'],['huy','cancel'],['it','approved']]));
   const list=[],seen=new Set();
   rows.slice(hi+1).forEach((r,ri)=>{
     const line=hi+ri+2,codeRaw=String(get(r,'code')).trim(),title=String(get(r,'title')).trim();
@@ -2253,9 +2259,9 @@ function exportReport(kind,fmt){
 /* ===== Phiếu CR/SR =====
    Mỗi nhân viên tự nhập và theo dõi phiếu của mình (chủ phiếu và quản trị xem được, giống đầu việc).
    Liên kết với báo cáo tuần bằng mã phiếu: việc nào có ô "Mã phiếu/Eof/Email" trùng mã phiếu CR/SR thì hiện trong dòng thời gian của phiếu. */
-const CR_ST=[['new','Mới tạo'],['approved','Đã phê duyệt (Chuyển IT/Media)'],['dev','Đang phát triển'],['uat','Nghiệm thu / UAT'],['hold','Tạm dừng'],['done','Hoàn thành'],['cancel','Huỷ']];
-/* Trạng thái cũ (bản trước 2.11) quy về trạng thái mới khi tải: Đang phân tích -> Mới tạo, Chuyển IT -> Đã phê duyệt */
-const CR_ST_OLD={analysis:'new',it:'approved'};
+const CR_ST=[['new','Mới tạo'],['approved','Đã phê duyệt (Chuyển IT/Media)'],['analysis','Phân tích yêu cầu'],['dev','Đang phát triển'],['uat','Nghiệm thu / UAT'],['hold','Tạm dừng'],['done','Hoàn thành'],['cancel','Huỷ']];
+/* Trạng thái cũ (bản trước 2.11) quy về trạng thái mới khi tải: Chuyển IT -> Đã phê duyệt. Bản 2.19 có lại trạng thái Phân tích yêu cầu (analysis) */
+const CR_ST_OLD={it:'approved'};
 /* Đơn vị "Media" và "VNPT Media" là một: quy về VNPT Media */
 const crUnitN=u=>/^\s*media\s*$/i.test(String(u||''))?'VNPT Media':u;
 const CR_UNITS=['VNPT IT','VNPT AI','Ban Sản phẩm','VNPT Media'];
@@ -2863,11 +2869,14 @@ function renderAdminUsers(){
   const el=$('user-list');if(!el)return;
   const me=S.user.uid;
   const q=normQ(S.uQ);
-  const shown=S.users.filter(u=>!q||normQ([u.name,u.username,u.unit].join(' ')).indexOf(q)>=0);
-  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button>'+(S.orgs.length&&S.users.some(u=>u.role!=='admin'&&!u.org)?'<select id="u-bulkorg" aria-label="Đơn vị để gán"><option value="">Chọn đơn vị…</option>'+S.orgs.filter(o=>o.active!==false).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join('')+'</select><button type="button" class="btn sm" data-act="usr-orgbulk" title="Gán đơn vị đã chọn cho mọi người dùng chưa có đơn vị">Gán cho '+S.users.filter(u=>u.role!=='admin'&&!u.org).length+' người chưa có đơn vị</button>':'')+'<button type="button" class="btn sm" data-act="usr-orgdata" title="Ghi đơn vị của chủ lên các phiếu CR/SR và sáng kiến đã có">Gán đơn vị cho dữ liệu cũ</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
+  const fo=S.uOrg||'';
+  const shown=S.users.filter(u=>(!q||normQ([u.name,u.username,u.unit,orgName(u.org)].join(' ')).indexOf(q)>=0)&&(!fo||(fo==='__none'?(u.role!=='admin'&&!u.org):u.org===fo)));
+  const uc=$('usr-count');if(uc)uc.textContent=S.users.length+' người dùng';
+  if(S.rstOpen){const pn=$('usr-panel');if(pn)pn.open=true}
+  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><select id="u-forg" aria-label="Lọc theo đơn vị"><option value="">Tất cả đơn vị</option>'+S.orgs.map(o=>'<option value="'+esc(o.id)+'"'+(fo===o.id?' selected':'')+'>'+esc(o.name)+'</option>').join('')+'<option value="__none"'+(fo==='__none'?' selected':'')+'>Chưa gán đơn vị</option></select><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button>'+(S.orgs.length&&S.users.some(u=>u.role!=='admin'&&!u.org)?'<select id="u-bulkorg" aria-label="Đơn vị để gán"><option value="">Chọn đơn vị…</option>'+S.orgs.filter(o=>o.active!==false).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join('')+'</select><button type="button" class="btn sm" data-act="usr-orgbulk" title="Gán đơn vị đã chọn cho mọi người dùng chưa có đơn vị">Gán cho '+S.users.filter(u=>u.role!=='admin'&&!u.org).length+' người chưa có đơn vị</button>':'')+'<button type="button" class="btn sm" data-act="usr-orgdata" title="Ghi đơn vị của chủ lên các phiếu CR/SR và sáng kiến đã có">Gán đơn vị cho dữ liệu cũ</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
    +(shown.map(u=>{
      const self=u.uid===me;
-     return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span><span class="muted">'+esc(u.unit||'')+'</span>'+(u.role!=='admin'?'<span class="muted">'+(u.org?'[Đơn vị: '+esc(orgName(u.org))+']':'[Chưa gán đơn vị]')+'</span>':'')+'<span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
+     return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span>'+(u.role!=='admin'&&u.org?'':'<span class="muted">'+esc(u.unit||'')+'</span>')+(u.role!=='admin'?'<span class="muted">'+(u.org?'[Đơn vị: '+esc(orgName(u.org))+']':'[Chưa gán đơn vị]')+'</span>':'')+'<span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
      +'<div class="urow'+(u.active===false?' off':'')+'" data-uid="'+esc(u.uid)+'"><span class="nm">'+esc(u.name||'')+(self?' (bạn)':'')+(u.active===false?' · đã khóa':'')+'</span>'
       +'<span class="mono">'+esc(u.username||'')+'</span><span>'+esc(u.unit||'')+'</span>'
       +'<select data-role="'+esc(u.uid)+'" aria-label="Quyền của '+esc(u.name||u.username)+'"'+(self?' disabled':'')+'><option value="user"'+(u.role!=='admin'?' selected':'')+'>Người dùng</option><option value="admin"'+(u.role==='admin'?' selected':'')+'>Quản trị</option></select>'
@@ -3150,6 +3159,20 @@ function renderSettings(){
   const c=$('allow-signup');if(c)c.checked=!!S.settings.allowSignup;
   const bl=$('bk-last');if(bl){const l=Number(S.settings.lastBackup)||0;bl.textContent=l?'Lần sao lưu đầy đủ gần nhất: '+new Date(l).toLocaleString('vi-VN')+'.':'Chưa ghi nhận lần sao lưu nào.'}
 }
+async function orgBackfill(auto){
+  try{
+        const rd=async q=>{try{return (await getDocs(q)).docs}catch(e){if(e&&e.code==='permission-denied')return [];throw e}};
+        const al=allowedSys();let cs=[];
+        for(const q of (al?[...al].map(id=>query(collection(db,'crs'),where('system','==',id))):[query(collection(db,'crs'))]))cs=cs.concat(await rd(q));
+        const is=await rd(query(collection(db,'ideas')));
+        let ts=[];for(const q of (al?[...al].map(id=>query(collection(db,'tasks'),where('system','==',id))):[query(collection(db,'tasks'))]))ts=ts.concat(await rd(q));
+        const need=cs.map(d=>({r:d.ref||doc(db,'crs',d.id),o:orgOfUid(d.data().uid),c:d.data().org||''})).filter(x=>x.o!==x.c).concat(is.map(d=>({r:d.ref||doc(db,'ideas',d.id),o:orgOfUid(d.data().uid),c:d.data().org||''})).filter(x=>x.o!==x.c)).concat(ts.map(d=>({r:d.ref||doc(db,'tasks',d.id),o:orgOfUid(d.data().uid),c:d.data().org||''})).filter(x=>x.o!==x.c));
+        if(!need.length){flash('Dữ liệu đã đúng đơn vị, không cần cập nhật.',true)}
+        else if(auto||confirm('Cập nhật đơn vị cho '+need.length+' phiếu CR/SR, sáng kiến và việc tuần (theo đơn vị của chủ)?')){
+          for(let i=0;i<need.length;i+=400){const bt=writeBatch(db);need.slice(i,i+400).forEach(x=>bt.update(x.r,{org:x.o}));await bt.commit()}
+          flash('Đã cập nhật đơn vị cho '+need.length+' phiếu, sáng kiến và việc tuần.',true)}
+        }catch(err){flash(fsMsg(err))}
+}
 async function createUserAsAdmin(name,username,password,unit,role,groups,systems,modules,crAll,org){
   const sec=getApps().find(a=>a.name==='secondary')||initializeApp(firebaseConfig,'secondary');
   const sAuth=getAuth(sec);
@@ -3286,25 +3309,14 @@ root.addEventListener('click',async e=>{
       const sel=$('u-bulkorg'),o=sel&&S.orgs.find(x=>x.id===sel.value);
       if(!o){flash('Hãy chọn đơn vị ở ô bên cạnh trước.');return}
       const l=S.users.filter(u=>u.role!=='admin'&&!u.org);if(!l.length)return;
-      if(!confirm('Gán đơn vị "'+o.name+'" cho '+l.length+' người dùng chưa có đơn vị?\n\nSau đó bấm "Gán đơn vị cho dữ liệu cũ" để việc tuần, phiếu CR/SR và sáng kiến đã có theo đơn vị.'))return;
+      if(!confirm('Gán đơn vị "'+o.name+'" cho '+l.length+' người dùng chưa có đơn vị?\n\nCột Đơn vị (chữ) của họ cũng đổi thành tên này, và việc tuần, phiếu CR/SR, sáng kiến đã có sẽ được cập nhật theo đơn vị luôn.'))return;
       b.disabled=true;
-      try{for(let i=0;i<l.length;i+=400){const bt=writeBatch(db);l.slice(i,i+400).forEach(u=>bt.update(doc(db,'users',u.uid),{org:o.id}));await bt.commit()}flash('Đã gán đơn vị "'+o.name+'" cho '+l.length+' người dùng.',true)}catch(err){flash(fsMsg(err)+(err&&err.code?' [mã lỗi: '+err.code+']':''))}
+      try{for(let i=0;i<l.length;i+=400){const bt=writeBatch(db);l.slice(i,i+400).forEach(u=>bt.update(doc(db,'users',u.uid),{org:o.id,unit:o.name}));await bt.commit()}flash('Đã gán đơn vị "'+o.name+'" cho '+l.length+' người dùng. Đang cập nhật dữ liệu cũ…',true);await new Promise(r=>setTimeout(r,500));await orgBackfill(true)}catch(err){flash(fsMsg(err)+(err&&err.code?' [mã lỗi: '+err.code+']':''))}
       b.disabled=false;return;
     }
     if(act==='usr-orgdata'){
       b.disabled=true;const old=b.textContent;b.textContent='Đang quét…';
-      try{
-        const rd=async q=>{try{return (await getDocs(q)).docs}catch(e){if(e&&e.code==='permission-denied')return [];throw e}};
-        const al=allowedSys();let cs=[];
-        for(const q of (al?[...al].map(id=>query(collection(db,'crs'),where('system','==',id))):[query(collection(db,'crs'))]))cs=cs.concat(await rd(q));
-        const is=await rd(query(collection(db,'ideas')));
-        let ts=[];for(const q of (al?[...al].map(id=>query(collection(db,'tasks'),where('system','==',id))):[query(collection(db,'tasks'))]))ts=ts.concat(await rd(q));
-        const need=cs.map(d=>({r:d.ref||doc(db,'crs',d.id),o:orgOfUid(d.data().uid),c:d.data().org||''})).filter(x=>x.o!==x.c).concat(is.map(d=>({r:d.ref||doc(db,'ideas',d.id),o:orgOfUid(d.data().uid),c:d.data().org||''})).filter(x=>x.o!==x.c)).concat(ts.map(d=>({r:d.ref||doc(db,'tasks',d.id),o:orgOfUid(d.data().uid),c:d.data().org||''})).filter(x=>x.o!==x.c));
-        if(!need.length){flash('Dữ liệu đã đúng đơn vị, không cần cập nhật.',true)}
-        else if(confirm('Cập nhật đơn vị cho '+need.length+' phiếu CR/SR, sáng kiến và việc tuần (theo đơn vị của chủ)?')){
-          for(let i=0;i<need.length;i+=400){const bt=writeBatch(db);need.slice(i,i+400).forEach(x=>bt.update(x.r,{org:x.o}));await bt.commit()}
-          flash('Đã cập nhật đơn vị cho '+need.length+' phiếu, sáng kiến và việc tuần.',true)}
-      }catch(err){flash(fsMsg(err))}
+      await orgBackfill(false);
       b.disabled=false;b.textContent=old;return;
     }
     if(act==='usr-fixsys'){
@@ -3609,6 +3621,7 @@ root.addEventListener('change',async e=>{
     if(t.id==='who'){S.who=t.value;S.editing=null;resetQuick();renderWho();renderReport();renderNotes();return}
     if(t.id==='w-group'){S.wGroup=t.value;renderReport();return}
     if(t.id==='m-group'){S.mGroup=t.value;renderStats();return}
+    if(t.id==='u-forg'){S.uOrg=t.value;renderAdminUsers();return}
     if(t.matches&&t.matches('select[data-status]')){
       const task=S.tasks.find(x=>x.id===t.dataset.status);if(!task||!isMine(task)){renderReport();return}
       S.expanded.clear();try{await updateDoc(doc(db,'tasks',task.id),{status:t.value});tplReset()}catch(err){flash(fsMsg(err));renderReport()}return;
