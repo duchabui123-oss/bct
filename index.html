@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.00 -->
+<!-- Phiên bản 2.02 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -121,7 +121,9 @@ textarea{resize:vertical;min-height:4.5rem}
 .idt td{white-space:normal}
 .mods{display:inline-flex;flex-wrap:wrap;gap:4px 14px;vertical-align:middle}.mods .check,.usys>.check{display:inline-flex;align-items:center;gap:6px;margin:0 12px 0 0}
 .cr-vw{display:inline-flex;gap:6px;margin-right:10px}
-@media(min-width:1180px){#tab-cr.wide,#tab-ideas.wide{width:min(1500px,calc(100vw - 40px));max-width:none;margin-left:50%;transform:translateX(-50%)}}
+@media(min-width:1180px){#tab-cr.wide,#tab-ideas.wide{width:min(1500px,calc(100vw - 40px));max-width:none;margin-left:50%;transform:translateX(-50%)}
+.app.wideon>header.bar,.app.wideon>footer.foot{width:min(1500px,calc(100vw - 40px));max-width:none;margin-left:50%;transform:translateX(-50%)}
+.app.wideon>header.bar{position:relative;z-index:30}}
 .crt-wrap{overflow-x:auto}.crt{width:100%;min-width:980px;table-layout:fixed;border-collapse:collapse;font-size:.84rem}
 .crt th,.crt td{border:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top;word-break:break-word}
 .crt th{background:var(--surface-2,var(--accent-soft));font-weight:600;text-align:center;font-size:.8rem}.crt td.c{text-align:center;white-space:nowrap}.crt th:first-child{writing-mode:initial}
@@ -523,6 +525,8 @@ function teardown(){
   crUnsubs.forEach(f=>{try{f()}catch(e){}});crUnsubs=[];S.crs=[];S.crLoaded=false;ideaUnsubs.forEach(f=>{try{f()}catch(e){}});ideaUnsubs=[];S.ideas=[];S.ideasLoaded=false;
   S.users=[];S.systems=[];S.types=[];S.tasks=[];S.notes=[];S.loadedTasks=false;S.editing=null;S.tab='report';
 }
+/* Quản trị vừa đổi chức năng của tài khoản đang mở: Firestore ngắt các truy vấn cũ bằng permission-denied trước khi web kịp huỷ, nên xoá cảnh báo sau khi đã huỷ */
+function clearNet(){const n=$('net');if(n){n.textContent='';n.hidden=true}}
 function listen(ref,cb,onErr){
   const u=onSnapshot(ref,cb,err=>{
     if(onErr)onErr(err);
@@ -602,7 +606,7 @@ function listenTasks(a,b,cb){
 function subWeek(){
   weekUnsubs.forEach(f=>{try{f()}catch(e){}});weekUnsubs=[];
   S.loadedTasks=false;
-  if(!modOn('report')){S.tasks=[];S.notes=[];S.loadedTasks=true;return}
+  if(!modOn('report')){S.tasks=[];S.notes=[];S.loadedTasks=true;clearNet();try{renderReport()}catch(e){}return}
   const a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
   weekUnsubs.push(listenTasks(a,b,(list,snap)=>{
     canonTitles(list);canonTypes(list);S.tasks=list;S.loadedTasks=true;try{renderUnits();refreshTplUses()}catch(e){}
@@ -1231,6 +1235,7 @@ function buildStats(){
 function subMonth(){
   monthUnsubs.forEach(f=>{try{f()}catch(e){}});monthUnsubs=[];
   S.loadedM=false;
+  if(!modOn('report')){S.mTasks=[];S.loadedM=true;clearNet();return}
   const y=S.month.getFullYear(),mo=S.month.getMonth();
   const a=iso(new Date(y,mo,1)),b=iso(new Date(y,mo+1,0));
   monthUnsubs.push(listenTasks(a,b,list=>{
@@ -1935,7 +1940,7 @@ const crSysName=id=>{const s=S.systems.find(x=>x.id===id);return s?s.name:''};
 const crOwnerName=c=>userName(c.uid);
 function subCrs(){
   crUnsubs.forEach(f=>{try{f()}catch(e){}});crUnsubs=[];S.crLoaded=false;
-  if(!modOn('cr')){S.crs=[];S.crLoaded=true;S.crNoRule=false;return}
+  if(!modOn('cr')){S.crs=[];S.crLoaded=true;S.crNoRule=false;clearNet();return}
   const al=allowedSys(),col=collection(db,'crs'),own=isAdminUser()?[]:[where('uid','==',S.user.uid)];
   const qs=al?[...al].map(id=>query(col,where('system','==',id),...own)):[query(col,...own)];
   const parts=new Array(qs.length).fill(null);
@@ -2077,7 +2082,8 @@ function crBadges(){
     n.textContent=String(v);n.className='nbadge'+(late?' bad':'');n.title=late?late+' phiếu quá hạn'+(soon?', '+soon+' sắp đến hạn':''):soon+' phiếu sắp đến hạn';
   });
 }
-function renderCr(){if(!$('cr-list'))return;const al=$('cr-alert');if(al)al.innerHTML=S.crNoRule||!S.crLoaded?'':crAlertHtml();crBadges();crAutoLoad();const tb=$('tab-cr');if(tb)tb.classList.toggle('wide',S.crView==='table');renderCrFilters();renderCrList()}
+function syncWide(){const r=root&&root.firstElementChild;if(!r)return;r.classList.toggle('wideon',!!document.querySelector('#tab-cr.wide:not([hidden]),#tab-ideas.wide:not([hidden])'))}
+function renderCr(){if(!$('cr-list'))return;const al=$('cr-alert');if(al)al.innerHTML=S.crNoRule||!S.crLoaded?'':crAlertHtml();crBadges();crAutoLoad();const tb=$('tab-cr');if(tb)tb.classList.toggle('wide',S.crView==='table');syncWide();renderCrFilters();renderCrList()}
 function crSysOpts(sel){
   const al=allowedSys();let l=S.systems.filter(x=>x.active!==false&&(!al||al.has(x.id)));
   if(sel&&!l.some(x=>x.id===sel)){const o=S.systems.find(x=>x.id===sel);if(o)l=l.concat([o])}
@@ -2263,7 +2269,7 @@ function idLint(d){
 }
 function subIdeas(){
   ideaUnsubs.forEach(f=>{try{f()}catch(e){}});ideaUnsubs=[];S.ideasLoaded=false;
-  if(!modOn('ideas')){S.ideas=[];S.ideasLoaded=true;S.ideasNoRule=false;return}
+  if(!modOn('ideas')){S.ideas=[];S.ideasLoaded=true;S.ideasNoRule=false;clearNet();return}
   const col=collection(db,'ideas'),q=isAdminUser()?query(col):query(col,where('uid','==',S.user.uid));
   ideaUnsubs.push(onSnapshot(q,snap=>{S.ideasNoRule=false;S.ideas=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.ideasLoaded=true;renderIdeas();aggRefresh()},err=>{
     if(err&&err.code==='permission-denied')S.ideasNoRule=true;S.ideas=[];S.ideasLoaded=true;renderIdeas()}));
@@ -2319,7 +2325,7 @@ function renderIdeaList(){
     const id='id-'+k;
     return '<details class="sys" data-sys="'+esc(id)+'"'+(S.expanded.has(id)?' open':'')+'><summary><b>'+esc(idGroupName(k))+'</b><span class="muted">'+g.get(k).length+' sáng kiến</span></summary>'+idTable(g.get(k))+'</details>'}).join('');
 }
-function renderIdeas(){if(!$('id-list'))return;const tb=$('tab-ideas');if(tb)tb.classList.add('wide');renderIdeaFilters();renderIdeaList()}
+function renderIdeas(){if(!$('id-list'))return;const tb=$('tab-ideas');if(tb)tb.classList.add('wide');syncWide();renderIdeaFilters();renderIdeaList()}
 /* ---- Form ---- */
 function idRowsHtml(g){
   const arr=S.idDraft[g];
@@ -2972,6 +2978,7 @@ root.addEventListener('click',async e=>{
       if(S.tab==='ideas'&&prevTab!=='ideas'){S.idF={q:'',year:'',round:'',who:isAdminUser()?S.user.uid:''};S.idWhoInit=true;const fq=$('id-fq');if(fq)fq.value='';idCloseForm();renderIdeas()}
       if(S.tab==='cr')renderCr();
       if(S.tab==='admin')renderSettings();
+      syncWide();
       return;
     }
     if(act==='adm'){
