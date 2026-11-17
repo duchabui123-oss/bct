@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.11 -->
+<!-- Phiên bản 2.12 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -565,7 +565,7 @@ async function boot(){
   unsubs.push(listen(collection(db,'groups'),snap=>{
     S.groups=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
     const k=effSig();
-    if(!S.groupsReady){S.groupsReady=true;S.effKey=k;if(groupsOf(S.profile).length){subWeek();subCrs();subIdeas()}}
+    if(!S.groupsReady){S.groupsReady=true;S.effKey=k;clearNet();if(groupsOf(S.profile).length){subWeek();subCrs();subIdeas();if(S.tab==='stats'||monthUnsubs.length)subMonth()}}
     else if(k!==S.effKey){S.effKey=k;subWeek();subCrs();subIdeas();if(monthUnsubs.length)subMonth()}
     renderQuickSelects();renderWho();renderReport();renderCatalog('groups');renderTplAdmin();renderAdminUsers();if($('stats-body'))renderStats();
   }));
@@ -590,7 +590,11 @@ async function boot(){
 /* Đọc việc theo khoảng ngày. Người được gán "Hệ thống phụ trách" chỉ được đọc việc của các hệ thống đó (luật Firestore chặn phần còn lại),
    nên mỗi hệ thống một truy vấn (cần chỉ mục system + date, xem HUONG-DAN.md); không được gán thì một truy vấn như cũ. */
 const isAdminUser=()=>!!(S.profile&&S.profile.role==='admin');
+/* Chưa tải xong danh sách nhóm mà tài khoản lấy hệ thống theo nhóm: chưa biết được hệ thống nào, truy vấn không kèm điều kiện hệ thống sẽ bị luật Firestore từ chối
+   (báo permission-denied). Hoãn đăng ký; trình nghe nhóm sẽ đăng ký ngay khi nhóm tải xong. */
+const needGroups=()=>!S.groupsReady&&!!S.profile&&groupsOf(S.profile).length>0&&!((S.profile.systems||[]).length);
 function listenTasks(a,b,cb){
+  if(needGroups())return ()=>{};
   const al=allowedSys(),col=collection(db,'tasks'),un=[];
   /* Người dùng thường chỉ đọc việc của chính mình (luật Firestore chặn phần còn lại); quản trị đọc của mọi người */
   const own=isAdminUser()?[]:[where('uid','==',S.user.uid)];
@@ -602,7 +606,7 @@ function listenTasks(a,b,cb){
   },err=>{
     /* một hệ thống lỗi (chưa có chỉ mục, thiếu quyền...) thì các hệ thống còn lại vẫn hiển thị */
     parts[i]=[];if(parts.every(x=>x))cb([].concat(...parts),null);
-    const n=$('net');if(n)setTimeout(()=>{n.textContent+=' [mã lỗi: '+(err&&err.code||'?')+']';n.hidden=false},0);
+    const n=$('net');if(n)setTimeout(()=>{n.textContent+=' [mã lỗi: '+(err&&err.code||'?')+']'+(S.profile&&S.profile.role!=='admin'?' [hs: '+(allowedSys()?[...allowedSys()].join(','):'tất cả')+']':'');n.hidden=false},0);
   })));
   if(!qs.length)cb([],null);
   return ()=>un.forEach(f=>{try{f()}catch(e){}});
@@ -1640,6 +1644,9 @@ function allowedSys(){
   groupsOf(S.profile).forEach(id=>{const g=S.groups.find(x=>x.id===id);if(g&&Array.isArray(g.systems))g.systems.forEach(y=>gs.push(y))});
   return gs.length?new Set(gs):null;
 }
+/* Tài khoản chỉ lấy hệ thống theo nhóm (chưa có hệ thống riêng): danh sách hệ thống nhóm sẽ được gán thành hệ thống riêng */
+const grpSysOf=u=>{const r=new Set();groupsOf(u).forEach(id=>{const g=S.groups.find(x=>x.id===id);if(g&&Array.isArray(g.systems))g.systems.forEach(y=>r.add(y))});return [...r]};
+const byGroupOnly=()=>S.users.filter(u=>u.role!=='admin'&&!(Array.isArray(u.systems)&&u.systems.length)&&grpSysOf(u).length);
 const userGroup=uid=>groupsOf(S.users.find(x=>x.uid===uid));
 const myGroup=()=>groupsOf(S.profile);
 /* việc mẫu không gắn nhóm = dùng chung; chưa có ngữ cảnh nhóm (g rỗng) = thấy tất cả */
@@ -2221,6 +2228,7 @@ const crSysName=id=>{const s=S.systems.find(x=>x.id===id);return s?s.name:''};
 const crOwnerName=c=>userName(c.uid);
 function subCrs(){
   crUnsubs.forEach(f=>{try{f()}catch(e){}});crUnsubs=[];S.crLoaded=false;
+  if(needGroups())return;
   if(!modOn('cr')){S.crs=[];S.crLoaded=true;S.crNoRule=false;clearNet();return}
   const al=allowedSys(),col=collection(db,'crs'),all=crSeesAll(),own=all?[]:[where('uid','==',S.user.uid)];
   let qs=al?[...al].map(id=>query(col,where('system','==',id),...own)):[query(col,...own)];
@@ -2793,7 +2801,7 @@ function renderAdminUsers(){
   const me=S.user.uid;
   const q=normQ(S.uQ);
   const shown=S.users.filter(u=>!q||normQ([u.name,u.username,u.unit].join(' ')).indexOf(q)>=0);
-  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button><span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
+  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
    +(shown.map(u=>{
      const self=u.uid===me;
      return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span><span class="muted">'+esc(u.unit||'')+'</span><span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
@@ -3085,6 +3093,7 @@ async function createUserAsAdmin(name,username,password,unit,role,groups,systems
   const prof={username:username,name:name,unit:unit,role:role,active:true,created:Date.now()};
   if(groups&&groups.length){prof.groups=groups;prof.group=groups[0]}
   if(systems&&systems.length)prof.systems=systems;
+  else if(role!=='admin'&&groups&&groups.length){const gs=grpSysOf({groups:groups});if(gs.length)prof.systems=gs}
   if(role!=='admin'&&modules&&modules.length&&modules.length<MODS.length)prof.modules=modules;
   if(role!=='admin'&&crAll===true)prof.crAll=true;
   await setDoc(doc(db,'users',uid),prof);
@@ -3206,6 +3215,12 @@ root.addEventListener('click',async e=>{
     if(act==='tpg-all'){const ks=[...document.querySelectorAll('#tpl-list details.tpg')].map(d=>d.dataset.sys);ks.forEach(k=>b.dataset.m==='open'?S.expanded.add(k):S.expanded.delete(k));document.querySelectorAll('#tpl-list details.tpg').forEach(d=>{d.open=b.dataset.m==='open'});return}
     if(act==='uimp-tpl'){uimpTemplate();return}
     if(act==='uimp-go'){await uimpRun();return}
+    if(act==='usr-fixsys'){
+      const l=byGroupOnly();if(!l.length)return;
+      if(!confirm('Gán hệ thống riêng cho '+l.length+' tài khoản đang để "Theo nhóm"?\n\nMỗi người sẽ được ghi sẵn các hệ thống mặc định của nhóm mình (sau đó muốn đổi vẫn tích lại ở từng người).'))return;
+      try{for(let i=0;i<l.length;i+=400){const bt=writeBatch(db);l.slice(i,i+400).forEach(u=>bt.update(doc(db,'users',u.uid),{systems:grpSysOf(u)}));await bt.commit()}flash('Đã gán hệ thống riêng cho '+l.length+' tài khoản. Nhờ họ tải lại trang.',true)}catch(err){flash(fsMsg(err))}
+      return;
+    }
     if(act==='usr-all'){S.users.forEach(u=>b.dataset.m==='open'?S.expanded.add('usr-'+u.uid):S.expanded.delete('usr-'+u.uid));renderAdminUsers();return}
     if(act==='cr-imp-open'){const pn=$('cr-imp');if(pn){const h=$('cr-imp-hint');if(h)h.textContent=isAdminUser()?'Quản trị ghi tên tài khoản ở cột "Chủ phiếu" để nhập phiếu cho người khác.':'Phiếu nhập sẽ thuộc tài khoản của bạn.';pn.hidden=false;pn.scrollIntoView({block:'nearest'})}return}
     if(act==='cr-imp-close'){impClose();return}
