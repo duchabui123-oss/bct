@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.06 -->
+<!-- Phiên bản 2.07 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -714,6 +714,7 @@ function buildShell(){
 /* ===== Ô nhập có danh sách gợi ý tự vẽ (thay datalist vì mỗi trình duyệt hiển thị một kiểu: Edge, Firefox, Chrome) ===== */
 const COMBOS={
   'cr-unit':()=>[...new Map(CR_UNITS.concat(S.crs.map(c=>c.unit)).map(x=>String(x||'').trim()).filter(Boolean).map(x=>[x.toLowerCase(),x])).values()].map(v=>({v:v})),
+  'cr-htkh':()=>[...new Map(S.users.filter(u=>u.active!==false).map(u=>String(u.name||u.username||'').trim()).filter(Boolean).map(x=>[x.toLowerCase(),x])).values()].sort((a,b)=>a.localeCompare(b,'vi')).map(v=>({v:v})),
   'id-grade':()=>[...new Map(S.ideas.map(x=>String(x.grade||'').trim()).filter(Boolean).map(x=>[x.toLowerCase(),x])).values()].sort((a,b)=>a.localeCompare(b,'vi')).map(v=>({v:v})),
   'q-ticket':()=>S.crs.filter(c=>S.user&&c.uid===S.user.uid&&crIsOpen(c)).sort((a,b)=>String(b.createdDate||'').localeCompare(String(a.createdDate||''))).map(c=>({v:c.code,l:c.title}))
 };
@@ -1987,16 +1988,26 @@ const crOwnerName=c=>userName(c.uid);
 function subCrs(){
   crUnsubs.forEach(f=>{try{f()}catch(e){}});crUnsubs=[];S.crLoaded=false;
   if(!modOn('cr')){S.crs=[];S.crLoaded=true;S.crNoRule=false;clearNet();return}
-  const al=allowedSys(),col=collection(db,'crs'),own=crSeesAll()?[]:[where('uid','==',S.user.uid)];
-  const qs=al?[...al].map(id=>query(col,where('system','==',id),...own)):[query(col,...own)];
+  const al=allowedSys(),col=collection(db,'crs'),all=crSeesAll(),own=all?[]:[where('uid','==',S.user.uid)];
+  let qs=al?[...al].map(id=>query(col,where('system','==',id),...own)):[query(col,...own)];
+  /* Phiếu người khác giao cho mình làm TT DVKH (htkhUid = uid của mình): đọc thêm, chỉ xem */
+  if(!all)qs=qs.concat(al?[...al].map(id=>query(col,where('system','==',id),where('htkhUid','==',S.user.uid))):[query(col,where('htkhUid','==',S.user.uid))]);
   const parts=new Array(qs.length).fill(null);
-  const fin=()=>{if(!parts.every(x=>x))return;S.crs=[].concat(...parts);S.crLoaded=true;renderCr();aggRefresh();fillTicketList();if(S.tab==='report'&&typeof renderReport==='function')try{renderReport()}catch(e){}updateNotices()};
+  const fin=()=>{if(!parts.every(x=>x))return;S.crs=[...new Map([].concat(...parts).map(c=>[c.id,c])).values()];crBackfill();S.crLoaded=true;renderCr();aggRefresh();fillTicketList();if(S.tab==='report'&&typeof renderReport==='function')try{renderReport()}catch(e){}updateNotices()};
   qs.forEach((q,i)=>crUnsubs.push(onSnapshot(q,snap=>{S.crNoRule=false;parts[i]=snap.docs.map(d=>Object.assign({id:d.id},d.data()));fin()},err=>{
     if(err&&err.code==='permission-denied')S.crNoRule=true;
     parts[i]=[];fin()})));
   if(!qs.length){S.crs=[];S.crLoaded=true}
 }
 /* Gợi ý mã phiếu CR/SR đang mở ở ô "Mã phiếu/Eof/Email" của form thêm việc tuần */
+/* Phiếu cũ của chính mình đã ghi tên TT DVKH nhưng chưa gắn tài khoản: tự gắn một lần nếu tên khớp đúng một tài khoản */
+const crBfDone=new Set();
+function crBackfill(){
+  const me=S.user&&S.user.uid;if(!me||!S.users.length)return;
+  S.crs.filter(c=>c.uid===me&&c.htkh&&!c.htkhUid&&!crBfDone.has(c.id)).forEach(c=>{
+    crBfDone.add(c.id);const u=crHtkhUid(c.htkh);
+    if(u)updateDoc(doc(db,'crs',c.id),{htkhUid:u}).catch(()=>{})});
+}
 function fillTicketList(){
   const dl=$('q-ticket-dl');if(!dl)return;const me=S.user.uid;
   dl.innerHTML=S.crs.filter(c=>c.uid===me&&crIsOpen(c)).sort((a,b)=>String(b.createdDate||'').localeCompare(String(a.createdDate||''))).map(c=>'<option value="'+esc(c.code)+'">'+esc(c.title)+'</option>').join('');
@@ -2040,6 +2051,8 @@ function crTimeline(c){
     +'<button type="button" class="btn link sm" data-act="cr-useprog" data-id="'+esc(c.id)+'" data-tid="'+esc(t.id)+'">Dùng làm tiến độ hiện tại</button></li>').join('')+'</ul>';
 }
 const crHtkh=c=>c.htkh||crOwnerName(c);
+/* Tên người phụ trách khớp tài khoản nào (không phân biệt hoa thường, dấu) thì lấy uid để phiếu hiện sang tài khoản đó */
+const crHtkhUid=n=>{const k=normQ(n||'');if(!k)return '';const m=S.users.filter(u=>normQ(u.name||u.username||'')===k);return m.length===1?m[0].uid:''};
 const crNl=v=>esc(v||'').replace(/\n/g,'<br>');
 function crTable(a){
   const heads=['STT','Nội dung','Mã IT 360','Ngày tạo','Ngày thẩm định','Ngày yêu cầu hoàn thành','Tiến độ hiện tại','Đơn vị thực hiện','Nhân sự phối hợp','TT DVKH','Ngày hoàn thành',''];
@@ -2050,7 +2063,7 @@ function crTable(a){
     const flag=crFlagHtml(c);
     const link=/^https?:\/\//i.test(c.link||'')?'<a class="cr-lk" href="'+esc(c.link)+'" target="_blank" rel="noopener noreferrer">'+esc(c.code)+' ↗</a>':esc(c.code);
     h+='<tr class="cr'+crUrgCls(c)+'" data-id="'+esc(c.id)+'"><td class="c">'+(i+1)+'</td>'
-      +'<td><b>'+esc(c.title)+'</b><div class="cr-meta">'+esc([c.kind||'CR',crSysName(c.system)].concat(crSeesAll()?['Phụ trách: '+crOwnerName(c)]:[]).join(' · '))+'</div></td>'
+      +'<td><b>'+esc(c.title)+'</b><div class="cr-meta">'+esc([c.kind||'CR',crSysName(c.system)].concat((crSeesAll()||c.uid!==S.user.uid)?['Chủ phiếu: '+crOwnerName(c)]:[]).join(' · '))+'</div></td>'
       +'<td class="mono">'+link+'<div><span class="cr-st cr-st-'+esc(c.status||'new')+'">'+esc(crStName(c.status))+'</span></div>'+(flag?'<div>'+flag+'</div>':'')+crMiss(c)+crLinkInfo(c)+'</td>'
       +'<td class="c">'+esc(crFmt(c.createdDate))+'</td><td class="c">'+esc(crFmt(c.reviewDate))+'</td><td class="c">'+esc(crFmt(c.dueDate))+'</td>'
       +'<td>'+(c.progress?crNl(c.progress):'<span class="muted">Chưa ghi tiến độ.</span>')+'</td>'
@@ -2073,7 +2086,7 @@ function crRow(c){
   const late=crLate(c),soon=crSoon(c),adm=crSeesAll();
   const flag=crFlagHtml(c);
   const meta=[['Tạo',c.createdDate],['Thẩm định',c.reviewDate],['Hạn hoàn thành',c.dueDate],['Đã hoàn thành',c.doneDate]].filter(x=>x[1]).map(x=>x[0]+' '+crFmt(x[1]));
-  const info=[c.kind||'CR',crSysName(c.system)].filter(Boolean).concat(c.unit?['Đơn vị: '+c.unit]:[],c.coop?['Phối hợp: '+String(c.coop).split(/\n+/).map(x=>x.replace(/^\s*[-•]\s*/,'').trim()).filter(Boolean).join('; ')]:[],c.htkh?['TT DVKH: '+c.htkh]:[],adm?['Phụ trách: '+crOwnerName(c)]:[]);
+  const info=[c.kind||'CR',crSysName(c.system)].filter(Boolean).concat(c.unit?['Đơn vị: '+c.unit]:[],c.coop?['Phối hợp: '+String(c.coop).split(/\n+/).map(x=>x.replace(/^\s*[-•]\s*/,'').trim()).filter(Boolean).join('; ')]:[],c.htkh?['TT DVKH: '+c.htkh]:[],(adm||c.uid!==S.user.uid)?['Chủ phiếu: '+crOwnerName(c)]:[]);
   const open=S.crOpenTl.has(c.id);
   return '<div class="cr'+crUrgCls(c)+'" data-id="'+esc(c.id)+'"><div class="cr-main">'
     +'<div class="cr-top"><b class="cr-code mono">'+esc(c.code)+'</b>'+(/^https?:\/\//i.test(c.link||'')?' <a class="cr-lk" href="'+esc(c.link)+'" target="_blank" rel="noopener noreferrer">Mở phiếu ↗</a>':'')
@@ -2167,14 +2180,14 @@ async function crSave(){
   const ed=S.crEdit,uid=ed?ed.uid:S.user.uid;
   if(S.crs.some(x=>x.uid===uid&&String(x.code).toLowerCase()===code.toLowerCase()&&(!ed||x.id!==ed.id))){msg.textContent='Phiếu '+code+' đã có trong danh sách.';return}
   const body={uid:uid,code:code,title:title,kind:$('cr-kind').value,system:sys,status:st,createdDate:cd,reviewDate:rd,dueDate:dd,doneDate:dn,
-    unit:$('cr-unit').value.trim(),htkh:$('cr-htkh').value.trim(),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
+    unit:$('cr-unit').value.trim(),htkh:(crHtkhUid($('cr-htkh').value)?userName(crHtkhUid($('cr-htkh').value)):$('cr-htkh').value.trim()),htkhUid:crHtkhUid($('cr-htkh').value),coop:$('cr-coop').value.trim(),progress:$('cr-prog').value.trim(),link:link,ts:ed&&ed.ts?ed.ts:Date.now(),updated:Date.now()};
   $('cr-save').disabled=true;msg.textContent='Đang lưu…';
   try{
     const id=ed?ed.id:doc(collection(db,'crs')).id;
     await setDoc(doc(db,'crs',id),body);
     if(ed&&ed.code!==code)delete S.crLinked[ed.id];
-    crCloseForm();flash('Đã lưu phiếu '+code+'.',true);
-  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.25, xem HUONG-DAN.md)':'')}
+    crCloseForm();flash(body.htkh&&!body.htkhUid?'Đã lưu phiếu '+code+'. Tên "'+body.htkh+'" chưa khớp tài khoản nào nên phiếu chưa hiện sang người đó; hãy chọn tên trong danh sách gợi ý.':'Đã lưu phiếu '+code+(body.htkhUid&&body.htkhUid!==uid?'. Phiếu đã hiện trong tài khoản của '+userName(body.htkhUid)+' (chỉ xem).':'.'),true);
+  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.27, xem HUONG-DAN.md)':'')}
   $('cr-save').disabled=false;
 }
 let crAutoT=0;
@@ -2279,7 +2292,7 @@ function buildCr(){
   +f('','Ngày yêu cầu hoàn thành','<input id="cr-due" type="date">')
   +f('','Ngày hoàn thành','<input id="cr-done" type="date">')
   +f('','Đơn vị thực hiện','<input id="cr-unit" maxlength="120" autocomplete="off" data-combo="cr-unit" placeholder="VNPT IT, VNPT AI, Ban Sản phẩm…">')
-  +f('','TT DVKH (người phụ trách; bỏ trống = chủ phiếu)','<input id="cr-htkh" maxlength="120" placeholder="Ví dụ: Nguyễn Văn A">')
+  +f('','TT DVKH (người phụ trách; bỏ trống = chủ phiếu)','<input id="cr-htkh" maxlength="120" autocomplete="off" data-combo="cr-htkh" placeholder="Chọn tên tài khoản, ví dụ: Nguyễn Văn A">')
   +f('','Nhân sự phối hợp','<textarea id="cr-coop" rows="3" maxlength="800" placeholder="Mỗi người một dòng (Enter để xuống dòng), ví dụ:&#10;- Nguyễn Văn A&#10;- Trần Văn B"></textarea>')
   +f('','Tiến độ hiện tại','<textarea id="cr-prog" rows="2" maxlength="1500" placeholder="Ví dụ: Phiếu đã chuyển sang IT ở trạng thái Phân tích yêu cầu"></textarea>','wide')
   +f('','Đường dẫn phiếu','<input id="cr-link" maxlength="500" placeholder="https://…">','wide')
@@ -2423,7 +2436,7 @@ async function idSave(){
     S.idLastYear=d.year;S.idLastRound=d.round;
     const w=idLint(Object.assign({},d,{leaders:leaders,members:members}));
     idCloseForm();flash('Đã lưu sáng kiến.'+(w.length?' Lưu ý: '+w[0]+(w.length>1?' (và '+(w.length-1)+' lưu ý khác, bấm Sửa để xem)':''):''),true);
-  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.25, xem HUONG-DAN.md)':'')}
+  }catch(e){msg.textContent=fsMsg(e)+(e&&e.code==='permission-denied'?' (có thể cần dán luật Firestore bản 1.27, xem HUONG-DAN.md)':'')}
   $('id-save').disabled=false;
 }
 function idFixAuthors(){
