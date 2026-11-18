@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<!-- Phiên bản 2.21 -->
+<!-- Phiên bản 2.22 -->
 <title>Báo cáo tuần</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1437,6 +1437,34 @@ function impTemplate(){
   download(makeXlsx([{name:'Nhập phiếu',rows:[IMP_HEADS,ex],headRows:[0],freeze:1,widths:[16,44,22,8,18,18,12,12,14,14,12,16,24,18,40,30]},{name:'Hướng dẫn',rows:guide,titleRows:[0],widths:[110]}]),'Mau_nhap_phieu_CR-SR.xlsx');
 }
 
+/* ===== Xuất danh sách người dùng ra Excel (theo ô tìm và lọc đơn vị đang chọn, không có mật khẩu) ===== */
+function usrFiltered(){
+  const q=normQ(S.uQ),fo=S.uOrg||'';
+  return S.users.filter(u=>(!q||normQ([u.name,u.username,u.unit,orgName(u.org)].join(' ')).indexOf(q)>=0)&&(!fo||(fo==='__none'?(u.role!=='admin'&&!u.org):u.org===fo)));
+}
+function usrExport(){
+  try{
+    if(!isAdminUser()){flash('Chỉ quản trị mới xuất được danh sách người dùng.');return}
+    const l=usrFiltered().slice().sort((a,b)=>String(a.name||a.username||'').localeCompare(String(b.name||b.username||''),'vi'));
+    if(!l.length){flash('Không có người dùng nào để xuất.');return}
+    const yn=v=>v?'Có':'Không';
+    const heads=['STT','Họ tên','Tên đăng nhập','Đơn vị','Quyền','Trạng thái','Chức năng được dùng','Quản lý CR/SR','Quản lý sáng kiến','Quản lý báo cáo tuần','Nhóm','Hệ thống phụ trách','Ngày tạo'];
+    const rows=[heads].concat(l.map((u,i)=>{
+      const adm=u.role==='admin',sys=Array.isArray(u.systems)?u.systems:[];
+      return [i+1,u.name||'',u.username||'',orgName(u.org)||u.unit||'',adm?'Quản trị':'Người dùng',u.active===false?'Đã khóa':'Hoạt động',
+        adm?'Tất cả':modsOf(u).map(m=>(MODS.find(x=>x[0]===m)||[0,m])[1]).join('; '),
+        adm?'—':yn(u.crAll===true),adm?'—':yn(u.ideaAll===true),adm?'—':yn(u.repAll===true),
+        groupsOf(u).map(id=>(S.groups.find(g=>g.id===id)||{}).name||'').filter(Boolean).join('; '),
+        adm||(!sys.length&&!groupsOf(u).length)?'Tất cả':(sys.length?sys.map(sysName).join('; '):'Theo nhóm'),
+        u.created?full(new Date(u.created)):''];
+    }));
+    const fo=S.uOrg?(S.uOrg==='__none'?'Chưa gán đơn vị':orgName(S.uOrg)):'';
+    const title=['Danh sách người dùng'+(fo?' – '+fo:'')+' ('+l.length+' người, xuất ngày '+full(new Date())+')'];
+    const all=[title,['']].concat(rows);
+    download(makeXlsx([{name:'Người dùng',rows:all,titleRows:[0],headRows:[2],freeze:3,widths:[6,24,18,24,12,12,34,12,14,16,26,44,12]}]),'DanhSach_NguoiDung_'+full(new Date()).replace(/\//g,'-')+'.xlsx');
+    flash('Đã xuất '+l.length+' người dùng ra Excel.',true);
+  }catch(e){flash('Không xuất được: '+(e&&e.message?e.message:e))}
+}
 /* ===== Nhập danh sách người dùng từ Excel (.xlsx) hoặc CSV ===== */
 const UIMP_HEADS=['Họ tên','Tên đăng nhập','Mật khẩu (tối thiểu 6 ký tự)','Đơn vị','Quyền','Chức năng được dùng','Quản lý CR/SR','Nhóm','Hệ thống phụ trách'];
 const UIMP_KEYS=[['name',['ho ten','ho va ten','ten']],['user',['ten dang nhap','tai khoan','username']],['pass',['mat khau']],['unit',['don vi']],['role',['quyen']],['mods',['chuc nang']],['crall',['quan ly cr']],['groups',['nhom']],['systems',['he thong']]];
@@ -2881,7 +2909,7 @@ function renderAdminUsers(){
   const shown=S.users.filter(u=>(!q||normQ([u.name,u.username,u.unit,orgName(u.org)].join(' ')).indexOf(q)>=0)&&(!fo||(fo==='__none'?(u.role!=='admin'&&!u.org):u.org===fo)));
   const uc=$('usr-count');if(uc)uc.textContent=S.users.length+' người dùng';
   if(S.rstOpen){const pn=$('usr-panel');if(pn)pn.open=true}
-  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><select id="u-forg" aria-label="Lọc theo đơn vị"><option value="">Tất cả đơn vị</option>'+S.orgs.map(o=>'<option value="'+esc(o.id)+'"'+(fo===o.id?' selected':'')+'>'+esc(o.name)+'</option>').join('')+'<option value="__none"'+(fo==='__none'?' selected':'')+'>Chưa gán đơn vị</option></select><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button>'+(S.orgs.length&&S.users.some(u=>u.role!=='admin'&&!u.org)?'<select id="u-bulkorg" aria-label="Đơn vị để gán"><option value="">Chọn đơn vị…</option>'+S.orgs.filter(o=>o.active!==false).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join('')+'</select><button type="button" class="btn sm" data-act="usr-orgbulk" title="Gán đơn vị đã chọn cho mọi người dùng chưa có đơn vị">Gán cho '+S.users.filter(u=>u.role!=='admin'&&!u.org).length+' người chưa có đơn vị</button>':'')+'<button type="button" class="btn sm" data-act="usr-orgdata" title="Ghi đơn vị của chủ lên các phiếu CR/SR và sáng kiến đã có">Gán đơn vị cho dữ liệu cũ</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
+  el.innerHTML='<div class="ngrp" style="margin-bottom:10px"><input type="search" id="u-q" value="'+esc(S.uQ||'')+'" placeholder="Tìm theo họ tên, tên đăng nhập, đơn vị…" aria-label="Tìm người dùng" style="flex:1;min-width:14rem"><select id="u-forg" aria-label="Lọc theo đơn vị"><option value="">Tất cả đơn vị</option>'+S.orgs.map(o=>'<option value="'+esc(o.id)+'"'+(fo===o.id?' selected':'')+'>'+esc(o.name)+'</option>').join('')+'<option value="__none"'+(fo==='__none'?' selected':'')+'>Chưa gán đơn vị</option></select><button type="button" class="btn sm" data-act="usr-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="usr-all" data-m="close">Thu gọn tất cả</button><button type="button" class="btn sm" data-act="usr-xlsx" title="Xuất danh sách người dùng đang hiển thị (theo ô tìm và lọc đơn vị) ra Excel, không gồm mật khẩu">Xuất Excel</button>'+(S.orgs.length&&S.users.some(u=>u.role!=='admin'&&!u.org)?'<select id="u-bulkorg" aria-label="Đơn vị để gán"><option value="">Chọn đơn vị…</option>'+S.orgs.filter(o=>o.active!==false).map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join('')+'</select><button type="button" class="btn sm" data-act="usr-orgbulk" title="Gán đơn vị đã chọn cho mọi người dùng chưa có đơn vị">Gán cho '+S.users.filter(u=>u.role!=='admin'&&!u.org).length+' người chưa có đơn vị</button>':'')+'<button type="button" class="btn sm" data-act="usr-orgdata" title="Ghi đơn vị của chủ lên các phiếu CR/SR và sáng kiến đã có">Gán đơn vị cho dữ liệu cũ</button>'+(byGroupOnly().length?'<button type="button" class="btn sm" data-act="usr-fixsys" title="Ghi hệ thống mặc định của nhóm thành hệ thống riêng của từng người (dùng khi tài khoản Theo nhóm báo lỗi quyền)">Gán hệ thống riêng cho '+byGroupOnly().length+' tài khoản Theo nhóm</button>':'')+'<span class="muted">'+shown.length+'/'+S.users.length+' người dùng</span></div><div class="list">'
    +(shown.map(u=>{
      const self=u.uid===me;
      return '<details class="sys usr'+(u.active===false?' off':'')+'" data-sys="usr-'+esc(u.uid)+'"'+(S.expanded.has('usr-'+u.uid)||(S.rstOpen&&S.rstOpen===u.username)?' open':'')+'><summary><b>'+esc(u.name||'')+(self?' (bạn)':'')+'</b><span class="mono">'+esc(u.username||'')+'</span>'+(u.role!=='admin'&&u.org?'':'<span class="muted">'+esc(u.unit||'')+'</span>')+(u.role!=='admin'?'<span class="muted">'+(u.org?'[Đơn vị: '+esc(orgName(u.org))+']':'[Chưa gán đơn vị]')+'</span>':'')+'<span class="muted">'+(u.role==='admin'?'Quản trị':'Người dùng')+(u.crAll===true&&u.role!=='admin'?' · Quản lý CR/SR':'')+(u.active===false?' · đã khóa':'')+'</span></summary><div class="usr-body">'
@@ -3312,6 +3340,7 @@ root.addEventListener('click',async e=>{
     if(act==='agg-xlsx'){aggExport();return}
     if(act==='tpg-all'){const ks=[...document.querySelectorAll('#tpl-list details.tpg')].map(d=>d.dataset.sys);ks.forEach(k=>b.dataset.m==='open'?S.expanded.add(k):S.expanded.delete(k));document.querySelectorAll('#tpl-list details.tpg').forEach(d=>{d.open=b.dataset.m==='open'});return}
     if(act==='uimp-tpl'){uimpTemplate();return}
+    if(act==='usr-xlsx'){usrExport();return}
     if(act==='uimp-go'){await uimpRun();return}
     if(act==='usr-orgbulk'){
       const sel=$('u-bulkorg'),o=sel&&S.orgs.find(x=>x.id===sel.value);
