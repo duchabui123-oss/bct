@@ -284,7 +284,8 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 @media(max-width:760px){.trow{grid-template-columns:1fr 1fr}.trow .tnm,.trow>input{grid-column:1/-1}.tbtns{grid-column:1/-1}}
 .crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .crow.off input{opacity:.55}
-.crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto auto}
+.crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto auto;overflow:visible}
+.crow:has(details.msel[open]){position:relative;z-index:5}
 .crow.typ{grid-template-columns:minmax(0,1fr) auto auto auto auto}
 @media(max-width:600px){.crow.sys{grid-template-columns:1fr 1fr}.crow.sys input{grid-column:1/-1}}
 .inline-add{display:flex;gap:8px;flex-wrap:wrap}
@@ -899,7 +900,7 @@ function buildAdmin(){
   +'<div class="subtabs" role="group" aria-label="Mục quản lý">'
   +'<button type="button" data-act="adm" data-t="users" aria-pressed="true">Người dùng</button>'
   +'<button type="button" data-act="adm" data-t="agg" aria-pressed="false">Tổng hợp</button>'
-  +'<button type="button" data-act="adm" data-t="systems" aria-pressed="false">Hệ thống</button>'
+  +'<button type="button" data-act="adm" data-t="systems" data-slm="{S}" aria-pressed="false">Hệ thống</button>'
   +'<button type="button" data-act="adm" data-t="groups" aria-pressed="false">Nhóm</button>'
   +'<button type="button" data-act="adm" data-t="orgs" aria-pressed="false">Đơn vị</button>'
   +'<button type="button" data-act="adm" data-t="types" aria-pressed="false">Loại việc</button>'
@@ -930,7 +931,7 @@ function buildAdmin(){
   +'<div class="actions"><button type="button" class="btn" data-act="mv-run">Chuyển toàn bộ việc, tổng kết tuần, phiếu CR/SR và sáng kiến</button><span class="msg" id="mv-msg" role="status"></span></div></section></div>'
 
   +'<div id="adm-agg" class="app" hidden><section class="panel"><div id="agg-box"></div></section></div>'
-  +'<div id="adm-systems" class="app" hidden><section class="panel"><h2>Hệ thống</h2>'
+  +'<div id="adm-systems" class="app" hidden><section class="panel"><h2 data-slm="{S}">Hệ thống</h2>'
   +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="300" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
   +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên. <b>Xóa</b> hệ thống sẽ gỡ nó khỏi người dùng, nhóm và ẩn các việc mẫu của hệ thống đó; báo cáo cũ hiện là "(Hệ thống đã xóa)".<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
 
@@ -953,7 +954,7 @@ function buildAdmin(){
   +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
   +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="500" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><input id="t-label" maxlength="200" placeholder="Nhãn số lượng (mặc định: Số lượng)" aria-label="Nhãn số lượng"><select id="t-unit" aria-label="Đơn vị tính"></select><label class="tpl-noq"><input type="checkbox" id="t-noq">Không ghi số lượng</label><details id="t-groups" class="tgrp"><summary>Dành cho nhóm (không tích = tất cả nhóm)</summary><div class="qdays" id="t-gchips"></div></details><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
   +'<div class="actions"><button type="button" class="btn" data-act="tpl-import">Lấy từ các việc đã nhập</button>'
-  +'<button type="button" class="btn" data-act="tpl-sort">Sắp xếp theo hệ thống</button>'
+  +'<button type="button" class="btn" data-act="tpl-sort" data-slm="Sắp xếp theo {s}">Sắp xếp theo hệ thống</button>'
   +'<label class="who">Xem theo <select id="tpl-filter" aria-label="Lọc theo hệ thống"></select></label><label class="who">Nhóm <select id="tpl-gfilter" aria-label="Lọc theo nhóm"></select></label><span class="msg" id="tpl-msg" role="status"></span></div>'
   +'<div id="tpl-import" class="impbox" hidden></div>'
   +'<div class="tbl" id="tpl-list"></div>'
@@ -1768,8 +1769,10 @@ function sysMode(){
 const SL=()=>({system:'Hệ thống',service:'Dịch vụ',mixed:'Hệ thống/Dịch vụ'})[sysMode()];
 const sl=()=>SL().toLowerCase();
 const delSys=()=>'('+SL()+' đã xóa)';
-function applyLabels(){document.querySelectorAll('[data-slt]').forEach(e=>{const t=e.dataset.slt.replace(/\{S\}/g,SL()).replace(/\{s\}/g,sl());if(e.textContent!==t)e.textContent=t})}
-const tplOrgOk=x=>{const o=myOrg();if(!o||isAdminUser())return true;const sy=S.systems.find(y=>y.id===x.system),ty=S.types.find(y=>y.id===x.type);return (!sy||orgOk(sy,o))&&(!ty||orgOk(ty,o))};
+const admSL=()=>S.orgs.some(o=>o.reportBy==='service')?'Hệ thống/Dịch vụ':'Hệ thống';
+const admsl=()=>admSL().toLowerCase();
+function applyLabels(){document.querySelectorAll('[data-slm]').forEach(e=>{const t=e.dataset.slm.replace(/\{S\}/g,admSL()).replace(/\{s\}/g,admsl());if(e.textContent!==t)e.textContent=t});document.querySelectorAll('[data-slt]').forEach(e=>{const t=e.dataset.slt.replace(/\{S\}/g,SL()).replace(/\{s\}/g,sl());if(e.textContent!==t)e.textContent=t})}
+const tplOrgOk=x=>{const o=myOrg();if(!o||isAdminUser())return true;if(!orgOk(x,o))return false;const sy=S.systems.find(y=>y.id===x.system),ty=S.types.find(y=>y.id===x.type);return (!sy||orgOk(sy,o))&&(!ty||orgOk(ty,o))};
 const idCanEdit=i=>isAdminUser()||(!!S.user&&i.uid===S.user.uid);
 const crCanEdit=c=>isAdminUser()||(!!S.user&&c.uid===S.user.uid);
 function applyModules(){
@@ -2980,11 +2983,12 @@ function renderAdminUsers(){
       +'<div class="usys"><b>Chức năng được dùng</b> '+MODS.map(x=>'<label class="check"><input type="checkbox" data-umod="'+esc(u.uid)+'" data-m="'+x[0]+'"'+(modsOf(u).indexOf(x[0])>=0?' checked':'')+(u.role==='admin'?' disabled':'')+'><span>'+x[1]+'</span></label>').join('')+(u.role==='admin'?' <small>(quản trị luôn dùng được tất cả)</small>':'')+'</div>'
       +(u.role==='admin'?'':'<div class="usys"><label class="check"><input type="checkbox" data-ucrall="'+esc(u.uid)+'"'+(u.crAll===true?' checked':'')+'><span><b>Quản lý CR/SR</b>: xem phiếu CR/SR của mọi người và dùng mục Tổng hợp CR/SR (chỉ xem, không sửa hay xóa phiếu của người khác)</span></label></div>'+'<div class="usys"><label class="check"><input type="checkbox" data-uideaall="'+esc(u.uid)+'"'+(u.ideaAll===true?' checked':'')+'><span><b>Quản lý sáng kiến</b>: xem sáng kiến của mọi người và dùng mục Tổng hợp sáng kiến (chỉ xem, không sửa hay xóa sáng kiến của người khác)</span></label></div>'+'<div class="usys"><label class="check"><input type="checkbox" data-urepall="'+esc(u.uid)+'"'+(u.repAll===true?' checked':'')+'><span><b>Quản lý báo cáo tuần</b>: xem báo cáo tuần và Thống kê báo cáo của mọi người (chỉ xem, không sửa hay xóa việc của người khác)</span></label></div>'+'<div class="usys"><label class="check"><input type="checkbox" data-urepex="'+esc(u.uid)+'"'+(u.repExempt===true?' checked':'')+'><span><b>Miễn nộp báo cáo tuần</b>: người này không phải gửi báo cáo tuần và không có trong trang Nộp báo cáo</span></label></div>')
       +(u.role==='admin'?'':'<div class="usys"><b>Đơn vị (tách dữ liệu)</b> <select data-uorg="'+esc(u.uid)+'"><option value="">— Chưa gán —</option>'+S.orgs.filter(o=>o.active!==false||o.id===u.org).map(o=>'<option value="'+esc(o.id)+'"'+(o.id===u.org?' selected':'')+'>'+esc(o.name)+'</option>').join('')+'</select></div>')
-      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>g.active!==false||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm',true)+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div></div></details>';
+      +'<div class="usys"><b>Nhóm</b> '+msel('ug:'+u.uid,S.groups.filter(g=>(g.active!==false&&(!u.org||orgOk(g,u.org)))||groupsOf(u).indexOf(g.id)>=0),new Set(groupsOf(u)),g=>'data-ugrp="'+esc(u.uid)+'" data-gid="'+esc(g.id)+'"','— Chưa chọn —')+' <b>Hệ thống phụ trách</b> '+msel('us:'+u.uid,S.systems.filter(x=>x.active!==false),new Set(u.systems||[]),x=>'data-usys="'+esc(u.uid)+'" data-sid="'+esc(x.id)+'"','Theo nhóm',true)+' <small>(không tích = theo hệ thống mặc định của các nhóm; nhóm cũng không có thì thấy tất cả)</small></div></div></div></details>';
    }).join('')||'<p class="muted">Không có người dùng nào khớp.</p>')+'</div>';
 }
 function renderCatalog(kind){
   const el=$('cat-'+kind);if(!el)return;
+  applyLabels();
   const list=S[kind];
   el.innerHTML=list.map((x,i)=>'<div class="crow'+(kind==='systems'?' sys':'')+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
     +'<input data-catname="'+kind+'" data-id="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên">'
@@ -2994,13 +2998,14 @@ function renderCatalog(kind){
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
     +'<button type="button" class="btn sm" data-act="cat-del" data-k="'+kind+'" data-id="'+esc(x.id)+'">Xóa</button>'
     +(kind==='orgs'?'<div class="usys"><b>Người dùng</b> '+S.users.filter(u=>u.org===x.id).length+' người</div><div class="usys"><b>Báo cáo theo</b> <select data-orgrb="'+esc(x.id)+'" aria-label="Báo cáo theo"><option value="">Hệ thống</option><option value="service"'+(x.reportBy==='service'?' selected':'')+'>Dịch vụ</option></select> <small class="muted">đổi nhãn Hệ thống thành Dịch vụ cho người của đơn vị này</small></div>':'')
-    +((kind==='systems'||kind==='types')?'<div class="usys"><b>Dành cho đơn vị</b> '+msel('so:'+kind+':'+x.id,S.orgs.filter(o=>o.active!==false||(x.orgs||[]).indexOf(o.id)>=0),new Set(x.orgs||[]),y=>'data-corg="'+kind+'" data-cid="'+esc(x.id)+'" data-oid="'+esc(y.id)+'"','Tất cả đơn vị')+'</div>':'')
-    +(kind==='groups'?'<div class="usys"><b>Thành viên</b> '+msel('gm:'+x.id,S.users.filter(u=>u.role!=='admin'&&(u.active!==false||groupsOf(u).indexOf(x.id)>=0)).map(u=>({id:u.uid,name:(u.name||u.username)+(u.unit?' – '+u.unit:'')})),new Set(S.users.filter(u=>groupsOf(u).indexOf(x.id)>=0).map(u=>u.uid)),y=>'data-gmem="'+esc(x.id)+'" data-uid="'+esc(y.id)+'"','— Chưa có —')+'</div><div class="usys"><b>Hệ thống mặc định</b> '+msel('gs:'+x.id,S.systems.filter(y=>y.active!==false),new Set(x.systems||[]),y=>'data-gsys="'+esc(x.id)+'" data-sid="'+esc(y.id)+'"','— Tất cả hệ thống —',true)+'</div>':'')
+    +((kind==='systems'||kind==='types'||kind==='groups')?'<div class="usys"><b>Dành cho đơn vị</b> '+msel('so:'+kind+':'+x.id,S.orgs.filter(o=>o.active!==false||(x.orgs||[]).indexOf(o.id)>=0),new Set(x.orgs||[]),y=>'data-corg="'+kind+'" data-cid="'+esc(x.id)+'" data-oid="'+esc(y.id)+'"','Tất cả đơn vị')+'</div>':'')
+    +(kind==='groups'?'<div class="usys"><b>Thành viên</b> '+msel('gm:'+x.id,S.users.filter(u=>u.role!=='admin'&&(u.active!==false||groupsOf(u).indexOf(x.id)>=0)).map(u=>({id:u.uid,name:(u.name||u.username)+(u.unit?' – '+u.unit:'')})),new Set(S.users.filter(u=>groupsOf(u).indexOf(x.id)>=0).map(u=>u.uid)),y=>'data-gmem="'+esc(x.id)+'" data-uid="'+esc(y.id)+'"','— Chưa có —')+'</div><div class="usys"><b>'+esc(admSL())+' mặc định</b> '+msel('gs:'+x.id,S.systems.filter(y=>y.active!==false&&(!(x.orgs||[]).length||!(y.orgs||[]).length||y.orgs.some(o=>x.orgs.indexOf(o)>=0)||(x.systems||[]).indexOf(y.id)>=0)),new Set(x.systems||[]),y=>'data-gsys="'+esc(x.id)+'" data-sid="'+esc(y.id)+'"','— Tất cả '+admsl()+' —',true)+'</div>':'')
     +'</div>').join('')
     ||'<p class="muted">Chưa có mục nào.</p>';
 }
 const tplVisible=x=>(!S.tplFilter||(S.tplFilter==='none'?!x.system:x.system===S.tplFilter))
   &&(!S.tplGroup||(S.tplGroup==='none'?!(x.groups&&x.groups.length):(x.groups||[]).indexOf(S.tplGroup)>=0));
+const orgSummary=x=>{const g=(x.orgs||[]).map(id=>{const o=S.orgs.find(y=>y.id===id);return o?o.name:null}).filter(Boolean);return g.length?' · đơn vị: '+g.join(', '):''};
 const grpSummary=x=>{const g=(x.groups||[]).map(id=>{const o=S.groups.find(y=>y.id===id);return o?o.name:null}).filter(Boolean);return g.length?g.join(', '):'tất cả nhóm'};
 /* Thêm việc mẫu mới: xếp ổn định theo thứ tự hệ thống để việc cùng hệ thống (kể cả "dùng chung") luôn nằm liền một khối */
 function tplsWith(add){
@@ -3200,6 +3205,7 @@ function renderImport(){
   const qi=$('imp-q');if(qi&&S.impFocus){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length)}
 }
 function renderTplAdmin(){
+  applyLabels();
   const sf=$('t-system'),tf=$('t-type'),ls=$('tpl-list');if(!sf||!tf||!ls)return;
   /* Quản trị mở danh sách mà việc mẫu cùng hệ thống đang nằm rời nhau thì tự gom lại một lần (xếp ổn định, giữ thứ tự trong từng khối) */
   if(isAdminUser()&&S.systems.length&&S.tpls.length&&!S.tplNorm){
@@ -3209,9 +3215,9 @@ function renderTplAdmin(){
   }
   const opt=(list,first,cur)=>'<option value="">'+first+'</option>'+list.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name)+(x.active===false?' (đã ẩn)':'')+'</option>').join('');
   const vs=sf.value,vt=tf.value,on=l=>l.filter(x=>x.active!==false);
-  sf.innerHTML=opt(on(S.systems),'— Không gắn hệ thống —',vs);tf.innerHTML=opt(on(S.types),'— Không gắn loại việc —',vt);
+  sf.innerHTML=opt(on(S.systems),'— Không gắn '+admsl()+' —',vs);tf.innerHTML=opt(on(S.types),'— Không gắn loại việc —',vt);
   const ff=$('tpl-filter'),sysOn=S.systems.filter(x=>x.active!==false);
-  ff.innerHTML='<option value="">Tất cả hệ thống</option>'+S.systems.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'<option value="none">Dùng chung (không gắn hệ thống)</option>';
+  ff.innerHTML='<option value="">Tất cả '+admsl()+'</option>'+S.systems.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'<option value="none">Dùng chung (không gắn '+admsl()+')</option>';
   if(S.tplFilter&&![...ff.options].some(o=>o.value===S.tplFilter))S.tplFilter='';
   ff.value=S.tplFilter;
   const gf=$('tpl-gfilter');
@@ -3229,19 +3235,19 @@ function renderTplAdmin(){
     no++;prev=g;const G=tg[tg.length-1];G.n++;
     G.h+='<div class="trow'+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
     +'<div class="tnm"><span class="no" aria-hidden="true">'+no+'.</span><input data-tplname="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="500" aria-label="Tên đầu việc"></div>'
-    +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống">'+opt(S.systems,'— Tất cả hệ thống —',x.system)+'</select>'
+    +'<select data-tplsys="'+esc(x.id)+'" aria-label="Hệ thống hoặc dịch vụ">'+opt(S.systems,'— Tất cả '+admsl()+' —',x.system)+'</select>'
     +'<select data-tpltype="'+esc(x.id)+'" aria-label="Loại việc">'+opt(S.types,'— Không gắn loại việc —',x.type)+'</select>'
     +'<div class="tul"><input data-tpllabel="'+esc(x.id)+'" value="'+esc(x.label||'')+'" maxlength="200" placeholder="Nhãn số lượng" aria-label="Nhãn số lượng"><select data-tplunit="'+esc(x.id)+'" aria-label="Đơn vị tính">'+unitOpts(x.unit||'')+'</select></div>'
     +'<span class="tbtns"><label class="tpl-noq"><input type="checkbox" data-tplnoq="'+esc(x.id)+'"'+(x.noQty?' checked':'')+'>Không SL</label><button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="Lên">↑</button>'
     +'<button type="button" class="btn sm" data-act="tpl-move" data-id="'+esc(x.id)+'" data-d="1"'+(i===vis.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="tpl-toggle" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
     +'<button type="button" class="btn sm" data-act="tpl-del" data-id="'+esc(x.id)+'">Xóa</button></span>'
-    +'<details class="tgrp" data-tgid="'+esc(x.id)+'"'+(S.tplOpen.has(x.id)?' open':'')+'><summary>Dành cho: '+esc(grpSummary(x))+'<span class="tuse" data-tid="'+esc(x.id)+'" title="Tính trên các tuần và tháng đang tải">'+usesText(tplUses(x))+'</span></summary><div class="qdays">'
+    +'<details class="tgrp" data-tgid="'+esc(x.id)+'"'+(S.tplOpen.has(x.id)?' open':'')+'><summary>Dành cho: '+esc(grpSummary(x))+esc(orgSummary(x))+'<span class="tuse" data-tid="'+esc(x.id)+'" title="Tính trên các tuần và tháng đang tải">'+usesText(tplUses(x))+'</span></summary><div class="qdays">'
     +S.groups.filter(g=>g.active!==false||(x.groups||[]).indexOf(g.id)>=0).map(g=>'<label class="qf-chip"><input type="checkbox" data-tplg="'+esc(x.id)+'" data-gid="'+esc(g.id)+'"'+((x.groups||[]).indexOf(g.id)>=0?' checked':'')+'> '+esc(g.name)+'</label>').join('')
-    +'</div></details></div>'});
+    +'</div><div class="qdays" style="margin-top:6px"><b>Đơn vị:</b> '+S.orgs.filter(o=>o.active!==false||(x.orgs||[]).indexOf(o.id)>=0).map(o=>'<label class="qf-chip"><input type="checkbox" data-tplo="'+esc(x.id)+'" data-oid="'+esc(o.id)+'"'+((x.orgs||[]).indexOf(o.id)>=0?' checked':'')+'> '+esc(o.name)+'</label>').join('')+' <small class="muted">(không tích = mọi đơn vị)</small></div></details></div>'});
   ls.innerHTML=(vis.length?'<div class="ngrp" style="margin-bottom:10px"><button type="button" class="btn sm" data-act="tpg-all" data-m="open">Mở tất cả</button><button type="button" class="btn sm" data-act="tpg-all" data-m="close">Thu gọn tất cả</button><span class="muted">'+vis.length+' việc mẫu · '+tg.length+' nhóm hệ thống</span></div>':'')
     +tg.map(G=>{const key='tp-'+(G.g||'common'),op=S.expanded.has(key)||(S.tplFilter&&tg.length===1);
-      return '<details class="sys tpg" data-sys="'+esc(key)+'"'+(op?' open':'')+'><summary><h3>'+(G.g?esc(sysName(G.g)):'Dùng chung (không gắn hệ thống)')+'</h3><span class="muted">'+G.n+' việc mẫu</span></summary><div class="tpg-body">'+G.h+'</div></details>'}).join('')
+      return '<details class="sys tpg" data-sys="'+esc(key)+'"'+(op?' open':'')+'><summary><h3>'+(G.g?esc(sysName(G.g)):'Dùng chung (không gắn '+admsl()+')')+'</h3><span class="muted">'+G.n+' việc mẫu</span></summary><div class="tpg-body">'+G.h+'</div></details>'}).join('')
     ||'<p class="muted">Chưa có việc mẫu nào. Hãy thêm ở ô phía trên.</p>';
 }
 function applyWeekSetting(){
@@ -4049,6 +4055,9 @@ root.addEventListener('change',async e=>{
     }
     if(t.id==='tpl-filter'){S.tplFilter=t.value;renderTplAdmin();return}
     if(t.id==='tpl-gfilter'){S.tplGroup=t.value;renderTplAdmin();return}
+    if(t.matches&&t.matches('input[data-tplo]')){
+      try{await saveTpls(S.tpls.map(x=>{if(x.id!==t.dataset.tplo)return x;const n=new Set(x.orgs||[]);t.checked?n.add(t.dataset.oid):n.delete(t.dataset.oid);return Object.assign({},x,{orgs:[...n]})}))}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
+    }
     if(t.matches&&t.matches('input[data-tplg]')){
       try{await saveTpls(S.tpls.map(x=>{if(x.id!==t.dataset.tplg)return x;const n=new Set(x.groups||[]);t.checked?n.add(t.dataset.gid):n.delete(t.dataset.gid);return Object.assign({},x,{groups:[...n]})}))}catch(err){flash(fsMsg(err));renderTplAdmin()}return;
     }
