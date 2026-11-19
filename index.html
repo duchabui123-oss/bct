@@ -285,6 +285,7 @@ details.more>summary{cursor:pointer;color:var(--accent);font-weight:600;font-siz
 .crow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;gap:6px;align-items:center;padding:.5rem 0;border-top:1px solid var(--line)}
 .crow.off input{opacity:.55}
 .crow.sys{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto auto auto;overflow:visible}
+.inline-add .aoadd{display:inline-flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink-2);flex-wrap:wrap}
 .crow:has(details.msel[open]){position:relative;z-index:5}
 .crow.typ{grid-template-columns:minmax(0,1fr) auto auto auto auto}
 @media(max-width:600px){.crow.sys{grid-template-columns:1fr 1fr}.crow.sys input{grid-column:1/-1}}
@@ -932,18 +933,18 @@ function buildAdmin(){
 
   +'<div id="adm-agg" class="app" hidden><section class="panel"><div id="agg-box"></div></section></div>'
   +'<div id="adm-systems" class="app" hidden><section class="panel"><h2 data-slm="{S}">Hệ thống</h2>'
-  +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="300" placeholder="Tên hệ thống mới" required><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
+  +'<form class="inline-add" data-add="systems"><input id="add-systems" maxlength="300" placeholder="Tên hệ thống mới" required><span class="aoadd"><b>Dành cho đơn vị</b> <span id="ao-systems"></span></span><button type="submit" class="btn primary">Thêm hệ thống</button></form>'
   +'<div class="tbl" id="cat-systems"></div><p class="muted">Hệ thống bị ẩn không còn xuất hiện khi thêm việc mới, báo cáo cũ vẫn giữ nguyên. <b>Xóa</b> hệ thống sẽ gỡ nó khỏi người dùng, nhóm và ẩn các việc mẫu của hệ thống đó; báo cáo cũ hiện là "(Hệ thống đã xóa)".<br>Ô thứ hai là <b>nhóm báo cáo</b>: các hệ thống cùng nhóm được gộp thành một khối trong Bảng tổng hợp. Để trống thì web tự gộp mọi hệ thống bắt đầu bằng "IPCC" thành IPCC, CCOS và OBTT thành CCOS, hệ thống khác giữ tên riêng.</p></section></div>'
 
   +'<div id="adm-groups" class="app" hidden><section class="panel"><h2>Nhóm (chức danh)</h2>'
-  +'<form class="inline-add" data-add="groups"><input id="add-groups" maxlength="300" placeholder="Tên nhóm mới, ví dụ: Chuyên viên vận hành" required><button type="submit" class="btn primary">Thêm nhóm</button></form>'
+  +'<form class="inline-add" data-add="groups"><input id="add-groups" maxlength="300" placeholder="Tên nhóm mới, ví dụ: Chuyên viên vận hành" required><span class="aoadd"><b>Dành cho đơn vị</b> <span id="ao-groups"></span></span><button type="submit" class="btn primary">Thêm nhóm</button></form>'
   +'<div class="tbl" id="cat-groups"></div><p class="muted">Mỗi người dùng thuộc một hoặc nhiều nhóm, tối đa 5 (chọn ở mục Người dùng). Việc mẫu gắn với nhóm nào thì chỉ người trong nhóm đó thấy; việc mẫu không gắn nhóm là dùng chung. Tích <b>Hệ thống mặc định</b> để người trong nhóm tự thấy đúng các hệ thống đó; người nào đã được tích hệ thống riêng thì ưu tiên theo tích riêng. Không tích gì thì thấy tất cả hệ thống. <b>Xóa</b> nhóm sẽ gỡ nhóm khỏi người dùng và ẩn các việc mẫu chỉ dành cho nhóm đó.</p></section></div>'
 
   +'<div id="adm-orgs" class="app" hidden><section class="panel"><h2>Đơn vị (tách dữ liệu)</h2>'
   +'<form class="inline-add" data-add="orgs"><input id="add-orgs" maxlength="120" placeholder="Tên đơn vị mới, ví dụ: Trung tâm Công nghệ" required><button type="submit" class="btn primary">Thêm đơn vị</button></form>'
   +'<div class="tbl" id="cat-orgs"></div><p class="muted">Gán đơn vị cho từng người ở mục <b>Người dùng</b>. Người của một đơn vị chỉ thấy người dùng cùng đơn vị; người được cấp Quản lý CR/SR hoặc Quản lý sáng kiến chỉ xem được dữ liệu trong đơn vị mình. Quản trị thấy tất cả. Hệ thống, loại việc, việc mẫu dùng chung cho mọi đơn vị. Người chưa gán đơn vị hoạt động như trước. Sau khi gán hoặc đổi đơn vị cho người dùng, bấm nút <b>Gán đơn vị cho dữ liệu cũ</b> ở mục Người dùng để phiếu CR/SR và sáng kiến đã có theo đúng đơn vị.</p></section></div>'
   +'<div id="adm-types" class="app" hidden><section class="panel"><h2>Loại việc</h2>'
-  +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="300" placeholder="Tên loại việc mới" required><button type="submit" class="btn primary">Thêm loại việc</button></form>'
+  +'<form class="inline-add" data-add="types"><input id="add-types" maxlength="300" placeholder="Tên loại việc mới" required><span class="aoadd"><b>Dành cho đơn vị</b> <span id="ao-types"></span></span><button type="submit" class="btn primary">Thêm loại việc</button></form>'
   +'<div class="tbl" id="cat-types"></div><p class="muted">Ẩn loại việc để người dùng không còn thấy khi thêm việc, báo cáo cũ vẫn giữ nguyên. Xóa loại việc là xóa hẳn khỏi danh sách; các việc đã nhập với loại đó sẽ hiện là "Khác".</p></section></div>'
 
   +'<div id="adm-units" class="app" hidden><section class="panel"><h2>Đơn vị tính</h2>'
@@ -952,7 +953,7 @@ function buildAdmin(){
   +'<p class="muted">Đơn vị tính được chọn ở từng việc mẫu (mục Việc mẫu) và hiện ngay cạnh ô Số lượng khi thêm việc. Ẩn đơn vị để không còn chọn được nữa, báo cáo cũ vẫn giữ nguyên. Đổi tên đơn vị chỉ áp dụng cho các việc nhập sau đó; việc đã nhập giữ tên cũ.</p></section></div>'
   +'<div id="adm-tpls" class="app" hidden><section class="panel"><h2>Việc mẫu</h2>'
   +'<p class="muted">Danh sách đầu việc có sẵn để người dùng chọn nhanh khi thêm việc, không phải gõ lại tên. Nếu việc không có trong danh sách, người dùng vẫn chọn "Việc khác" và tự nhập tên.</p>'
-  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="500" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><input id="t-label" maxlength="200" placeholder="Nhãn số lượng (mặc định: Số lượng)" aria-label="Nhãn số lượng"><select id="t-unit" aria-label="Đơn vị tính"></select><label class="tpl-noq"><input type="checkbox" id="t-noq">Không ghi số lượng</label><details id="t-groups" class="tgrp"><summary>Dành cho nhóm (không tích = tất cả nhóm)</summary><div class="qdays" id="t-gchips"></div></details><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
+  +'<form class="inline-add" id="f-addtpl"><input id="t-name" maxlength="500" placeholder="Tên đầu việc mẫu, ví dụ: Cấp mới tài khoản" required><select id="t-system" aria-label="Hệ thống"></select><select id="t-type" aria-label="Loại việc"></select><input id="t-label" maxlength="200" placeholder="Nhãn số lượng (mặc định: Số lượng)" aria-label="Nhãn số lượng"><select id="t-unit" aria-label="Đơn vị tính"></select><label class="tpl-noq"><input type="checkbox" id="t-noq">Không ghi số lượng</label><details id="t-groups" class="tgrp"><summary>Dành cho nhóm (không tích = tất cả nhóm)</summary><div class="qdays" id="t-gchips"></div></details><details id="t-orgs" class="tgrp"><summary>Dành cho đơn vị (không tích = mọi đơn vị)</summary><div class="qdays" id="t-ochips"></div></details><button type="submit" class="btn primary">Thêm việc mẫu</button></form>'
   +'<div class="actions"><button type="button" class="btn" data-act="tpl-import">Lấy từ các việc đã nhập</button>'
   +'<button type="button" class="btn" data-act="tpl-sort" data-slm="Sắp xếp theo {s}">Sắp xếp theo hệ thống</button>'
   +'<label class="who">Xem theo <select id="tpl-filter" aria-label="Lọc theo hệ thống"></select></label><label class="who">Nhóm <select id="tpl-gfilter" aria-label="Lọc theo nhóm"></select></label><span class="msg" id="tpl-msg" role="status"></span></div>'
@@ -1771,6 +1772,11 @@ const sl=()=>SL().toLowerCase();
 const delSys=()=>'('+SL()+' đã xóa)';
 const admSL=()=>S.orgs.some(o=>o.reportBy==='service')?'Hệ thống/Dịch vụ':'Hệ thống';
 const admsl=()=>admSL().toLowerCase();
+const ADDO={systems:new Set(),types:new Set(),groups:new Set()};
+function renderAddOrgs(){
+  ['systems','types','groups'].forEach(k=>{const el=$('ao-'+k);if(!el)return;
+    el.innerHTML=msel('ao:'+k,S.orgs.filter(o=>o.active!==false),ADDO[k],y=>'data-aoadd="'+k+'" data-oid="'+esc(y.id)+'"','Tất cả đơn vị')});
+}
 function applyLabels(){document.querySelectorAll('[data-slm]').forEach(e=>{const t=e.dataset.slm.replace(/\{S\}/g,admSL()).replace(/\{s\}/g,admsl());if(e.textContent!==t)e.textContent=t});document.querySelectorAll('[data-slt]').forEach(e=>{const t=e.dataset.slt.replace(/\{S\}/g,SL()).replace(/\{s\}/g,sl());if(e.textContent!==t)e.textContent=t})}
 const tplOrgOk=x=>{const o=myOrg();if(!o||isAdminUser())return true;if(!orgOk(x,o))return false;const sy=S.systems.find(y=>y.id===x.system),ty=S.types.find(y=>y.id===x.type);return (!sy||orgOk(sy,o))&&(!ty||orgOk(ty,o))};
 const idCanEdit=i=>isAdminUser()||(!!S.user&&i.uid===S.user.uid);
@@ -2988,7 +2994,7 @@ function renderAdminUsers(){
 }
 function renderCatalog(kind){
   const el=$('cat-'+kind);if(!el)return;
-  applyLabels();
+  applyLabels();renderAddOrgs();
   const list=S[kind];
   el.innerHTML=list.map((x,i)=>'<div class="crow'+(kind==='systems'?' sys':'')+(x.active===false?' off':'')+'" data-id="'+esc(x.id)+'">'
     +'<input data-catname="'+kind+'" data-id="'+esc(x.id)+'" value="'+esc(x.name)+'" maxlength="300" aria-label="Tên">'
@@ -3224,6 +3230,9 @@ function renderTplAdmin(){
   if(gf){gf.innerHTML='<option value="">Tất cả nhóm</option><option value="none">Dùng chung (không gắn nhóm)</option>'+S.groups.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+(g.active===false?' (đã ẩn)':'')+'</option>').join('');
     if(S.tplGroup&&S.tplGroup!=='none'&&!S.groups.some(g=>g.id===S.tplGroup))S.tplGroup='';gf.value=S.tplGroup}
   const tu=$('t-unit');if(tu){const cu=tu.value;tu.innerHTML=unitOpts(cu);tu.value=cu}
+  const oc=$('t-ochips');
+  if(oc){const keepO=new Set([...oc.querySelectorAll('input:checked')].map(i=>i.dataset.tonew));
+    oc.innerHTML=S.orgs.filter(o=>o.active!==false).map(o=>'<label class="qf-chip"><input type="checkbox" data-tonew="'+esc(o.id)+'"'+(keepO.has(o.id)?' checked':'')+'> '+esc(o.name)+'</label>').join('')||'<small class="muted">Chưa có đơn vị nào. Thêm ở mục Đơn vị.</small>'}
   const gc=$('t-gchips');
   if(gc){const keep=new Set([...gc.querySelectorAll('input:checked')].map(i=>i.dataset.tgnew));
     gc.innerHTML=S.groups.filter(g=>g.active!==false).map(g=>'<label class="qf-chip"><input type="checkbox" data-tgnew="'+esc(g.id)+'"'+(keep.has(g.id)?' checked':'')+'> '+esc(g.name)+'</label>').join('')||'<small class="muted">Chưa có nhóm nào. Thêm ở mục Nhóm.</small>'}
@@ -3732,6 +3741,7 @@ root.addEventListener('click',async e=>{
       try{
         if(key.indexOf('us:')===0)await updateDoc(doc(db,'users',key.slice(3)),{systems:[...cur]});
         else if(key.indexOf('gs:')===0)await updateDoc(doc(db,'groups',key.slice(3)),{systems:[...cur]});
+        else if(key.indexOf('ao:')===0){ADDO[key.slice(3)]=new Set(cur);renderAddOrgs()}
         else if(key.indexOf('so:')===0){const q=key.split(':');await updateDoc(doc(db,q[1],q[2]),{orgs:[...cur]})}
         else if(key.indexOf('gm:')===0){const gid=key.slice(3);const bt=writeBatch(db);let nn=0;
           S.users.forEach(u=>{const has=groupsOf(u).indexOf(gid)>=0,want=cur.has(u.uid);if(has===want)return;
@@ -3977,6 +3987,9 @@ root.addEventListener('change',async e=>{
       const task=S.tasks.find(x=>x.id===t.dataset.status);if(!task||!isMine(task)){renderReport();return}
       S.expanded.clear();try{await updateDoc(doc(db,'tasks',task.id),{status:t.value,upd:Date.now()});tplReset()}catch(err){flash(fsMsg(err));renderReport()}return;
     }
+    if(t.matches&&t.matches('input[data-aoadd]')){
+      const k=t.dataset.aoadd;t.checked?ADDO[k].add(t.dataset.oid):ADDO[k].delete(t.dataset.oid);renderAddOrgs();return;
+    }
     if(t.matches&&t.matches('input[data-corg]')){
       const k=t.dataset.corg,it=S[k].find(x=>x.id===t.dataset.cid);if(!it)return;
       const n=new Set(it.orgs||[]);t.checked?n.add(t.dataset.oid):n.delete(t.dataset.oid);
@@ -4172,14 +4185,16 @@ root.addEventListener('submit',async e=>{
   if(id==='f-addtpl'){
     const n=$('t-name').value.trim().replace(/\s+/g,' ');if(!n)return;
     if(S.tpls.some(x=>x.name.trim().toLowerCase()===n.toLowerCase())){flash('Việc mẫu này đã có trong danh sách.');return}
-    try{await saveTpls(tplsWith({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,label:$('t-label').value.trim(),unit:$('t-unit').value,noQty:$('t-noq').checked,groups:[...document.querySelectorAll('#t-gchips input:checked')].map(i=>i.dataset.tgnew),active:true}));document.querySelectorAll('#t-gchips input').forEach(i=>{i.checked=false});$('t-name').value='';$('t-label').value='';$('t-unit').value='';$('t-noq').checked=false;$('t-name').focus()}
+    try{await saveTpls(tplsWith({id:newId(),name:n,system:$('t-system').value,type:$('t-type').value,label:$('t-label').value.trim(),unit:$('t-unit').value,noQty:$('t-noq').checked,groups:[...document.querySelectorAll('#t-gchips input:checked')].map(i=>i.dataset.tgnew),orgs:[...document.querySelectorAll('#t-ochips input:checked')].map(i=>i.dataset.tonew),active:true}));document.querySelectorAll('#t-gchips input,#t-ochips input').forEach(i=>{i.checked=false});$('t-name').value='';$('t-label').value='';$('t-unit').value='';$('t-noq').checked=false;$('t-name').focus()}
     catch(err){flash(fsMsg(err))}
     return;
   }
   if(e.target.dataset&&e.target.dataset.add){
     const kind=e.target.dataset.add,inp=e.target.querySelector('input'),name=inp.value.trim();if(!name)return;
     const l=S[kind],order=l.length?Math.max.apply(null,l.map(x=>x.order||0))+1:1;
-    try{await setDoc(doc(collection(db,kind)),{name:name,order:order,active:true});inp.value=''}
+    const rec={name:name,order:order,active:true};
+    if((kind==='systems'||kind==='types'||kind==='groups')&&ADDO[kind].size)rec.orgs=[...ADDO[kind]];
+    try{await setDoc(doc(collection(db,kind)),rec);inp.value='';if(ADDO[kind]){ADDO[kind]=new Set();renderAddOrgs()}}
     catch(err){flash(fsMsg(err))}
   }
 });
