@@ -687,7 +687,7 @@ function buildShell(){
   +'<button type="button" data-act="tab" data-t="crsum" aria-pressed="false" style="display:none">Tổng hợp CR/SR</button>'
   +'<button type="button" data-act="tab" data-t="ideas" aria-pressed="false">Sáng kiến</button>'
   +'<button type="button" data-act="tab" data-t="ideasum" aria-pressed="false" style="display:none">Tổng hợp sáng kiến</button>'
-  +'<button type="button" data-act="tab" data-t="subsum" aria-pressed="false" style="display:none">Nộp báo cáo</button>'
+  +'<button type="button" data-act="tab" data-t="subsum" aria-pressed="false" style="display:none">Theo dõi nộp báo cáo</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin" aria-pressed="false">Quản lý</button>':'')+'</nav>'
   +'<form id="gsearch" class="gsearch" role="search" autocomplete="off"><input id="sr-q" type="search" placeholder="Tìm việc, ghi chú, mã phiếu…" aria-label="Tìm kiếm việc" maxlength="80" aria-controls="sr-panel"><button type="button" class="btn sm sr-tbtn" id="sr-tbtn" data-act="sr-types" aria-controls="sr-panel" aria-expanded="false" title="Lọc theo loại việc, việc mẫu">Lọc nâng cao</button><div id="sr-panel" class="sr-panel" hidden></div></form>'
   +'<div class="me"><button type="button" class="btn link" data-act="me" id="me-name">'+esc(S.profile.name||S.profile.username)+'</button>'
@@ -756,7 +756,7 @@ function buildShell(){
   +'<button type="button" data-act="tab" data-t="crsum" style="display:none">Tổng hợp CR/SR</button>'
   +'<button type="button" data-act="tab" data-t="ideas">Sáng kiến</button>'
   +'<button type="button" data-act="tab" data-t="ideasum" style="display:none">Tổng hợp sáng kiến</button>'
-  +'<button type="button" data-act="tab" data-t="subsum" style="display:none">Nộp báo cáo</button>'
+  +'<button type="button" data-act="tab" data-t="subsum" style="display:none">Theo dõi nộp báo cáo</button>'
   +(admin?'<button type="button" data-act="tab" data-t="admin">Quản lý</button>':'')
   +'<button type="button" data-act="to-top">Lên đầu trang ↑</button></nav>'
   +'<span class="fstat" id="foot-stat"></span></footer></div>';
@@ -3494,7 +3494,7 @@ function renderSubRes(){
 function renderSubSum(){
   const box=$('subsum-box');if(!box||!repSeesAll())return;
   if(!$('sub-res')){
-    box.innerHTML='<div class="cr-head"><h2>Tổng hợp nộp báo cáo tuần</h2><div class="ngrp"><button type="button" class="btn" data-act="sub-xlsx">Xuất Excel</button><button type="button" class="btn" data-act="sub-pdf">Xuất PDF</button></div></div>'
+    box.innerHTML='<div class="cr-head"><h2>Theo dõi nộp báo cáo tuần</h2><div class="ngrp"><button type="button" class="btn" data-act="sub-xlsx">Xuất Excel</button><button type="button" class="btn" data-act="sub-pdf">Xuất PDF</button></div></div>'
       +'<div class="weeknav" style="margin:8px 0"><button type="button" class="btn" data-act="wk-prev">‹ Tuần trước</button><div class="wk-label mono" id="sub-wk"></div><button type="button" class="btn" data-act="wk-next">Tuần sau ›</button><button type="button" class="btn link" data-act="wk-today">Tuần này</button></div>'
       +'<div class="ngrp" style="margin:8px 0"><input type="search" id="sub-q" placeholder="Tìm theo họ tên, tên đăng nhập…" aria-label="Tìm người" style="flex:1;min-width:14rem"><select id="sub-st" aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="ontime">Đúng hạn</option><option value="late">Nộp muộn</option><option value="unsub">Chưa nộp (gồm quá hạn)</option><option value="over">Quá hạn, chưa nộp</option></select><select id="sub-org" aria-label="Lọc theo đơn vị"></select></div>'
       +'<div id="sub-res"></div>';
