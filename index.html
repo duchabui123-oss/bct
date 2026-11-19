@@ -601,7 +601,7 @@ async function boot(){
   /* chưa dán luật 1.31 thì chưa đọc được danh mục đơn vị: bỏ qua im lặng, không báo lỗi */
   unsubs.push(onSnapshot(collection(db,'orgs'),snap=>{
     S.orgs=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
-    fillOrgSelects();renderCatalog('orgs');renderAdminUsers();
+    fillOrgSelects();renderCatalog('orgs');renderCatalog('systems');renderCatalog('types');renderAdminUsers();renderQuickSelects();renderReport();
   },()=>{}));
   unsubs.push(listen(collection(db,'types'),snap=>{
     S.types=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byOrder);
@@ -708,7 +708,7 @@ function buildShell(){
   +'<div class="toolbar"><div class="weeknav"><button type="button" class="btn" data-act="wk-prev">‹ Tuần trước</button><div class="wk-label mono" id="wk-label"></div>'
   +'<button type="button" class="btn" data-act="wk-next">Tuần sau ›</button><button type="button" class="btn link" id="wk-today" data-act="wk-today">Tuần này</button></div>'
   +'<label class="who">Xem báo cáo của <select id="who"></select></label><label class="who" id="wg-l" hidden>Nhóm <select id="w-group"></select></label>'
-  +'<div class="seg" role="group" aria-label="Kiểu xem"><button type="button" data-act="view" data-v="system" aria-pressed="true">Theo hệ thống</button><button type="button" data-act="view" data-v="day" aria-pressed="false">Theo ngày</button></div>'
+  +'<div class="seg" role="group" aria-label="Kiểu xem"><button type="button" data-act="view" data-v="system" data-slt="Theo {s}" aria-pressed="true">Theo hệ thống</button><button type="button" data-act="view" data-v="day" aria-pressed="false">Theo ngày</button></div>'
   +'<button type="button" class="btn" data-act="copy">Sao chép báo cáo</button>'
   +'<button type="button" class="btn" data-act="sum-open" data-k="week">Bảng tổng hợp</button><button type="button" class="btn" data-act="x-xlsx" data-k="week">Xuất Excel</button><button type="button" class="btn" data-act="x-pdf" data-k="week">Xuất PDF</button></div>'
 
@@ -717,7 +717,7 @@ function buildShell(){
   +'<section id="sub-card" class="subcard" hidden></section>'
   +'<form id="quick" class="panel"><h2 id="q-heading">Thêm việc</h2><div class="qg">'
   +'<label class="field"><span>Ngày</span><select id="q-date"></select><input id="q-dateother" type="date" hidden aria-label="Chọn ngày khác"></label>'
-  +'<label class="field"><span>Hệ thống</span><select id="q-system"></select></label>'
+  +'<label class="field"><span data-slt="{S}">Hệ thống</span><select id="q-system"></select></label>'
   +'<label class="field"><span>Loại việc</span><select id="q-type"></select></label>'
   +'<label class="field"><span>Trạng thái</span><select id="q-status">'+STATUS.map(s=>'<option value="'+s.id+'">'+s.label+'</option>').join('')+'</select></label>'
   +'<label class="field"><span>Số lượng</span><div class="qq"><input id="q-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Không bắt buộc" aria-label="Số lượng (không bắt buộc)"><select id="q-unit" aria-label="Đơn vị tính"></select></div></label></div>'
@@ -981,7 +981,7 @@ function buildAdmin(){
 }
 
 /* ===== Dữ liệu hiển thị ===== */
-const sysName=id=>{const s=S.systems.find(x=>x.id===id);return s?s.name:'(Hệ thống đã xóa)'};
+const sysName=id=>{const s=S.systems.find(x=>x.id===id);return s?s.name:delSys()};
 const typeName=id=>{const t=S.types.find(x=>x.id===id);return t?t.name:'Khác'};
 const userName=uid=>{const u=S.users.find(x=>x.uid===uid);return u?(u.name||u.username):'(Không rõ)'};
 const sysIdx=id=>{const i=S.systems.findIndex(x=>x.id===id);return i<0?99:i};
@@ -1019,6 +1019,7 @@ function renderWho(){
 }
 function renderQuickSelects(){
   if(!$('q-date'))return;
+  applyLabels();
   const days=Array.from({length:7},(_,i)=>{const d=iso(addDays(S.weekStart,i));return '<option value="'+d+'">'+dayName(i)+' · '+dm(d)+'</option>'}).join('')+'<option value="__other">Ngày khác (tuần khác)…</option>';
   const dsel=$('q-date');dsel.innerHTML=days;$('q-dateother').hidden=true;
   const t=iso(vnNow()),a=iso(S.weekStart),b=iso(addDays(S.weekStart,6));
@@ -1028,13 +1029,13 @@ function renderQuickSelects(){
   const act=l=>l.filter(x=>x.active!==false);
   const fill=(id,list,cur)=>{const s=$(id);s.innerHTML=list.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
     if(cur&&list.some(x=>x.id===cur))s.value=cur;};
-  const mine=allowedSys(),allS=act(S.systems),mineL=mine?allS.filter(x=>mine.has(x.id)):[];
+  const mine=allowedSys(),allS=visOrg(act(S.systems)),mineL=mine?allS.filter(x=>mine.has(x.id)):[];
   fill('q-system',mineL.length?mineL:allS,S.qSystem||$('q-system').value);
-  fill('q-type',act(S.types),S.qType||$('q-type').value);
+  fill('q-type',visOrg(act(S.types)),S.qType||$('q-type').value);
   {const ct=curTpl();qSysBlank(!!(ct&&!ct.system&&!S.qSysPicked))}
   $('q-status').value=S.qStatus;
   setQuickUnit($('q-unit').value);
-  const hsT=hiddenSys(),tl=act(S.tpls).filter(x=>!hsT.has(x.system)&&tplForGroup(x,myGroup())),sel=$('q-tpl');
+  const hsT=hiddenSys(),tl=act(S.tpls).filter(x=>!hsT.has(x.system)&&tplForGroup(x,myGroup())&&tplOrgOk(x)),sel=$('q-tpl');
   $('q-tplf').hidden=!tl.length;
   const o1=x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>';
   let og='';const used=new Set();
@@ -1117,15 +1118,15 @@ function bySystem(list){
   const ordered=S.systems.filter(s=>s.active!==false).concat(S.systems.filter(s=>s.active===false));
   ordered.forEach(s=>{const l=list.filter(t=>t.system===s.id);if(l.length){groups.push({id:s.id,name:s.name,list:l});seen.add(s.id)}});
   const rest=list.filter(t=>!seen.has(t.system));
-  if(rest.length)groups.push({id:'_x',name:'(Hệ thống đã xóa)',list:rest});
+  if(rest.length)groups.push({id:'_x',name:delSys(),list:rest});
   let h=groups.map(g=>{
     const c=counts(g.list),pct=Math.round(c.done*100/g.list.length);
     return '<details class="sys" data-sys="'+esc(g.id)+'"'+(S.expanded.has(g.id)?' open':'')+'><summary><h2>'+esc(g.name)+'</h2>'
      +'<span class="head-end">'+(c.block?'<span class="flag">'+c.block+' vướng</span>':'')+'<span class="mini" aria-hidden="true"><i style="width:'+pct+'%"></i></span>'
      +'<span class="count mono">'+c.done+'/'+g.list.length+'</span></span></summary><div>'+g.list.map(t=>row(t,'system')).join('')+'</div></details>';
   }).join('');
-  if(groups.length)h='<p class="listhint">Bấm vào tên từng hệ thống bên dưới để xem chi tiết công việc.</p>'+h;
-  const hs=hiddenSys(list),empty=S.systems.filter(s=>s.active!==false&&!seen.has(s.id)&&!hs.has(s.id)).map(s=>s.name);
+  if(groups.length)h='<p class="listhint">Bấm vào tên từng '+sl()+' bên dưới để xem chi tiết công việc.</p>'+h;
+  const hs=hiddenSys(list),empty=visOrg(S.systems).filter(s=>s.active!==false&&!seen.has(s.id)&&!hs.has(s.id)).map(s=>s.name);
   if(groups.length&&empty.length)h+='<p class="muted">Chưa có việc: '+empty.map(esc).join(', ')+'.</p>';
   return h;
 }
@@ -1157,7 +1158,7 @@ function renderReport(){
   else if(!n){el.innerHTML='<div class="emptybox">Tuần này chưa có việc nào'+(S.who===S.user.uid?'. Hãy thêm việc đầu tiên ở khung phía trên.':'.')+'</div>'}
   else el.innerHTML=S.view==='system'?bySystem(list):byDay(list);
   renderSummary('week');
-  renderSub();if(S.tab==='subsum')renderSubSum();
+  applyLabels();renderSub();if(S.tab==='subsum')renderSubSum();
 }
 function noteOf(uid){return S.notes.find(n=>n.uid===uid)||{}}
 function renderNotes(){
@@ -1239,13 +1240,13 @@ function startEdit(t){
 }
 /* Việc dùng chung (không gắn hệ thống): ô Hệ thống để trống để người dùng tự chọn. */
 function qSysBlank(on){const s=$('q-system');if(!s)return;const o=[...s.options].find(x=>x.value==='');
-  if(on){if(!o){const b=document.createElement('option');b.value='';b.textContent='— Chọn hệ thống —';s.insertBefore(b,s.firstChild)}s.value=''}
+  if(on){if(!o){const b=document.createElement('option');b.value='';b.textContent='— Chọn '+sl()+' —';s.insertBefore(b,s.firstChild)}s.value=''}
   else if(o)o.remove()}
 async function submitQuick(){
   const tp=curTpl(),title=tp?tp.name:$('q-title').value.trim(),msg=$('q-msg');
   if(!title){msg.className='msg';msg.textContent='Hãy nhập đầu việc.';$('q-title').focus();return}
-  if(!$('q-system').value&&$('q-system').options.length&&[...$('q-system').options].some(o=>o.value==='')){msg.className='msg';msg.textContent='Việc dùng chung: hãy chọn hệ thống.';$('q-system').focus();return}
-  if(!$('q-system').value||!$('q-type').value){msg.className='msg';msg.textContent='Chưa có hệ thống hoặc loại việc. Hãy nhờ quản trị viên thêm.';return}
+  if(!$('q-system').value&&$('q-system').options.length&&[...$('q-system').options].some(o=>o.value==='')){msg.className='msg';msg.textContent='Việc dùng chung: hãy chọn '+sl()+'.';$('q-system').focus();return}
+  if(!$('q-system').value||!$('q-type').value){msg.className='msg';msg.textContent='Chưa có '+sl()+' hoặc loại việc. Hãy nhờ quản trị viên thêm.';return}
   const dv=$('q-date').value==='__other'?$('q-dateother').value:$('q-date').value;
   if(!dv){msg.className='msg';msg.textContent='Hãy chọn ngày thực hiện.';return}
   const qv=(tp&&tp.noQty)?'':$('q-qty').value.trim();let qty=null;
@@ -1587,7 +1588,7 @@ function reportText(){
     l.forEach(t=>L.push(lineOf(t)));L.push('');
   });
   const rest=list.filter(t=>!seen.has(t.system));
-  if(rest.length){k++;L.push(k+'. (Hệ thống đã xóa)');rest.forEach(t=>L.push(lineOf(t)));L.push('')}
+  if(rest.length){k++;L.push(k+'. '+delSys());rest.forEach(t=>L.push(lineOf(t)));L.push('')}
   const ids=S.who==='all'?S.users.map(u=>u.uid):[S.who];
   ids.forEach(uid=>{
     const d=noteOf(uid);if(!(d.highlights||d.issues||d.plan))return;
@@ -1677,14 +1678,14 @@ function renderStats(){
   let h='<section class="summary"><div class="sum-line"><span class="mono">'+n+'</span> việc · <span class="mono">'+c.done+'</span> hoàn thành (<span class="mono">'+pct+'%</span>) · <span class="mono">'+days+'</span> ngày có việc</div>'
     +'<div class="bar-s" role="img" aria-label="Tỷ lệ trạng thái trong tháng">'+STATUS.map(s=>c[s.id]?'<i class="b-'+s.id+'" style="width:'+(c[s.id]*100/n)+'%"></i>':'').join('')+'</div>'
     +'<ul class="legend">'+STATUS.map(s=>'<li><span class="dot b-'+s.id+'"></span>'+s.label+' <span class="mono">'+c[s.id]+'</span></li>').join('')+'</ul></section>';
-  h+='<p class="listhint">Bấm vào tên từng mục bên dưới để xem chi tiết thống kê.</p><div class="list">'+statBox('st-sys','Theo hệ thống',statTable('Hệ thống',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)')));
+  h+='<p class="listhint">Bấm vào tên từng mục bên dưới để xem chi tiết thống kê.</p><div class="list">'+statBox('st-sys','Theo '+sl(),statTable(SL(),groupRows(list,'system',S.systems,delSys())));
   h+=statBox('st-type','Theo loại việc',statTable('Loại việc',groupRows(list,'type',S.types,'Khác')));
   const qv=qtyView(list,true);
   const checked=c=>qv.isDefault?c.n>0:qv.sel.has(c.key);
   h+=statBox('st-qty','Số lượng theo đầu việc','<div class="qf">'
-    +'<details id="qf-sdet"'+(S.qfSOpen?' open':'')+'><summary>Chọn hệ thống ('+(S.qfSys.size?S.qfSys.size+' đã chọn':'tất cả hệ thống')+')</summary>'
-    +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qfs-all">Chọn tất cả hệ thống</button></div>'
-    +'<div class="qf-list">'+S.systems.filter(x=>!hiddenSys(list).has(x.id)).map(x=>'<label class="qf-item"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(!S.qfSys.size||S.qfSys.has(x.id)?' checked':'')+'><span>'+esc(x.name)+'</span></label>').join('')+'</div></details>'
+    +'<details id="qf-sdet"'+(S.qfSOpen?' open':'')+'><summary>Chọn '+sl()+' ('+(S.qfSys.size?S.qfSys.size+' đã chọn':'tất cả '+sl())+')</summary>'
+    +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qfs-all">Chọn tất cả '+sl()+'</button></div>'
+    +'<div class="qf-list">'+S.systems.filter(x=>!hiddenSys(list).has(x.id)&&(orgOk(x,myOrg())||!myOrg()||isAdminUser()||list.some(t=>t.system===x.id))).map(x=>'<label class="qf-item"><input type="checkbox" data-qfs="'+esc(x.id)+'"'+(!S.qfSys.size||S.qfSys.has(x.id)?' checked':'')+'><span>'+esc(x.name)+'</span></label>').join('')+'</div></details>'
     +'<details id="qf-det"'+(S.qfOpen?' open':'')+'><summary>Chọn đầu việc ('+(qv.isDefault?'mặc định: các việc đã thực hiện':qv.sel.size+' đã chọn')+')</summary>'
     +'<div class="actions" style="margin:8px 0"><button type="button" class="btn sm" data-act="qf-default">Mặc định</button><button type="button" class="btn sm" data-act="qf-all">Chọn tất cả</button><button type="button" class="btn sm" data-act="qf-none">Bỏ chọn tất cả</button></div>'
     +'<div class="qf-list">'+(qv.catalog.map(c=>'<label class="qf-item"><input type="checkbox" data-qfk="'+esc(c.key)+'"'+(checked(c)?' checked':'')+'><span>'+esc(c.name)+' <span class="muted">('+c.n+' lần)</span></span></label>').join('')||'<span class="muted">Chưa có đầu việc nào.</span>')+'</div></details></div>'
@@ -1710,7 +1711,7 @@ function statsText(){
     rows.forEach(r=>{const cc=counts(r.list),k=r.list.length;L.push('- '+r.name+': '+k+' việc (hoàn thành '+cc.done+', đang làm '+cc.doing+', chờ '+cc.wait+', vướng '+cc.block+') – '+Math.round(cc.done*100/k)+'%')});
     L.push('');
   };
-  sect('THEO HỆ THỐNG',groupRows(list,'system',S.systems,'(Hệ thống đã xóa)'));
+  sect('THEO '+SL().toUpperCase(),groupRows(list,'system',S.systems,delSys()));
   sect('THEO LOẠI VIỆC',groupRows(list,'type',S.types,'Khác'));
   const qv=qtyView(list,true);
   if(qv.rows.length){L.push('SỐ LƯỢNG THEO ĐẦU VIỆC'+(qv.sys.length?' – '+sysLabel(qv.sys):''));qv.rows.forEach(c=>L.push('- '+c.name+': '+(c.hasSum?qtyDisp(c)+(c.n?' ('+c.n+' lần ghi nhận)':''):(c.n?c.n+' lần ghi nhận':'(chưa có)'))));L.push('')}
@@ -1750,6 +1751,25 @@ const myOrg=()=>(S.profile&&S.profile.org)||'';
 const orgScope=()=>!isAdminUser()&&!!myOrg();
 const orgOfUid=uid=>{const u=S.users.find(x=>x.uid===uid);return (u&&u.org)||''};
 const orgName=id=>{const o=S.orgs.find(x=>x.id===id);return o?o.name:''};
+/* Bản 2.26: danh mục (hệ thống/dịch vụ, loại việc) theo đơn vị; đơn vị báo cáo theo Hệ thống hoặc Dịch vụ */
+const orgOk=(x,org)=>!(Array.isArray(x.orgs)&&x.orgs.length)||x.orgs.indexOf(org)>=0;
+const visOrg=l=>(!myOrg()||isAdminUser())?l:l.filter(x=>orgOk(x,myOrg()));
+const svcOrgId=id=>{const o=S.orgs.find(x=>x.id===id);return !!o&&o.reportBy==='service'};
+function sysMode(){
+  let uid=S.tab==='stats'?S.mWho:S.who;
+  if(!S.user)return 'system';
+  if(!uid||uid==='all'){
+    if((isAdminUser()||repSeesAll())&&!orgScope())return S.orgs.some(o=>o.reportBy==='service')?'mixed':'system';
+    uid=S.user.uid;
+  }
+  const u=S.users.find(x=>x.uid===uid)||(uid===S.user.uid?S.profile:null);
+  return u&&u.org&&svcOrgId(u.org)?'service':'system';
+}
+const SL=()=>({system:'Hệ thống',service:'Dịch vụ',mixed:'Hệ thống/Dịch vụ'})[sysMode()];
+const sl=()=>SL().toLowerCase();
+const delSys=()=>'('+SL()+' đã xóa)';
+function applyLabels(){document.querySelectorAll('[data-slt]').forEach(e=>{const t=e.dataset.slt.replace(/\{S\}/g,SL()).replace(/\{s\}/g,sl());if(e.textContent!==t)e.textContent=t})}
+const tplOrgOk=x=>{const o=myOrg();if(!o||isAdminUser())return true;const sy=S.systems.find(y=>y.id===x.system),ty=S.types.find(y=>y.id===x.type);return (!sy||orgOk(sy,o))&&(!ty||orgOk(ty,o))};
 const idCanEdit=i=>isAdminUser()||(!!S.user&&i.uid===S.user.uid);
 const crCanEdit=c=>isAdminUser()||(!!S.user&&c.uid===S.user.uid);
 function applyModules(){
@@ -1848,7 +1868,7 @@ function summaryBlocks(list,grp){
     blocks.push(mkBlock(gname,byType(tplItems(arr,tasks).concat(extraItems(tasks,tk)))));
   });
   const lost=list.filter(t=>!known.has(t.system));
-  if(lost.length)blocks.push(mkBlock('(Hệ thống đã xóa)',byType(extraItems(lost,new Set()))));
+  if(lost.length)blocks.push(mkBlock(delSys(),byType(extraItems(lost,new Set()))));
   return blocks;
 }
 function summaryDocs(x){
@@ -2101,9 +2121,9 @@ const qtyCells=c=>[c.name,c.n?c.n:'',c.hasSum?(c.multi?c.multiText:Math.round(c.
 const dmy=s=>{const p=String(s).split('-');return p[2]+'/'+p[1]+'/'+p[0]};
 const wdName=s=>DAYS[(parse(s).getDay()+6)%7];
 const stLabel=id=>ST[id]?ST[id].label:'Chờ';
-const sysGroupOf=id=>{const sy=S.systems.find(x=>x.id===id);return sy?sysGroup(sy):'(Hệ thống đã xóa)'};
+const sysGroupOf=id=>{const sy=S.systems.find(x=>x.id===id);return sy?sysGroup(sy):delSys()};
 function taskTableRows(list,all,withGroup){
-  const head=['Ngày','Thứ','Hệ thống','Loại việc','Đầu việc','Số lượng','Đơn vị tính','Kết quả','Trạng thái','Mã phiếu/Eof/Email','Ghi chú'].concat(all?['Người thực hiện']:[]).concat(withGroup?['Nhóm hệ thống']:[]);
+  const head=['Ngày','Thứ',SL(),'Loại việc','Đầu việc','Số lượng','Đơn vị tính','Kết quả','Trạng thái','Mã phiếu/Eof/Email','Ghi chú'].concat(all?['Người thực hiện']:[]).concat(withGroup?['Nhóm hệ thống']:[]);
   const rows=list.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(sysIdx(a.system)-sysIdx(b.system))||((a.ts||0)-(b.ts||0)))
     .map(t=>[dmy(t.date),wdName(t.date),sysName(t.system),typeName(t.type),t.title||'',hasQty(t)?t.qty:'',hasQty(t)?unitOf(t):'',t.result||'',stLabel(t.status),t.ticket||'',t.note||''].concat(all?[userName(t.uid)]:[]).concat(withGroup?[sysGroupOf(t.system)]:[]));
   return {head:head,rows:rows};
@@ -2112,7 +2132,7 @@ function groupStat(list,key,items,rest){
   return groupRows(list,key,items,rest).map(r=>{const c=counts(r.list),n=r.list.length;return {name:r.name,n:n,c:c,p:n?Math.round(c.done*100/n):0}});
 }
 function statSets(x){
-  const sets=[['Theo hệ thống','Hệ thống',groupStat(x.list,'system',S.systems,'(Hệ thống đã xóa)')],['Theo loại việc','Loại việc',groupStat(x.list,'type',S.types,'Khác')]];
+  const sets=[['Theo '+sl().replace('/',' - '),SL(),groupStat(x.list,'system',S.systems,delSys())],['Theo loại việc','Loại việc',groupStat(x.list,'type',S.types,'Khác')]];
   if(x.all)sets.push(['Theo người','Người báo cáo',groupStat(x.list,'uid',S.users.map(u=>({id:u.uid,name:u.name||u.username})),'(Không rõ)')]);
   return sets;
 }
@@ -2158,7 +2178,7 @@ function buildXlsx(x){
   sheets.push(pivotSheet(x.list));
   statSets(x).forEach(s=>sheets.push({name:s[0],rows:[statHead(s[1])].concat(s[2].map(statRow)),headRows:[0],freeze:1,widths:[34,9,12,11,8,8,20]}));
   const qv=qtyView(x.list,x.kind==='month',x.kind);
-  if(qv.rows.length||!qv.isDefault)sheets.push({name:'Số lượng theo đầu việc',rows:[['Hệ thống',qv.sys.length?sysLabel(qv.sys):'Tất cả hệ thống'],[],['Đầu việc','Số lần ghi nhận','Tổng số lượng','Đơn vị tính']].concat(qv.rows.map(qtyCells)),headRows:[2],freeze:3,widths:[56,16,16,14]});
+  if(qv.rows.length||!qv.isDefault)sheets.push({name:'Số lượng theo đầu việc',rows:[[SL(),qv.sys.length?sysLabel(qv.sys):'Tất cả '+sl()],[],['Đầu việc','Số lần ghi nhận','Tổng số lượng','Đơn vị tính']].concat(qv.rows.map(qtyCells)),headRows:[2],freeze:3,widths:[56,16,16,14]});
   if(x.kind==='week'){
     const nr=[['Người báo cáo','Kết quả nổi bật','Tồn đọng, rủi ro, cần hỗ trợ','Kế hoạch tuần sau']];
     noteIds(x).forEach(uid=>{const d=noteOf(uid);if(d.highlights||d.issues||d.plan)nr.push([userName(uid),d.highlights||'',d.issues||'',d.plan||''])});
@@ -2168,7 +2188,7 @@ function buildXlsx(x){
 }
 function buildPrintHtml(x){
   const c=counts(x.list),n=x.list.length,pct=n?Math.round(c.done*100/n):0;
-  const TKW={'Ngày':9,'Thứ':6,'Hệ thống':9,'Loại việc':17,'Đầu việc':17,'Số lượng':6,'Đơn vị tính':8,'Kết quả':5,'Trạng thái':9,'Mã phiếu/Eof/Email':11,'Ghi chú':24,'Người thực hiện':9,'Nhóm hệ thống':8};
+  const TKW={'Ngày':9,'Thứ':6,[SL()]:9,'Loại việc':17,'Đầu việc':17,'Số lượng':6,'Đơn vị tính':8,'Kết quả':5,'Trạng thái':9,'Mã phiếu/Eof/Email':11,'Ghi chú':24,'Người thực hiện':9,'Nhóm hệ thống':8};
   const colg=(head,cls)=>{if(cls!=='tk')return '';const w=head.map(h=>TKW[h]||8),t=w.reduce((a,b)=>a+b,0);return '<colgroup>'+w.map(v=>'<col style="width:'+(v*100/t).toFixed(2)+'%">').join('')+'</colgroup>'};
   const tbl=(head,rows,cls)=>'<table'+(cls?' class="'+cls+'"':'')+'>'+colg(head,cls)+'<thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v).replace(/\n/g,'<br>')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
   let h='<h1>'+esc(x.title)+'</h1><p class="meta">'+esc(x.period)+' · '+esc(x.who)+' · Ngày xuất '+full(vnNow())+'</p>'
@@ -2182,9 +2202,9 @@ function buildPrintHtml(x){
   {
     let k=0;const seen=new Set();
     S.systems.forEach(sy=>{const l=x.list.filter(t=>t.system===sy.id);if(!l.length)return;seen.add(sy.id);k++;const tt=taskTableRows(l,x.all);
-      h+='<h2>'+k+'. '+esc(sy.name)+' ('+l.length+' việc)</h2>'+tbl(tt.head.filter(v=>v!=='Hệ thống'),tt.rows.map(r=>r.filter((v,i)=>i!==2)),'tk')});
+      h+='<h2>'+k+'. '+esc(sy.name)+' ('+l.length+' việc)</h2>'+tbl(tt.head.filter(v=>v!==SL()),tt.rows.map(r=>r.filter((v,i)=>i!==2)),'tk')});
     const rest=x.list.filter(t=>!seen.has(t.system));
-    if(rest.length){const tt=taskTableRows(rest,x.all);h+='<h2>(Hệ thống đã xóa)</h2>'+tbl(tt.head,tt.rows,'tk')}
+    if(rest.length){const tt=taskTableRows(rest,x.all);h+='<h2>'+esc(delSys())+'</h2>'+tbl(tt.head,tt.rows,'tk')}
   }
   return '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(x.file)+'</title><style>'
     +'@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px/16px "Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:0}'
@@ -2525,7 +2545,7 @@ function crBadges(){
 function syncWide(){const r=root&&root.firstElementChild;if(!r)return;r.classList.toggle('wideon',!!document.querySelector('#tab-cr.wide:not([hidden]),#tab-ideas.wide:not([hidden])'))}
 function renderCr(){if(!$('cr-list'))return;const al=$('cr-alert');if(al)al.innerHTML=S.crNoRule||!S.crLoaded?'':crAlertHtml();crBadges();crAutoLoad();const tb=$('tab-cr');if(tb)tb.classList.toggle('wide',S.crView==='table');syncWide();renderCrFilters();renderCrList()}
 function crSysOpts(sel){
-  const al=allowedSys();let l=S.systems.filter(x=>x.active!==false&&(!al||al.has(x.id)));
+  const al=allowedSys();let l=visOrg(S.systems.filter(x=>x.active!==false&&(!al||al.has(x.id))));
   if(sel&&!l.some(x=>x.id===sel)){const o=S.systems.find(x=>x.id===sel);if(o)l=l.concat([o])}
   return l.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
 }
@@ -2549,7 +2569,7 @@ async function crSave(){
   const title=$('cr-title').value.trim(),sys=$('cr-sys').value;
   if(!code){msg.textContent='Hãy nhập mã phiếu, ví dụ IT360-163228.';$('cr-code').focus();return}
   if(!title){msg.textContent='Hãy nhập nội dung phiếu.';$('cr-title').focus();return}
-  if(!sys){msg.textContent='Hãy chọn hệ thống.';return}
+  if(!sys){msg.textContent='Hãy chọn '+sl()+'.';return}
   if(link&&!/^https?:\/\//i.test(link)){msg.textContent='Đường dẫn phải bắt đầu bằng http:// hoặc https://';$('cr-link').focus();return}
   const st=$('cr-status').value,cd=$('cr-created').value,rd=$('cr-review').value,dd=$('cr-due').value;let dn=$('cr-done').value;
   if(st==='done'&&!dn)dn=iso(vnNow());if(st!=='done')dn='';
@@ -2663,7 +2683,7 @@ function buildCr(){
   +'<form id="cr-form" class="crf" hidden autocomplete="off"><h3 id="cr-ftitle">Thêm phiếu CR/SR</h3><div class="cr-form">'
   +f('','Mã phiếu IT360 *','<input id="cr-code" maxlength="200" placeholder="IT360-163228 (hoặc dán đường dẫn phiếu)">')
   +f('','Loại','<select id="cr-kind"><option value="CR">CR</option><option value="SR">SR</option></select>')
-  +f('','Hệ thống *','<select id="cr-sys"></select>')
+  +f('','Hệ thống / Dịch vụ *','<select id="cr-sys"></select>')
   +f('','Trạng thái','<select id="cr-status"></select>')
   +f('','Nội dung *','<input id="cr-title" maxlength="500" placeholder="Nội dung phiếu">','wide')
   +f('','Ngày tạo','<input id="cr-created" type="date">')
@@ -2973,7 +2993,8 @@ function renderCatalog(kind){
     +'<button type="button" class="btn sm" data-act="cat-move" data-k="'+kind+'" data-id="'+esc(x.id)+'" data-d="1"'+(i===list.length-1?' disabled':'')+' aria-label="Xuống">↓</button>'
     +'<button type="button" class="btn sm" data-act="cat-toggle" data-k="'+kind+'" data-id="'+esc(x.id)+'">'+(x.active===false?'Hiện':'Ẩn')+'</button>'
     +'<button type="button" class="btn sm" data-act="cat-del" data-k="'+kind+'" data-id="'+esc(x.id)+'">Xóa</button>'
-    +(kind==='orgs'?'<div class="usys"><b>Người dùng</b> '+S.users.filter(u=>u.org===x.id).length+' người</div>':'')
+    +(kind==='orgs'?'<div class="usys"><b>Người dùng</b> '+S.users.filter(u=>u.org===x.id).length+' người</div><div class="usys"><b>Báo cáo theo</b> <select data-orgrb="'+esc(x.id)+'" aria-label="Báo cáo theo"><option value="">Hệ thống</option><option value="service"'+(x.reportBy==='service'?' selected':'')+'>Dịch vụ</option></select> <small class="muted">đổi nhãn Hệ thống thành Dịch vụ cho người của đơn vị này</small></div>':'')
+    +((kind==='systems'||kind==='types')?'<div class="usys"><b>Dành cho đơn vị</b> '+msel('so:'+kind+':'+x.id,S.orgs.filter(o=>o.active!==false||(x.orgs||[]).indexOf(o.id)>=0),new Set(x.orgs||[]),y=>'data-corg="'+kind+'" data-cid="'+esc(x.id)+'" data-oid="'+esc(y.id)+'"','Tất cả đơn vị')+'</div>':'')
     +(kind==='groups'?'<div class="usys"><b>Thành viên</b> '+msel('gm:'+x.id,S.users.filter(u=>u.role!=='admin'&&(u.active!==false||groupsOf(u).indexOf(x.id)>=0)).map(u=>({id:u.uid,name:(u.name||u.username)+(u.unit?' – '+u.unit:'')})),new Set(S.users.filter(u=>groupsOf(u).indexOf(x.id)>=0).map(u=>u.uid)),y=>'data-gmem="'+esc(x.id)+'" data-uid="'+esc(y.id)+'"','— Chưa có —')+'</div><div class="usys"><b>Hệ thống mặc định</b> '+msel('gs:'+x.id,S.systems.filter(y=>y.active!==false),new Set(x.systems||[]),y=>'data-gsys="'+esc(x.id)+'" data-sid="'+esc(y.id)+'"','— Tất cả hệ thống —',true)+'</div>':'')
     +'</div>').join('')
     ||'<p class="muted">Chưa có mục nào.</p>';
@@ -3698,13 +3719,14 @@ root.addEventListener('click',async e=>{
     if(act==='np-ins'){const x=(S.npList||[]).find(y=>y.id===b.dataset.id);if(x){npInsert(x.name);npClose()}return}
     if(act==='ms-bulk'){
       const d=b.closest('details.msel'),key=b.dataset.mk,all=[...d.querySelectorAll('.msel-p input[type=checkbox]')];
-      const idOf=i=>i.dataset.sid||i.dataset.gid||i.dataset.uid||i.value;
+      const idOf=i=>i.dataset.sid||i.dataset.gid||i.dataset.uid||i.dataset.oid||i.value;
       const vis=all.filter(i=>!i.parentNode.hidden),cur=new Set(all.filter(i=>i.checked).map(idOf));
       vis.forEach(i=>b.dataset.mode==='all'?cur.add(idOf(i)):cur.delete(idOf(i)));
       if(key==='u-s'||key==='u-g'){all.forEach(i=>{i.checked=cur.has(idOf(i))});const f=all[0];if(f)f.dispatchEvent(new Event('change',{bubbles:true}));return}
       try{
         if(key.indexOf('us:')===0)await updateDoc(doc(db,'users',key.slice(3)),{systems:[...cur]});
         else if(key.indexOf('gs:')===0)await updateDoc(doc(db,'groups',key.slice(3)),{systems:[...cur]});
+        else if(key.indexOf('so:')===0){const q=key.split(':');await updateDoc(doc(db,q[1],q[2]),{orgs:[...cur]})}
         else if(key.indexOf('gm:')===0){const gid=key.slice(3);const bt=writeBatch(db);let nn=0;
           S.users.forEach(u=>{const has=groupsOf(u).indexOf(gid)>=0,want=cur.has(u.uid);if(has===want)return;
             const g=new Set(groupsOf(u));want?g.add(gid):g.delete(gid);if(g.size>5)return;
@@ -3948,6 +3970,14 @@ root.addEventListener('change',async e=>{
     if(t.matches&&t.matches('select[data-status]')){
       const task=S.tasks.find(x=>x.id===t.dataset.status);if(!task||!isMine(task)){renderReport();return}
       S.expanded.clear();try{await updateDoc(doc(db,'tasks',task.id),{status:t.value,upd:Date.now()});tplReset()}catch(err){flash(fsMsg(err));renderReport()}return;
+    }
+    if(t.matches&&t.matches('input[data-corg]')){
+      const k=t.dataset.corg,it=S[k].find(x=>x.id===t.dataset.cid);if(!it)return;
+      const n=new Set(it.orgs||[]);t.checked?n.add(t.dataset.oid):n.delete(t.dataset.oid);
+      try{await updateDoc(doc(db,k,it.id),{orgs:[...n]})}catch(err){flash(fsMsg(err));renderCatalog(k)}return;
+    }
+    if(t.matches&&t.matches('select[data-orgrb]')){
+      try{await updateDoc(doc(db,'orgs',t.dataset.orgrb),{reportBy:t.value})}catch(err){flash(fsMsg(err));renderCatalog('orgs')}return;
     }
     if(t.matches&&t.matches('input[data-gsys]')){
       const gid=t.dataset.gsys,g=S.groups.find(x=>x.id===gid);if(!g)return;
